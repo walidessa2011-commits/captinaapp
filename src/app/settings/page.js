@@ -19,6 +19,12 @@ export default function SettingsPage() {
     const [user, loadingAuth] = useAuthState(auth);
     const [notifications, setNotifications] = React.useState(true);
 
+    React.useEffect(() => {
+        if (!loadingAuth && !user) {
+            router.push('/login');
+        }
+    }, [user, loadingAuth, router]);
+
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
@@ -31,12 +37,6 @@ export default function SettingsPage() {
             </div>
         );
     }
-
-    React.useEffect(() => {
-        if (!loadingAuth && !user) {
-            router.push('/login');
-        }
-    }, [user, loadingAuth, router]);
 
     if (!user) {
         return null;

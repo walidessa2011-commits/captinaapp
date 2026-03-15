@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
 import { 
     ChevronRight, ChevronLeft, MapPin, Home, Building, 
@@ -14,7 +14,7 @@ import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Link from 'next/link';
 
-export default function Booking() {
+function BookingContent() {
     const { t, language } = useApp();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -633,5 +633,17 @@ export default function Booking() {
                 )}
             </AnimatePresence>
         </div>
+    );
+}
+
+export default function Booking() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-slate-50 dark:bg-[#001f3f] flex items-center justify-center">
+                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+            </div>
+        }>
+            <BookingContent />
+        </Suspense>
     );
 }
