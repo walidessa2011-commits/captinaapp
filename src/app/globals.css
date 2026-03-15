@@ -3,20 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --primary: #ff0000; /* Pure Red */
-  --primary-light: #ff3333;
-  --secondary: #ff8c00;
-  --background: #ffffff; /* Pure White */
-  --foreground: #020617; /* Dark slate */
+  --primary: #2279ec; /* The vibrant blue from the design */
+  --primary-light: #e8f1ff;
+  --secondary: #ffcc00;
+  --background: #f8fafc;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --border: #f1f5f9;
+  --border: #e2e8f0;
 }
 
 .dark {
-  --background: #0a0f1a; /* Premium Navy Dark */
+  --background: #0f172a;
   --foreground: #f8fafc;
-  --card: #161b22;
-  --border: #21262d;
+  --card: #1e293b;
+  --border: #334155;
 }
 
 body {
@@ -24,7 +24,6 @@ body {
   background: var(--background);
   color: var(--foreground);
   overflow-x: hidden;
-  letter-spacing: -0.01em;
 }
 
 .glass-card {
@@ -54,25 +53,20 @@ body {
 }
 
 .text-glow {
-  text-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+  text-shadow: 0 0 20px rgba(0, 134, 195, 0.3);
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0f1a;
+  background: #f1f1f1;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #ff0000;
+  background: #0086c3;
   border-radius: 10px;
-  border: 3px solid #0a0f1a;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #ff3333;
 }
 
 @keyframes float {
@@ -91,13 +85,4 @@ body {
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }

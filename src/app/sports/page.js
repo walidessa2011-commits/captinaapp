@@ -1,121 +1,96 @@
 "use client";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Dumbbell, Award, Target, Users, Star, Trophy, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Dumbbell, Award, Target, Users, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
 
 export default function Sports() {
     const { t, language } = useApp();
     const sportsList = t('pageSportsData');
-    
+    const sportsColors = [
+        'from-orange-500 to-rose-600',
+        'from-blue-500 to-indigo-600',
+        'from-emerald-500 to-teal-600',
+        'from-slate-700 to-slate-900'
+    ];
     const sportsImages = [
-        'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?q=80&w=600',
-        'https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=600',
-        'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?q=80&w=600',
-        'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=600'
+        'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?q=80&w=400',
+        'https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=400',
+        'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?q=80&w=400',
+        'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400'
     ];
 
     return (
-        <div className="min-h-screen bg-[#0a0f1a] pb-40 transition-colors relative overflow-hidden">
-            {/* Background Decorative Blobs */}
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
+        <div className="min-h-screen bg-background pb-32 transition-colors">
+            {/* Header Section */}
+            <div className={`pt-20 pb-16 px-6 text-start`}>
+                <h1 className="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{t('sportsPageTitle')}</h1>
+                <p className="text-gray-500 font-bold max-w-xl">
+                    {t('sportsPageSub')}
+                </p>
+            </div>
 
-            {/* Premium Ultra-Compact Header */}
-            <section className="relative pt-4 pb-2 px-4 z-20 max-w-7xl mx-auto">
-                <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/5 pb-2"
-                >
-                    <div className="flex flex-col text-start">
-                        <h1 className="text-base md:text-lg font-black text-white tracking-tighter flex items-center gap-2">
-                            <span className="opacity-50 text-[10px] font-bold uppercase tracking-widest">{t('main') || 'الرئيسية'}</span>
-                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                            <span className="opacity-50 text-[10px] font-bold uppercase tracking-widest">{language === 'ar' ? 'الرياضات' : 'Sports'}</span>
-                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                            <span className="text-primary">{language === 'ar' ? 'رياضات كابتينة' : 'Captina Sports'}</span>
-                        </h1>
-                        <p className="text-gray-500 text-[8px] font-bold uppercase tracking-wider">
-                            {language === 'ar' ? 'تجهيزات الأبطال في مكان واحد' : "Champions' gear in one place"}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-1 md:max-w-xs justify-end">
-                        <div className="relative group flex-1 max-w-[160px]">
-                            <input
-                                type="text"
-                                placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
-                                className="w-full bg-[#1a2235]/60 backdrop-blur-3xl border border-white/5 rounded-lg py-1.5 px-3 ps-8 transition-all outline-none text-white font-bold text-[9px] text-start"
-                            />
-                            <Target className={`absolute ${language === 'en' ? 'left-2.5' : 'right-2.5'} top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 group-focus-within:text-primary transition-colors`} />
-                        </div>
-                    </div>
-                </motion.div>
-            </section>
-
-            <div className="container mx-auto px-4 py-8 relative z-10 max-w-7xl">
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+            <div className="container mx-auto px-4 relative z-20">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {sportsList.map((sport, idx) => (
                         <motion.div
                             key={sport.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.05 }}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.1 }}
                         >
-                            <Link href={`/sports/${sport.id}`} className="block group h-full">
-                                <div className="bg-[#1a2235]/30 backdrop-blur-3xl rounded-xl overflow-hidden border border-white/5 transition-all duration-500 hover:border-primary/20 relative flex flex-col h-full shadow-sm">
-                                    {/* Image Container */}
-                                    <div className="relative aspect-[4/5] overflow-hidden shrink-0">
+                            <Link href={`/sports/${sport.id}`} className="block group">
+                                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] overflow-hidden premium-shadow border border-gray-100 dark:border-white/5 transition-all duration-500 hover:-translate-y-2">
+                                    {/* Image Container with Tag */}
+                                    <div className="relative aspect-[4/3] overflow-hidden">
                                         <img 
-                                            src={sportsImages[idx] || sportsImages[0]} 
+                                            src={sportsImages[idx]} 
                                             alt={sport.name}
-                                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-70"
+                                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                         />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-transparent to-transparent opacity-90"></div>
-                                        
-                                        <div className="absolute top-1.5 right-1.5 flex flex-col gap-1 items-end">
-                                            <span className="bg-primary backdrop-blur-md text-white text-[5px] font-black px-1 py-0.5 rounded shadow-lg uppercase tracking-widest border border-white/10">
-                                               {language === 'ar' ? 'متاح' : 'ACTIVE'}
+                                        <div className="absolute top-4 left-4">
+                                            <span className="bg-primary text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg">
+                                                {idx === 0 ? 'FEATURED' : 'ACTIVE'}
                                             </span>
                                         </div>
-                                        
-                                        <div className="absolute bottom-1.5 left-2 right-2 flex justify-between items-end text-white">
-                                            <div className="flex flex-col">
-                                                <h2 className="text-[10px] font-black tracking-tight leading-tight line-clamp-1 group-hover:text-primary transition-colors">{sport.name}</h2>
-                                                <div className="flex items-center gap-0.5 mt-0.5">
-                                                    <Trophy className="w-2 h-2 text-amber-500 fill-amber-500" />
-                                                    <span className="text-[8px] font-black">4.9</span>
-                                                </div>
-                                            </div>
-                                            <div className="w-5 h-5 bg-white/10 backdrop-blur-md rounded flex items-center justify-center border border-white/10 mb-0.5">
-                                                <ChevronRight className={`w-3 h-3 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                            </div>
+                                        <div className="absolute bottom-4 right-4 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20">
+                                            <Star className="w-5 h-5 fill-white" />
                                         </div>
                                     </div>
 
                                     {/* Content Container */}
-                                    <div className="p-2 text-start flex-1 flex flex-col justify-between">
-                                        <div className="mb-2">
-                                            <p className="text-[7px] text-gray-500 font-bold leading-tight line-clamp-2 opacity-80">
-                                                {sport.description}
-                                            </p>
+                                    <div className="p-8 text-start">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h2 className="text-2xl font-black text-gray-900 dark:text-white group-hover:text-primary transition-colors">{sport.name}</h2>
+                                                <p className="text-sm font-bold text-gray-400 mt-1 flex items-center gap-1">
+                                                    <Target className="w-3 h-3" />
+                                                    {sport.stats.intensity} Training
+                                                </p>
+                                            </div>
+                                            <div className="text-end">
+                                                <p className="text-xl font-black text-primary">$199</p>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase">Per Month</p>
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                                            <div className="flex flex-col">
-                                                <span className="text-[5px] font-black text-gray-600 uppercase tracking-widest leading-none mb-0.5">{language === 'ar' ? 'المدربين' : 'COACHES'}</span>
-                                                <span className="text-[8px] font-black text-white">12+</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <div className="flex -space-x-1.5">
-                                                    {[1,2,3].map(i => (
-                                                        <div key={i} className="w-4 h-4 rounded-sm border border-[#1a2235] bg-slate-800 overflow-hidden">
-                                                            <img src={`https://i.pravatar.cc/100?u=${sport.id}${i}`} alt="user" className="w-full h-full object-cover" />
-                                                        </div>
-                                                    ))}
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium leading-relaxed mb-6 line-clamp-2">
+                                            {sport.description}
+                                        </p>
+
+                                        <div className="flex items-center justify-between pt-6 border-t border-gray-50 dark:border-white/5">
+                                            <div className="flex -space-x-2">
+                                                {[1,2,3].map(i => (
+                                                    <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 bg-gray-200 overflow-hidden">
+                                                        <img src={`https://i.pravatar.cc/100?u=${sport.id}${i}`} alt="user" />
+                                                    </div>
+                                                ))}
+                                                <div className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-800 bg-primary-light flex items-center justify-center text-[10px] font-black text-primary">
+                                                    +12
                                                 </div>
+                                            </div>
+                                            <div className="bg-gray-100 dark:bg-white/5 p-2 rounded-xl text-gray-400 group-hover:bg-primary group-hover:text-white transition-all">
+                                                <ChevronRight className="w-5 h-5" />
                                             </div>
                                         </div>
                                     </div>
