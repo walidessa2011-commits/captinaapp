@@ -17,19 +17,26 @@ export default function Contact() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#001f3f] pb-32 transition-colors duration-300">
-            {/* Header */}
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-100/50 dark:border-white/5 sticky top-0 z-40">
-                <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-                    <Link href="/" className="p-2 bg-gray-50 dark:bg-white/5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-primary/10 hover:text-primary transition-all">
-                        {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                    </Link>
-                    <h1 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">
-                        {language === 'ar' ? 'تواصل معنا' : 'Contact Us'}
-                    </h1>
-                    <div className="w-9"></div>
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] transition-colors duration-300 pb-40 overflow-hidden relative">
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[140px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-[120px] -z-0"></div>
+
+            {/* Premium Ultra-Compact Header */}
+            <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0a0f1a]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5">
+                <div className="container mx-auto px-4 h-12 flex items-center justify-between max-w-4xl">
+                    <div className="flex items-center gap-3">
+                        <Link href="/" className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
+                            {language === 'ar' ? <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" /> : <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
+                        </Link>
+                        <h1 className="text-sm font-black text-gray-900 dark:text-white tracking-tighter flex items-center gap-2">
+                            <span className="opacity-50 text-[9px] font-bold uppercase tracking-widest">{t('main') || 'الرئيسية'}</span>
+                            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-white/20"></span>
+                            <span className="text-primary">{language === 'ar' ? 'تواصل معنا' : 'Contact Us'}</span>
+                        </h1>
+                    </div>
                 </div>
-            </div>
+            </header>
 
             <div className="container mx-auto px-4 py-8 max-w-4xl">
                 <div className="grid md:grid-cols-5 gap-6">

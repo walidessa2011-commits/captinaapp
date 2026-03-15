@@ -11,45 +11,45 @@ export default function KaratePage() {
     if (!content) return null;
 
     return (
-        <div className="min-h-screen bg-white dark:bg-slate-900 pb-32 transition-colors">
-            {/* Hero Image */}
-            <div className="relative h-[40vh] md:h-[60vh] overflow-hidden">
+        <div className="min-h-screen bg-[#0a0f1a] pb-32 transition-colors relative">
+            {/* Hero Image - Compact */}
+            <div className="relative h-[25vh] md:h-[35vh] overflow-hidden">
                 <img 
                     src={content.heroImg}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover opacity-60"
                     alt={content.title}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/99 via-black/40 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-transparent to-transparent"></div>
                 
-                <Link href="/sports" className={`absolute top-6 ${language === 'en' ? 'left-6' : 'right-6'} bg-white/10 backdrop-blur-md p-3 rounded-2xl text-white border border-white/20 hover:bg-white/20 transition-all flex items-center gap-2`}>
+                <Link href="/sports" className={`absolute top-4 ${language === 'en' ? 'left-4' : 'right-4'} bg-white/10 backdrop-blur-md p-2 rounded-xl text-white border border-white/10 hover:bg-white/20 transition-all flex items-center gap-2`}>
                     {language === 'ar' ? (
                         <>
-                            <span className="font-black text-sm">{content.backText}</span>
-                            <ChevronRight className="w-5 h-5" />
+                            <span className="font-black text-[10px] uppercase tracking-widest">{content.backText}</span>
+                            <ChevronRight className="w-4 h-4" />
                         </>
                     ) : (
                         <>
-                            <ChevronLeft className="w-5 h-5" />
-                            <span className="font-black text-sm">{content.backText}</span>
+                            <ChevronLeft className="w-4 h-4" />
+                            <span className="font-black text-[10px] uppercase tracking-widest">{content.backText}</span>
                         </>
                     )}
                 </Link>
 
-                <div className={`absolute bottom-10 ${language === 'en' ? 'left-10 text-left' : 'right-10 text-right'} text-white`}>
+                <div className={`absolute bottom-6 ${language === 'en' ? 'left-6 text-left' : 'right-6 text-right'} text-white`}>
                     <motion.div
-                        initial={{ opacity: 0, y: 30 }}
+                        initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
-                        <h1 className="text-5xl md:text-8xl font-black mb-4">{content.title}</h1>
-                        <div className={`flex flex-wrap gap-4 mb-6 ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
+                        <h1 className="text-2xl md:text-5xl font-black mb-3 tracking-tighter">{content.title}</h1>
+                        <div className={`flex flex-wrap gap-2 mb-2 ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
                             {[
                                 { icon: Clock, text: language === 'ar' ? '90 دقيقة' : '90 min', color: 'text-blue-300' },
                                 { icon: Target, text: language === 'ar' ? 'تركيز وانضباط' : 'Focus & Discipline', color: 'text-blue-300' },
                                 { icon: Zap, text: language === 'ar' ? '500 سعرة' : '500 kcal', color: 'text-blue-300' }
                             ].map((item, i) => (
-                                <div key={i} className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl flex items-center gap-2 border border-white/10">
-                                    <item.icon className={`w-4 h-4 ${item.color}`} />
-                                    <span className="text-xs font-bold">{item.text}</span>
+                                <div key={i} className="bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-white/5">
+                                    <item.icon className={`w-3 h-3 ${item.color}`} />
+                                    <span className="text-[9px] font-black uppercase tracking-wider">{item.text}</span>
                                 </div>
                             ))}
                         </div>
@@ -57,37 +57,37 @@ export default function KaratePage() {
                 </div>
             </div>
 
-            <div className="container mx-auto px-4 -mt-10 relative z-10">
-                <div className="bg-white dark:bg-slate-800 rounded-[3rem] p-8 md:p-16 shadow-2xl border border-gray-50 dark:border-white/5 flex flex-col lg:flex-row gap-16">
+            <div className="container mx-auto px-4 -mt-8 relative z-10 max-w-6xl">
+                <div className="bg-[#1a2235]/60 backdrop-blur-xl rounded-3xl p-6 md:p-10 shadow-2xl border border-white/5 flex flex-col lg:flex-row gap-10">
                     <div className="lg:w-2/3 text-start">
-                        <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-6">{content.descTitle}</h2>
-                        <p className="text-xl text-gray-500 dark:text-gray-400 font-bold leading-relaxed mb-10">
+                        <h2 className="text-xl font-black text-white mb-4 tracking-tight">{content.descTitle}</h2>
+                        <p className="text-[11px] md:text-[13px] text-gray-400 font-bold leading-relaxed mb-8">
                             {content.description}
                         </p>
 
-                        <div className="grid md:grid-cols-2 gap-8 mb-12">
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-                                    <Award className="w-7 h-7 text-primary" />
+                        <div className="grid md:grid-cols-2 gap-6 mb-10">
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-black text-white flex items-center gap-2 tracking-tight">
+                                    <Award className="w-5 h-5 text-primary" />
                                     {content.benefitsTitle}
                                 </h3>
                                 {content.benefits.map((item, i) => (
-                                    <div key={i} className="flex items-center gap-4 text-gray-600 dark:text-gray-300 font-bold">
-                                        <div className="w-6 h-6 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500 flex-shrink-0">
-                                            <Shield className="w-3 h-3" />
+                                    <div key={i} className="flex items-center gap-3 text-gray-400 font-black text-[10px]">
+                                        <div className="w-5 h-5 bg-white/5 rounded-md flex items-center justify-center text-blue-500 flex-shrink-0 border border-white/5">
+                                            <Shield className="w-2.5 h-2.5" />
                                         </div>
                                         <span>{item}</span>
                                     </div>
                                 ))}
                             </div>
                             
-                            <div className="bg-blue-50/30 dark:bg-white/5 p-8 rounded-[2.5rem]">
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-6">{content.scheduleTitle}</h3>
-                                <div className="space-y-4">
+                            <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                                <h3 className="text-lg font-black text-white mb-4 tracking-tight">{content.scheduleTitle}</h3>
+                                <div className="space-y-2">
                                     {content.schedule.map((sc, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
-                                            <span className="font-bold text-gray-500 dark:text-gray-400">{sc.day}</span>
-                                            <span className="font-black text-blue-600">{sc.time}</span>
+                                        <div key={i} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                                            <span className="font-bold text-[10px] text-gray-400">{sc.day}</span>
+                                            <span className="font-black text-xs text-blue-500">{sc.time}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -95,30 +95,30 @@ export default function KaratePage() {
                         </div>
 
                         <div className="flex flex-col md:flex-row gap-4">
-                            <Link href="/booking" className="bg-primary text-white font-black px-12 py-5 rounded-2xl shadow-xl shadow-primary/30 hover:bg-primary-dark transition-all text-center">
+                            <Link href="/booking" className="bg-primary text-white font-black px-10 py-3 rounded-xl shadow-xl shadow-primary/10 hover:bg-primary-dark transition-all text-center text-[11px] uppercase tracking-widest">
                                 {content.bookNow}
                             </Link>
                         </div>
                     </div>
 
                     <div className="lg:w-1/3">
-                        <div className="bg-blue-50/50 dark:bg-white/5 p-8 rounded-[3rem] sticky top-32 border border-blue-100 dark:border-white/5">
-                            <div className="text-center mb-10">
-                                <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-[2rem] shadow-xl mx-auto flex items-center justify-center mb-6 text-blue-600">
-                                    <Shield className="w-12 h-12" />
+                        <div className="bg-white/5 p-6 rounded-3xl sticky top-32 border border-white/5">
+                            <div className="text-center mb-8">
+                                <div className="w-16 h-16 bg-white/5 rounded-2xl shadow-xl mx-auto flex items-center justify-center mb-4 text-blue-500 border border-white/5">
+                                    <Shield className="w-8 h-8" />
                                 </div>
-                                <h4 className="text-xl font-black text-gray-900 dark:text-white">{content.ratingTitle}</h4>
-                                <p className="text-sm font-bold text-gray-400 mt-2">{content.ratingSub}</p>
+                                <h4 className="text-base font-black text-white tracking-tight">{content.ratingTitle}</h4>
+                                <p className="text-[10px] font-bold text-gray-500 mt-1 uppercase tracking-widest">{content.ratingSub}</p>
                             </div>
 
-                            <div className="space-y-6 font-black">
-                                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-white dark:border-white/5 shadow-sm">
-                                    <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">{content.equipmentTitle}</p>
-                                    <p className="text-gray-900 dark:text-white">{content.equipment}</p>
+                            <div className="space-y-4 font-black">
+                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 shadow-sm">
+                                    <p className="text-gray-500 text-[8px] mb-1 uppercase tracking-widest">{content.equipmentTitle}</p>
+                                    <p className="text-[11px] text-white">{content.equipment}</p>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-white dark:border-white/5 shadow-sm">
-                                    <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">{content.ageTitle}</p>
-                                    <p className="text-gray-900 dark:text-white">{content.age}</p>
+                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 shadow-sm">
+                                    <p className="text-gray-500 text-[8px] mb-1 uppercase tracking-widest">{content.ageTitle}</p>
+                                    <p className="text-[11px] text-white">{content.age}</p>
                                 </div>
                             </div>
                         </div>
