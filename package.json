@@ -1,0 +1,29 @@
+{
+  "name": "captina-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "clsx": "^2.1.0",
+    "firebase": "^12.10.0",
+    "framer-motion": "^11.0.0",
+    "lucide-react": "^0.344.0",
+    "next": "15.2.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-firebase-hooks": "^5.1.1",
+    "tailwind-merge": "^2.2.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.18",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "15.2.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1"
+  }
+}

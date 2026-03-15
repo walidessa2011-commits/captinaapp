@@ -1,0 +1,137 @@
+{
+  "colors": {
+    "primary": {
+      "DEFAULT": "#16a34a",
+      "light": "#22c55e",
+      "dark": "#15803d",
+      "shadow": "rgba(22,163,74,0.3)"
+    },
+    "secondary": {
+      "DEFAULT": "#f59e0b",
+      "dark": "#d97706"
+    },
+    "accent": {
+      "red": "#ef4444",
+      "blue": "#3b82f6",
+      "purple": "#a855f7"
+    },
+    "sports": {
+      "boxing": {
+        "bg": "#fee2e2",
+        "text": "#dc2626",
+        "border": "#fecaca"
+      },
+      "karate": {
+        "bg": "#dbeafe",
+        "text": "#2563eb",
+        "border": "#bfdbfe"
+      },
+      "taekwondo": {
+        "bg": "#f3e8ff",
+        "text": "#9333ea",
+        "border": "#e9d5ff"
+      },
+      "judo": {
+        "bg": "#dcfce7",
+        "text": "#16a34a",
+        "border": "#bbf7d0"
+      },
+      "muay_thai": {
+        "bg": "#ffedd5",
+        "text": "#ea580c",
+        "border": "#fed7aa"
+      },
+      "mma": {
+        "bg": "#fef9c3",
+        "text": "#ca8a04",
+        "border": "#fef08a"
+      },
+      "wrestling": {
+        "bg": "#e0e7ff",
+        "text": "#4f46e5",
+        "border": "#c7d2fe"
+      },
+      "jiu_jitsu": {
+        "bg": "#fce7f3",
+        "text": "#db2777",
+        "border": "#fbcfe8"
+      },
+      "kickboxing": {
+        "bg": "#cffafe",
+        "text": "#0891b2",
+        "border": "#a5f3fc"
+      }
+    }
+  },
+  "background": {
+    "gradient": "from-purple-50 via-pink-50 to-blue-50",
+    "card": "rgba(255,255,255,0.8)",
+    "input": "rgba(255,255,255,0.2)"
+  },
+  "dark": {
+    "bg": "#0f172a",
+    "bgCard": "#1e293b",
+    "textPrimary": "#f1f5f9",
+    "textSecondary": "#cbd5e1",
+    "border": "#334155"
+  },
+  "typography": {
+    "fontFamily": [
+      "Tajawal",
+      "Inter",
+      "system-ui",
+      "sans-serif"
+    ],
+    "sizes": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "1.875rem",
+      "4xl": "2.25rem"
+    },
+    "weights": {
+      "normal": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    }
+  },
+  "borderRadius": {
+    "sm": "0.5rem",
+    "md": "0.75rem",
+    "lg": "1rem",
+    "xl": "1.5rem",
+    "2xl": "1.75rem",
+    "full": "9999px"
+  },
+  "shadows": {
+    "sm": "0 1px 2px rgba(0,0,0,0.05)",
+    "md": "0 4px 6px rgba(0,0,0,0.07)",
+    "lg": "0 10px 15px rgba(0,0,0,0.1)",
+    "primary": "0 10px 15px rgba(22,163,74,0.3)",
+    "amber": "0 10px 15px rgba(245,158,11,0.3)"
+  },
+  "spacing": {
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "12": "3rem",
+    "16": "4rem"
+  },
+  "animation": {
+    "fast": "150ms ease",
+    "normal": "300ms ease",
+    "slow": "500ms ease"
+  },
+  "zIndex": {
+    "header": 50,
+    "bottomNav": 40,
+    "modal": 100
+  }
+}
