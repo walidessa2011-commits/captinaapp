@@ -1,11 +1,12 @@
 "use client";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
     Star, MessageCircle, ChevronLeft, MapPin, 
     Calendar, Trophy, Award, GraduationCap, 
     Briefcase, ShieldCheck, Heart, Share2, 
     CheckCircle2, Clock, Users, Play, StarHalf,
-    Dumbbell, Target, Zap, TrendingUp, Info
+    Dumbbell, Target, Zap, TrendingUp, Info, 
+    Sparkles, ArrowLeft
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import Link from 'next/link';
@@ -63,84 +64,80 @@ export default function TrainerProfile({ params }) {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#0b1120] pb-24 overflow-x-hidden">
-            {/* Header / Banner Secion - Reduced Height */}
-            <div className="relative h-[220px] w-full overflow-hidden">
-                <img src={trainer.coverImage} className="w-full h-full object-cover" alt="Cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0b1120] via-[#0b1120]/20 to-transparent"></div>
+        <div className="min-h-screen bg-[#0a0f1a] pb-32 transition-colors duration-500 overflow-x-hidden relative">
+            {/* Background Decorative Blobs */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
+            
+            {/* Header / Banner Section - Reduced Height */}
+            <div className="relative h-[200px] md:h-[240px] w-full overflow-hidden">
+                <img src={trainer.coverImage} className="w-full h-full object-cover opacity-60" alt="Cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-[#0a0f1a]/40 to-transparent"></div>
                 
                 {/* Back Button */}
-                <Link 
-                    href="/trainers"
-                    className="absolute top-4 left-4 w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/10 z-20"
-                >
-                    <ChevronLeft className="w-5 h-5" />
-                </Link>
+                <div className="max-w-4xl mx-auto px-6 pt-6">
+                    <Link 
+                        href="/trainers"
+                        className="inline-flex items-center justify-center w-10 h-10 bg-[#1a2235]/60 backdrop-blur-xl rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 relative z-20"
+                    >
+                        <ArrowLeft className={`w-5 h-5 ${language === 'ar' ? 'rotate-180' : ''}`} />
+                    </Link>
+                </div>
 
-                <div className="absolute top-4 right-4 flex gap-2 z-20">
-                    <button className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/10">
+                <div className="absolute top-6 right-6 flex gap-2 z-20">
+                    <button className="w-10 h-10 bg-[#1a2235]/60 backdrop-blur-xl rounded-xl flex items-center justify-center text-white/60 hover:text-white transition-all border border-white/10">
                         <Share2 className="w-4 h-4" />
                     </button>
-                    <button className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/10">
+                    <button className="w-10 h-10 bg-[#1a2235]/60 backdrop-blur-xl rounded-xl flex items-center justify-center text-white/60 hover:text-rose-500 transition-all border border-white/10">
                         <Heart className="w-4 h-4" />
                     </button>
                 </div>
             </div>
 
-            {/* Profile Info Card - Overlapping - Reduced Max Width and Negative Margin */}
-            <div className="max-w-3xl mx-auto px-4 -mt-20 relative z-10">
+            {/* Profile Info Card - Overlapping */}
+            <div className="max-w-4xl mx-auto px-6 -mt-16 md:-mt-20 relative z-10">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-xl border border-gray-100 dark:border-white/5"
+                    className="bg-[#1a2235]/40 backdrop-blur-3xl rounded-[2.5rem] p-6 lg:p-8 border border-white/10 shadow-2xl relative overflow-hidden"
                 >
-                    <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-                        <div className="relative">
-                            <div className="w-32 h-32 rounded-[2rem] overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl">
-                                <img src={trainer.profileImage} className="w-full h-full object-cover" alt={trainer.name} />
+                    <div className="absolute top-0 right-0 p-4">
+                        <div className="flex items-center gap-1.5 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                            <span className="text-sm font-black text-amber-500">{trainer.rating}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="w-28 h-28 md:w-36 md:h-36 rounded-[2rem] overflow-hidden border-4 border-white/10 relative z-10 shadow-2xl">
+                                <img src={trainer.profileImage} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={trainer.name} />
                             </div>
-                            <div className="absolute -bottom-1 -right-1 bg-primary w-8 h-8 rounded-xl flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-md">
-                                <Star className="w-4 h-4 text-white fill-white" />
+                            <div className="absolute -bottom-2 -right-2 bg-primary p-2 rounded-xl border-4 border-[#1a2235] z-20 flex items-center justify-center shadow-lg">
+                                <Sparkles className="w-4 h-4 text-white" />
                             </div>
                         </div>
 
                         <div className="flex-1 text-center md:text-start">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
-                                <div>
-                                    <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-1">{trainer.name}</h1>
-                                    <p className="text-primary font-black uppercase tracking-[0.1em] text-[10px]">{trainer.title}</p>
+                            <div className="mb-4">
+                                <div className="flex flex-col gap-1 mb-2">
+                                    <h1 className="text-3xl font-black text-white tracking-tighter">{trainer.name}</h1>
+                                    <div className="flex items-center justify-center md:justify-start gap-2">
+                                        <span className="text-xs font-black text-primary uppercase tracking-[0.2em]">{trainer.title}</span>
+                                        <div className="w-1 h-1 bg-white/20 rounded-full"></div>
+                                        <span className="text-[10px] font-bold text-gray-500">{trainer.location}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-500/10 px-3 py-1.5 rounded-lg">
-                                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                                    <span className="text-base font-black text-gray-900 dark:text-white">{trainer.rating}</span>
-                                    <span className="text-[10px] text-gray-400 font-bold">({trainer.reviewsCount})</span>
-                                </div>
+                                <p className="text-gray-400 text-xs md:text-sm font-medium leading-relaxed max-w-2xl">
+                                    {trainer.bio}
+                                </p>
                             </div>
 
-                            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-gray-500 dark:text-gray-400 mb-6">
-                                <div className="flex items-center gap-1.5">
-                                    <Briefcase className="w-3.5 h-3.5 text-primary" />
-                                    <span className="text-xs font-bold">{trainer.experience} {language === 'ar' ? 'خبرة' : 'Exp'}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-3.5 h-3.5 text-primary" />
-                                    <span className="text-xs font-bold">{trainer.location}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">{language === 'ar' ? 'موثق' : 'Verified'}</span>
-                                </div>
-                            </div>
-
-                            <p className="text-gray-500 dark:text-gray-400 font-medium text-sm leading-relaxed mb-6">
-                                {trainer.bio}
-                            </p>
-
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-2 md:gap-4 max-w-md">
                                 {trainer.stats.map((s, i) => (
-                                    <div key={i} className="bg-gray-50 dark:bg-white/5 p-3 rounded-xl text-center">
-                                        <div className="text-lg font-black text-gray-900 dark:text-white">{s.val}</div>
-                                        <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{s.label}</div>
+                                    <div key={i} className="bg-white/5 border border-white/5 rounded-2xl p-4 transition-all hover:bg-white/10">
+                                        <div className="text-lg md:text-xl font-black text-white tracking-tighter mb-0.5">{s.val}</div>
+                                        <div className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{s.label}</div>
                                     </div>
                                 ))}
                             </div>
@@ -148,152 +145,174 @@ export default function TrainerProfile({ params }) {
                     </div>
                 </motion.div>
 
-                {/* Main Content Sections - Reduced top margin and grid gap */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                    {/* Left Column - Details */}
-                    <div className="md:col-span-2 space-y-6">
-                        {/* Achievements */}
-                        <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-gray-100 dark:border-white/5 shadow-lg">
-                            <div className="flex items-center gap-2 mb-6">
-                                <Trophy className="w-5 h-5 text-amber-500" />
-                                <h3 className="text-lg font-black text-gray-900 dark:text-white">{language === 'ar' ? 'أهم الإنجازات' : 'Top Achievements'}</h3>
+                {/* Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+                    {/* Left Column */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Specializations - Compact */}
+                        <div className="bg-[#1a2235]/40 backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/5">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                    <Target className="w-5 h-5 text-primary" />
+                                </div>
+                                <h3 className="text-lg font-black text-white tracking-tight uppercase">
+                                    {language === 'ar' ? 'مجالات الخبرة' : 'Specializations'}
+                                </h3>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {trainer.specializations.map((spec) => (
+                                    <div key={spec.id} className="bg-white/5 border border-white/5 p-4 rounded-3xl text-center group hover:bg-primary/5 hover:border-primary/20 transition-all">
+                                        <spec.icon className="w-6 h-6 mx-auto mb-2 text-primary group-hover:scale-110 transition-transform" />
+                                        <span className="text-[8px] font-black text-white/60 uppercase tracking-widest block group-hover:text-primary transition-colors">{spec.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Achievements & Certificates Horizontal Split */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-[#1a2235]/40 backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/5">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <Trophy className="w-5 h-5 text-amber-500" />
+                                    <h3 className="text-sm font-black text-white uppercase tracking-wider">{language === 'ar' ? 'أهم الإنجازات' : 'Achievements'}</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    {trainer.achievements.map((item, i) => (
+                                        <div key={i} className="flex gap-3 items-center">
+                                            <div className="w-8 h-8 bg-white/5 rounded-xl flex-shrink-0 flex items-center justify-center border border-white/5">
+                                                <Award className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-white text-xs truncate leading-tight">{item.title}</h4>
+                                                <p className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">{item.date}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-[#1a2235]/40 backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/5">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <GraduationCap className="w-5 h-5 text-blue-500" />
+                                    <h3 className="text-sm font-black text-white uppercase tracking-wider">{language === 'ar' ? 'الشهادات' : 'Certificates'}</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    {trainer.certificates.map((cert, i) => (
+                                        <div key={i} className="flex gap-3 items-center">
+                                            <div className="w-8 h-8 bg-white/5 rounded-xl flex-shrink-0 flex items-center justify-center border border-white/5">
+                                                <ShieldCheck className="w-4 h-4 text-blue-500" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-white text-xs truncate leading-tight">{cert.name}</h4>
+                                                <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">{cert.issuer}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Reviews - Compact */}
+                        <div className="bg-[#1a2235]/40 backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/5">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <Users className="w-5 h-5 text-primary" />
+                                    <h3 className="text-lg font-black text-white tracking-tight uppercase">{language === 'ar' ? 'آراء المتدربين' : 'Reviews'}</h3>
+                                </div>
+                                <button className="text-xs font-black text-primary uppercase tracking-widest bg-primary/10 px-4 py-2 rounded-xl">
+                                    {language === 'ar' ? 'الكل' : 'All'}
+                                </button>
                             </div>
                             <div className="space-y-4">
-                                {trainer.achievements.map((item, i) => (
-                                    <div key={i} className="flex gap-3 group">
-                                        <div className="w-8 h-8 bg-gray-50 dark:bg-white/5 rounded-lg flex-shrink-0 flex items-center justify-center">
-                                            <Award className="w-4 h-4 text-gray-400" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 dark:text-white text-sm leading-tight mb-0.5">{item.title}</h4>
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.date}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                                {trainer.achievements.length === 0 && (
-                                    <p className="text-xs text-gray-400 italic">{language === 'ar' ? 'لا توجد إنجازات مسجلة حالياً' : 'No achievements recorded yet'}</p>
-                                )}
-                            </div>
-                        </section>
-
-                        {/* Certificates */}
-                        <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-gray-100 dark:border-white/5 shadow-lg">
-                            <div className="flex items-center gap-2 mb-6">
-                                <GraduationCap className="w-5 h-5 text-blue-500" />
-                                <h3 className="text-lg font-black text-gray-900 dark:text-white">{language === 'ar' ? 'الشهادات والاعتمادات' : 'Certs & Licenses'}</h3>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {trainer.certificates.map((cert, i) => (
-                                    <div key={i} className="p-4 border border-gray-50 dark:border-white/5 rounded-2xl bg-gray-50/50 dark:bg-white/5">
-                                        <h4 className="font-bold text-gray-900 dark:text-white text-xs mb-1">{cert.name}</h4>
-                                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{cert.issuer}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Reviews Section */}
-                        <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-gray-100 dark:border-white/5 shadow-lg">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2">
-                                    <Star className="w-5 h-5 text-primary" />
-                                    <h3 className="text-lg font-black text-gray-900 dark:text-white">{language === 'ar' ? 'آراء المتدربين' : 'Trainee Reviews'}</h3>
-                                </div>
-                                <Link href="#" className="text-primary font-black text-[9px] uppercase tracking-widest hover:opacity-70">{language === 'ar' ? 'عرض الكل' : 'View All'}</Link>
-                            </div>
-                            
-                            <div className="space-y-6">
-                                {trainer.reviews.length > 0 ? trainer.reviews.map((review) => (
-                                    <div key={review.id} className="border-b border-gray-50 dark:border-white/5 pb-4 last:border-0 last:pb-0">
+                                {trainer.reviews.map((review) => (
+                                    <div key={review.id} className="bg-white/5 border border-white/5 p-4 rounded-3xl">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-[10px]">
+                                                <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white font-black text-[10px]">
                                                     {review.user.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-gray-900 dark:text-white text-xs">{review.user}</h4>
-                                                    <p className="text-[8px] text-gray-400 font-bold">{review.date}</p>
+                                                    <h4 className="font-black text-white text-[11px] leading-tight">{review.user}</h4>
+                                                    <p className="text-[8px] text-gray-500 font-black">{review.date}</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-0.5">
                                                 {[...Array(5)].map((_, i) => (
-                                                    <Star key={i} className={`w-2.5 h-2.5 ${i < review.rating ? 'text-amber-500 fill-amber-500' : 'text-gray-200'}`} />
+                                                    <Star key={i} className={`w-2.5 h-2.5 ${i < review.rating ? 'text-amber-500 fill-amber-500' : 'text-white/10'}`} />
                                                 ))}
                                             </div>
                                         </div>
-                                        <p className="text-gray-500 dark:text-gray-400 text-xs leading-relaxed font-medium">{review.comment}</p>
-                                    </div>
-                                )) : (
-                                    <p className="text-xs text-gray-400 italic text-center py-4">{language === 'ar' ? 'لا توجد مراجعات حالياً' : 'No reviews yet'}</p>
-                                )}
-                            </div>
-                        </section>
-                    </div>
-
-                    {/* Right Column - Sidebar */}
-                    <div className="space-y-6">
-                        {/* Areas of Focus */}
-                        <section className="bg-[#1A1A2E] dark:bg-[#0f172a] rounded-[2rem] p-6 text-white shadow-xl">
-                            <h3 className="text-lg font-black mb-6">{language === 'ar' ? 'مجالات التركيز' : 'Areas of Focus'}</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                {trainer.specializations.map((spec) => (
-                                    <div key={spec.id} className="bg-white/5 border border-white/10 p-3 rounded-2xl text-center group">
-                                        <spec.icon className="w-6 h-6 mx-auto mb-2 text-primary" />
-                                        <span className="text-[8px] font-black uppercase tracking-widest leading-tight block">{spec.name}</span>
+                                        <p className="text-gray-400 text-xs leading-relaxed font-medium pl-11">{review.comment}</p>
                                     </div>
                                 ))}
                             </div>
-                        </section>
-
-                        {/* Availability Bar */}
-                        <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-gray-100 dark:border-white/5 shadow-lg">
-                            <h3 className="text-base font-black text-gray-900 dark:text-white mb-4 leading-tight">{language === 'ar' ? 'التوقيتات المتاحة' : 'Availability'}</h3>
-                            <div className="space-y-3">
-                                {[
-                                    { day: language === 'ar' ? 'السبت - الخميس' : 'Sat - Thu', time: '09:00 AM - 11:00 PM' },
-                                    { day: language === 'ar' ? 'الجمعة' : 'Friday', time: language === 'ar' ? 'مغلق' : 'Closed' }
-                                ].map((item, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-xl">
-                                        <span className="text-[10px] font-black text-gray-900 dark:text-white">{item.day}</span>
-                                        <span className="text-[9px] font-bold text-primary">{item.time}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Quick Tips or Message */}
-                        <div className="bg-primary/10 border-2 border-primary/20 p-6 rounded-[2rem] relative overflow-hidden group">
-                            <h3 className="text-base font-black text-gray-900 dark:text-white mb-1 leading-tight">{language === 'ar' ? 'احجز حصة تجريبية' : 'Book a Trial'}</h3>
-                            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">{language === 'ar' ? 'هل تريد تجربة التمرين مع مدربنا قبل الالتزام؟ احجز أول حصة بخصم 50%.' : 'Want to try training with our coach before committing? Book your first session with 50% discount.'}</p>
-                            <button className="w-full py-3 bg-primary text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg">
-                                {language === 'ar' ? 'احجز الآن' : 'Book Now'}
-                            </button>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            {/* Floating Action Bar - Reduced size */}
-            <div className="fixed bottom-6 left-0 w-full px-4 z-50">
-                <div className="max-w-3xl mx-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl p-3 rounded-[1.5rem] border border-white/20 shadow-2xl flex items-center justify-between gap-3">
-                    <div className="hidden sm:block px-3">
-                        <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{language === 'ar' ? 'سعر الجلسة' : 'Session Price'}</div>
-                        <div className="text-xl font-black text-gray-900 dark:text-white">{trainer.price} <span className="text-xs text-primary">EGP</span></div>
-                    </div>
-                    
-                    <div className="flex-1 flex gap-2">
-                        <button className="w-12 h-12 bg-gray-100 dark:bg-white/5 text-gray-400 rounded-xl flex items-center justify-center">
-                             <MessageCircle className="w-5 h-5" />
-                        </button>
-                        <Link 
-                            href="/booking"
-                            className="flex-1 py-3 bg-primary text-white rounded-xl font-black text-xs text-center shadow-xl hover:brightness-110 active:scale-95 transition-all outline-none"
-                        >
-                            {language === 'ar' ? 'احجز موعد مع الكابتن' : 'Book a Session'}
-                        </Link>
+                    {/* Right Column */}
+                    <div className="space-y-6">
+                        {/* Booking CTA - Ultra Compact */}
+                        <div className="bg-primary p-1 rounded-[2.5rem] relative group">
+                            <div className="bg-[#1a2235] rounded-[2.4rem] p-6 relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <h3 className="text-xl font-black text-white mb-1 tracking-tighter uppercase">{language === 'ar' ? 'احجز الآن' : 'Book Now'}</h3>
+                                    <p className="text-[10px] font-bold text-gray-500 mb-6 leading-relaxed">
+                                        {language === 'ar' ? 'ابدأ رحلة التغيير مع كابتن' : 'Start your transformation with Coach'} {trainer.name}
+                                    </p>
+                                    
+                                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/5 mb-6">
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{language === 'ar' ? 'سعر الجلسة' : 'Price'}</span>
+                                            <span className="text-xl font-black text-white tracking-tighter">{trainer.price} <span className="text-xs text-primary font-black">EGP</span></span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 p-2 bg-primary/10 rounded-xl">
+                                            <Clock className="w-3.5 h-3.5 text-primary" />
+                                            <span className="text-[10px] font-black text-primary">60m</span>
+                                        </div>
+                                    </div>
+
+                                    <Link 
+                                        href="/booking"
+                                        className="block w-full py-4 bg-primary text-white text-center rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                                    >
+                                        {language === 'ar' ? 'حجز موعد' : 'Reserve Spot'}
+                                    </Link>
+                                </div>
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                            </div>
+                        </div>
+
+                        {/* Availability */}
+                        <div className="bg-[#1a2235]/40 backdrop-blur-3xl rounded-[2.5rem] p-6 border border-white/5">
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4">{language === 'ar' ? 'المواعيد' : 'Availability'}</h3>
+                            <div className="space-y-2">
+                                {[
+                                    { day: language === 'ar' ? 'السبت - الخميس' : 'Sat - Thu', time: '09:00 - 23:00', status: 'active' },
+                                    { day: language === 'ar' ? 'الجمعة' : 'Friday', time: language === 'ar' ? 'مغلق' : 'Closed', status: 'closed' }
+                                ].map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                        <span className="text-[10px] font-black text-white/60">{item.day}</span>
+                                        <span className={`text-[9px] font-black ${item.status === 'active' ? 'text-primary' : 'text-gray-600'}`}>{item.time}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="flex gap-2">
+                            <button className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl text-white/80 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                                <MessageCircle className="w-4 h-4 text-primary" />
+                                {language === 'ar' ? 'مراسلة' : 'Message'}
+                            </button>
+                            <button className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl text-white/80 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                {language === 'ar' ? 'تطور' : 'Stats'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     );
 }
+

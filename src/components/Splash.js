@@ -34,7 +34,7 @@ export default function Splash({ onComplete }) {
                                 opacity: [0.1, 0.2, 0.1]
                             }}
                             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                            className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-primary/20 blur-[120px]"
+                            className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-primary/30 blur-[120px]"
                         ></motion.div>
                         <motion.div
                             animate={{ 

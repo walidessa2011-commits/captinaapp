@@ -13,6 +13,7 @@ import { useApp } from "@/context/AppContext";
 import { db, auth } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Link from 'next/link';
+import HorizontalDatePicker from '@/components/HorizontalDatePicker';
 
 function BookingContent() {
     const { t, language } = useApp();
@@ -98,39 +99,45 @@ function BookingContent() {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#001f3f] pb-32 transition-colors duration-300">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5">
-                <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <button onClick={() => router.back()} className="p-2 rounded-xl bg-gray-50 dark:bg-white/5 text-gray-400">
-                        {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                    </button>
-                    <h1 className="text-sm font-black text-gray-900 dark:text-white">
-                        {t('booking.pageTitle')}
-                    </h1>
-                    <div className="w-9"></div>
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] pb-40 transition-colors duration-500 relative overflow-hidden">
+            {/* Background Decorative Blobs */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
+            {/* Premium Ultra-Compact Header */}
+            <header className="sticky top-0 z-50 bg-[#0a0f1a]/80 backdrop-blur-xl border-b border-white/5">
+                <div className="container mx-auto px-4 h-12 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => router.back()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors">
+                            {language === 'ar' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                        </button>
+                        <h1 className="text-sm font-black text-white tracking-tighter flex items-center gap-2">
+                            <span className="opacity-50 text-[9px] font-bold uppercase tracking-widest">{t('main') || 'الرئيسية'}</span>
+                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                            <span className="text-primary">{t('booking.pageTitle')}</span>
+                        </h1>
+                    </div>
                 </div>
             </header>
 
-            {/* Progress Bar - Compact */}
-            <div className="bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-white/5 px-4 py-4">
-                <div className="max-w-6xl mx-auto flex items-center justify-between relative px-2 sm:px-4">
+            {/* Progress Bar - Ultra Compact */}
+            <div className="bg-black/20 border-b border-white/5 px-4 py-3">
+                <div className="max-w-4xl mx-auto flex items-center justify-between relative px-2">
                     {steps.map((s, i) => (
-                        <div key={s.id} className="relative z-10 flex flex-col items-center gap-1.5 min-w-[60px] sm:min-w-[80px]">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${step >= s.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-110' : 'bg-gray-100 dark:bg-white/5 text-gray-400'}`}>
-                                {step > s.id ? <CheckCircle2 className="w-4 h-4" /> : s.id}
+                        <div key={s.id} className="relative z-10 flex flex-col items-center gap-1">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${step >= s.id ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-110' : 'bg-white/5 text-gray-500'}`}>
+                                {step > s.id ? <CheckCircle2 className="w-3 h-3" /> : s.id}
                             </div>
-                            <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-tighter text-center whitespace-nowrap ${step >= s.id ? 'text-primary' : 'text-gray-400'}`}>
+                            <span className={`text-[7px] font-black uppercase tracking-tighter text-center whitespace-nowrap ${step >= s.id ? 'text-primary' : 'text-gray-500'}`}>
                                 {s.label}
                             </span>
                         </div>
                     ))}
                     {/* Background Line */}
-                    <div className="absolute top-4 left-10 right-10 h-0.5 bg-gray-100 dark:bg-white/5 -z-0"></div>
+                    <div className="absolute top-3 left-8 right-8 h-[1px] bg-white/5 -z-0"></div>
                     {/* Active Progress Line */}
-                    <div className="absolute top-4 left-10 right-10 h-0.5 -z-0">
+                    <div className="absolute top-3 left-8 right-8 h-[1px] -z-0">
                         <motion.div 
-                            className="h-full bg-primary"
+                            className="h-full bg-primary shadow-[0_0_8px_rgba(255,107,0,0.5)]"
                             initial={{ width: '0%' }}
                             animate={{ width: `${((step - 1) / (steps.length - 1)) * 100}%` }}
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -416,51 +423,51 @@ function BookingContent() {
                                     <div className="bg-white dark:bg-slate-800 rounded-[32px] p-6 border border-gray-100 dark:border-white/5 shadow-sm">
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                             {/* Left Column: Date and Notes */}
-                                            <div className="space-y-6">
-                                                <div className="space-y-3 text-start">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2">
-                                                        <Calendar className="w-3 h-3 text-primary" />
+                                                <div className="space-y-4 text-start">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
+                                                        <Calendar className="w-4 h-4 text-primary" />
                                                         {t('booking.dateLabel')}
                                                     </label>
-                                                    <input 
-                                                        type="date" 
-                                                        value={bookingData.date}
-                                                        onChange={(e) => setBookingData({...bookingData, date: e.target.value})}
-                                                        className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary rounded-2xl px-5 py-4 text-sm font-black outline-none transition-all"
+                                                    <HorizontalDatePicker 
+                                                        selectedDate={bookingData.date}
+                                                        onDateChange={(date) => setBookingData({...bookingData, date})}
+                                                        language={language}
                                                     />
                                                 </div>
 
-                                                <div className="space-y-3 text-start">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2">
-                                                        <Info className="w-3 h-3 text-emerald-500" />
+                                                <div className="space-y-4 text-start">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
+                                                        <Info className="w-4 h-4 text-emerald-500" />
                                                         {t('booking.extraNotes')}
                                                     </label>
                                                     <textarea 
                                                         placeholder={t('booking.trainerNotesPlaceholder')}
                                                         value={bookingData.notes}
                                                         onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
-                                                        className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary rounded-2xl px-5 py-4 text-xs font-bold outline-none h-32 lg:h-48 resize-none transition-all"
+                                                        className="w-full bg-gray-50 dark:bg-zinc-900 border border-transparent focus:border-primary/50 rounded-[2rem] px-6 py-5 text-sm font-bold outline-none h-32 lg:h-40 resize-none transition-all shadow-inner"
                                                     />
                                                 </div>
-                                            </div>
 
                                             {/* Right Column: Time Selection */}
-                                            <div className="space-y-3 text-start">
-                                                <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2">
-                                                    <Clock className="w-3 h-3 text-blue-500" />
+                                            <div className="space-y-4 text-start">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
+                                                    <Clock className="w-4 h-4 text-blue-500" />
                                                     {t('booking.timeLabel')}
                                                 </label>
-                                                <div className="grid grid-cols-3 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                                     {[
                                                         '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
                                                         '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', 
-                                                        '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM', 
-                                                        '09:00 PM', '10:00 PM', '11:00 PM'
+                                                        '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM'
                                                     ].map((time) => (
                                                         <button 
                                                             key={time}
                                                             onClick={() => setBookingData({...bookingData, time})}
-                                                            className={`py-3 rounded-2xl text-[10px] font-black transition-all border-2 ${bookingData.time === time ? 'border-primary bg-primary text-white shadow-lg shadow-primary/20' : 'border-gray-50 dark:border-white/5 bg-gray-50 dark:bg-white/5 text-gray-600 dark:text-gray-400'}`}
+                                                            className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 ${
+                                                                bookingData.time === time 
+                                                                ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20 scale-[1.05] z-10' 
+                                                                : 'border-transparent bg-gray-50 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                                                            }`}
                                                         >
                                                             {time}
                                                         </button>
@@ -639,7 +646,7 @@ function BookingContent() {
 export default function Booking() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-slate-50 dark:bg-[#001f3f] flex items-center justify-center">
+            <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] flex items-center justify-center">
                 <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
             </div>
         }>
