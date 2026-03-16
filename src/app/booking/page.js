@@ -16,7 +16,7 @@ import Link from 'next/link';
 import HorizontalDatePicker from '@/components/HorizontalDatePicker';
 
 function BookingContent() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const searchParams = useSearchParams();
     const router = useRouter();
     
@@ -98,23 +98,44 @@ function BookingContent() {
         { id: 3, name: language === 'ar' ? 'الكابتن سارة علي' : 'Captain Sara Ali', rating: 4.8, trainees: 195, image: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=200' }
     ];
 
+    const textClass = darkMode ? "text-white" : "text-slate-900";
+
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] pb-40 transition-colors duration-500 relative overflow-hidden">
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-40 transition-colors duration-500 relative overflow-hidden`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Background Decorative Blobs */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[100px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
-            {/* Premium Ultra-Compact Header */}
-            <header className="sticky top-0 z-50 bg-[#0a0f1a]/80 backdrop-blur-xl border-b border-white/5">
-                <div className="container mx-auto px-4 h-12 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => router.back()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors">
-                            {language === 'ar' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-                        </button>
-                        <h1 className="text-sm font-black text-white tracking-tighter flex items-center gap-2">
-                            <span className="opacity-50 text-[9px] font-bold uppercase tracking-widest">{t('main') || 'الرئيسية'}</span>
-                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                            <span className="text-primary">{t('booking.pageTitle')}</span>
-                        </h1>
+            <div className={`absolute top-0 right-0 w-[500px] h-[500px] ${darkMode ? 'bg-primary/20' : 'bg-primary/10'} rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
+            <div className={`absolute bottom-0 left-0 w-[400px] h-[400px] ${darkMode ? 'bg-blue-500/10' : 'bg-blue-500/5'} rounded-full blur-[100px] -z-0 -translate-x-1/2 translate-y-1/2`}></div>
+            {/* Header / Breadcrumbs - Compact Version */}
+            <header className="relative z-20 pt-6 px-4">
+                <div className="max-w-7xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{t('booking.pageTitle')}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line - Horizontal */}
+                    <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-3 mb-6"
+                        >
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase text-center">
+                                {language === 'ar' 
+                                    ? `( ${t('booking.pageTitle')} - حجز كابتنية )` 
+                                    : `( ${t('booking.pageTitle')} - Captina Booking )`}
+                            </h1>
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        </motion.div>
                     </div>
                 </div>
             </header>

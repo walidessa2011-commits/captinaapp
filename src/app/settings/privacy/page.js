@@ -13,7 +13,7 @@ import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function PrivacySettings() {
-    const { language } = useApp();
+    const { language, t } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     
@@ -25,7 +25,6 @@ export default function PrivacySettings() {
         twoFactorAuth: false
     });
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (!loadingAuth && !user) {
@@ -63,7 +62,7 @@ export default function PrivacySettings() {
 
     if (loadingAuth || loading) {
         return (
-            <div className="min-h-screen bg-[#001f3f] flex items-center justify-center">
+            <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
@@ -78,14 +77,16 @@ export default function PrivacySettings() {
                     icon: Globe,
                     title: language === 'ar' ? 'الملف الشخصي عام' : 'Public Profile',
                     desc: language === 'ar' ? 'السماح للآخرين برؤية ملفك وتطورك' : 'Allow others to see your profile and progress',
-                    value: settings.profileVisible
+                    value: settings.profileVisible,
+                    color: 'text-blue-400'
                 },
                 {
                     id: 'showActivity',
                     icon: Activity,
                     title: language === 'ar' ? 'إظهار النشاط' : 'Show Activity',
                     desc: language === 'ar' ? 'عرض متى كنت نشطاً آخر مرة للآخرين' : 'Display when you were last active to others',
-                    value: settings.showActivity
+                    value: settings.showActivity,
+                    color: 'text-emerald-400'
                 }
             ]
         },
@@ -97,88 +98,123 @@ export default function PrivacySettings() {
                     icon: Share2,
                     title: language === 'ar' ? 'مشاركة التحليلات' : 'Share Analytics',
                     desc: language === 'ar' ? 'ساعدنا في تحسين التطبيق بمشاركة بيانات مجهولة' : 'Help us improve by sharing anonymous usage data',
-                    value: settings.shareAnalytics
+                    value: settings.shareAnalytics,
+                    color: 'text-amber-400'
                 },
                 {
                     id: 'marketingEmails',
                     icon: Bell,
                     title: language === 'ar' ? 'الرسائل التسويقية' : 'Marketing Communications',
                     desc: language === 'ar' ? 'تلقي عروض وأخبار عن الخدمات والمنتجات' : 'Receive offers and news about services and products',
-                    value: settings.marketingEmails
+                    value: settings.marketingEmails,
+                    color: 'text-rose-400'
                 }
             ]
         }
     ];
 
+    const textClass = "text-white";
+
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#001f3f] transition-colors duration-300">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#001f3f]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 p-4">
-                <div className="container mx-auto max-w-2xl flex items-center justify-between">
-                    <Link href="/settings" className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors">
-                        {language === 'ar' ? <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" /> : <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />}
-                    </Link>
-                    <h1 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">
-                        {language === 'ar' ? 'الخصوصية والأمان' : 'Privacy & Security'}
-                    </h1>
-                    <div className="w-10"></div>
+        <div className="min-h-screen bg-[#0a0f1a] pb-20 transition-colors duration-500 overflow-hidden relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+            
+            {/* Immersive Header */}
+            <header className="relative z-20 pt-16 pb-6 px-6">
+                <div className="max-w-7xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <Link href="/settings" className="hover:text-primary transition-colors">{language === 'ar' ? 'الإعدادات' : 'Settings'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{language === 'ar' ? 'الخصوصية' : 'Privacy'}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-3 mb-4"
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        <h1 className={`text-xl md:text-2xl font-black ${textClass} tracking-tighter italic uppercase text-center`}>
+                            {language === 'ar' 
+                                ? '( حماية بياناتك - خصوصية كابتينة )' 
+                                : '( Secure Protocol - Privacy Core )'}
+                        </h1>
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                    </motion.div>
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-2xl">
-                <div className="space-y-8">
+            <main className="max-w-2xl mx-auto px-4 py-4 relative z-10">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="space-y-12"
+                >
                     {sections.map((section, idx) => (
-                        <div key={idx} className="space-y-4">
-                            <h3 className="text-[11px] font-black text-primary uppercase tracking-widest px-2">
+                        <div key={idx} className="space-y-6">
+                            <h3 className="text-xs font-black text-primary uppercase tracking-[0.3em] px-2">
                                 {section.title}
                             </h3>
-                            <div className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm divide-y divide-gray-50 dark:divide-white/5">
+                            <div className="bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden divide-y divide-white/5">
                                 {section.items.map((item) => (
-                                    <div key={item.id} className="p-5 flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4 text-start">
-                                            <div className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center shrink-0">
-                                                <item.icon className="w-5 h-5 text-gray-400" />
+                                    <div key={item.id} className="p-8 flex items-center justify-between gap-6 hover:bg-white/[0.02] transition-colors">
+                                        <div className="flex items-center gap-5 text-start">
+                                            <div className={`w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 border border-white/5 ${item.color}`}>
+                                                <item.icon className="w-6 h-6" />
                                             </div>
                                             <div>
-                                                <h4 className="text-sm font-black text-gray-900 dark:text-white mb-0.5">{item.title}</h4>
-                                                <p className="text-[10px] font-bold text-gray-400 leading-tight">{item.desc}</p>
+                                                <h4 className="text-sm font-black text-white mb-1 uppercase tracking-tight">{item.title}</h4>
+                                                <p className="text-[10px] font-bold text-gray-500 leading-relaxed max-w-[200px] md:max-w-sm">{item.desc}</p>
                                             </div>
                                         </div>
-                                        <button 
+                                        <div 
                                             onClick={() => toggleSetting(item.id)}
-                                            className={`w-12 h-6 rounded-full transition-all duration-300 relative ${item.value ? 'bg-primary' : 'bg-gray-200 dark:bg-white/10'}`}
+                                            className={`w-12 h-6 rounded-full p-1 cursor-pointer transition-all duration-500 shrink-0 ${item.value ? 'bg-primary' : 'bg-gray-700'}`}
                                         >
-                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${item.value ? (language === 'ar' ? '-translate-x-7' : 'translate-x-7') : (language === 'ar' ? '-translate-x-1' : 'translate-x-1')}`}></div>
-                                        </button>
+                                            <div className={`w-4 h-4 bg-white rounded-full shadow-lg transition-all duration-500 transform ${item.value ? (language === 'ar' ? '-translate-x-6' : 'translate-x-6') : 'translate-x-0'}`}></div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     ))}
 
-                    {/* Account Actions */}
-                    <div className="space-y-4">
-                        <h3 className="text-[11px] font-black text-rose-500 uppercase tracking-widest px-2">
-                            {language === 'ar' ? 'إدارة الحساب' : 'Account Management'}
+                    {/* Danger Zone */}
+                    <div className="space-y-6">
+                        <h3 className="text-xs font-black text-rose-500 uppercase tracking-[0.3em] px-2">
+                            {language === 'ar' ? 'منطقة الخطر' : 'Terminal Actions'}
                         </h3>
-                        <div className="bg-white dark:bg-slate-800 rounded-3xl overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm">
-                            <button className="w-full p-5 flex items-center justify-between group hover:bg-rose-500/5 transition-colors text-start">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center shrink-0">
-                                        <Trash2 className="w-5 h-5 text-rose-500" />
+                        <div className="bg-rose-500/5 backdrop-blur-3xl rounded-[2.5rem] border border-rose-500/10 shadow-2xl overflow-hidden">
+                            <button className="w-full p-8 flex items-center justify-between group hover:bg-rose-500/10 transition-all text-start">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center shrink-0 border border-rose-500/20 group-hover:scale-110 transition-transform">
+                                        <Trash2 className="w-6 h-6 text-rose-500" />
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-black text-rose-500 mb-0.5">{language === 'ar' ? 'حذف الحساب' : 'Delete Account'}</h4>
-                                        <p className="text-[10px] font-bold text-gray-400 leading-tight">
-                                            {language === 'ar' ? 'هذا الإجراء نهائي ولا يمكن التراجع عنه' : 'This action is final and cannot be undone'}
+                                        <h4 className="text-sm font-black text-rose-500 mb-1 uppercase tracking-tight">{language === 'ar' ? 'حذف الحساب نهائياً' : 'Redact Account Info'}</h4>
+                                        <p className="text-[10px] font-bold text-rose-500/50 leading-relaxed uppercase tracking-widest">
+                                            {language === 'ar' ? 'هذا الإجراء سيقوم بمسح كافة بياناتك' : 'Permanent deletion protocol'}
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-rose-500 transition-colors" />
+                                <ChevronRight className={`w-5 h-5 text-rose-800 transition-transform ${language === 'ar' ? 'rotate-180' : 'group-hover:translate-x-1'}`} />
                             </button>
                         </div>
                     </div>
-                </div>
+                </motion.div>
             </main>
         </div>
     );

@@ -10,7 +10,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function Register() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -67,144 +67,156 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-[#001f3f] relative overflow-hidden font-sans">
-            {/* Ambient Background */}
+        <div className={`min-h-[100dvh] flex flex-col items-center justify-center p-4 relative overflow-hidden transition-colors duration-500 ${darkMode ? 'bg-[#0A0E17] text-white' : 'bg-slate-50 text-gray-900'} ${language === 'ar' ? 'font-arabic' : ''}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Image with Immersive Effect */}
             <div className="absolute inset-0 z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] rounded-full bg-primary/10 blur-[120px] animate-pulse"></div>
-                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/carbon-fibre.png")' }}></div>
+                <img 
+                    src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=1000" 
+                    alt="" 
+                    className={`w-full h-full object-cover transition-opacity duration-500 ${darkMode ? 'opacity-40 grayscale-[20%]' : 'opacity-30'}`}
+                />
+                <div className={`absolute inset-0 transition-colors duration-500 bg-gradient-to-b ${darkMode ? 'from-[#0A0E17]/80 via-transparent to-[#0A0E17]' : 'from-white/80 via-transparent to-slate-50'}`}></div>
+            </div>
+
+            {/* Back Button Overlay */}
+            <div className="absolute top-8 left-8 z-30">
+                <Link 
+                    href="/login"
+                    className={`flex items-center gap-2 transition-all font-bold text-xs backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 ${darkMode ? 'text-white/60 bg-white/5 hover:text-white' : 'text-gray-500 bg-black/5 hover:text-gray-900'}`}
+                >
+                    <ChevronLeft className={`w-4 h-4 ${language === 'en' ? '' : 'rotate-180'}`} />
+                    {language === 'ar' ? 'تسجيل الدخول' : 'Login'}
+                </Link>
             </div>
 
             <motion.div
                 initial="hidden"
                 animate="visible"
                 variants={containerVariants}
-                className="max-w-[1000px] w-full min-h-[500px] md:min-h-[600px] flex flex-col md:flex-row-reverse bg-white/5 backdrop-blur-2xl rounded-[2.5rem] md:rounded-[3rem] border border-white/10 overflow-hidden relative z-10 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)]"
+                className="w-full max-w-2xl relative z-10 flex flex-col gap-6"
             >
-                {/* Visual Section */}
-                <div className="hidden md:flex md:w-5/12 relative overflow-hidden bg-gradient-to-tl from-[#001f3f] to-primary/40 p-12 flex-col justify-between">
-                    <div className="relative z-10">
-                        <motion.div 
-                            variants={itemVariants}
-                            className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 mb-8"
-                        >
-                            <User className="w-8 h-8 text-white" />
-                        </motion.div>
-                        <motion.h2 variants={itemVariants} className="text-4xl font-black text-white leading-tight mb-4">
-                            {language === 'ar' ? 'ابدأ رحلتك الرياضية' : 'Start Your Fitness Journey'}
-                        </motion.h2>
-                        <motion.p variants={itemVariants} className="text-white/60 font-medium text-lg">
-                            {t('discoverDesc')}
+                {/* Logo and Welcome */}
+                <div className="text-center space-y-4">
+                    <motion.div 
+                        variants={itemVariants}
+                        className={`inline-flex items-center gap-2.5 backdrop-blur-lg p-1 pr-3.5 rounded-xl border border-white/10 mx-auto transition-colors ${darkMode ? 'bg-black/30' : 'bg-white/40'}`}
+                    >
+                        <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10">
+                            <img src="/logo_captina.jpg" alt="Logo" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="font-black text-xs tracking-wider uppercase text-[#E51B24]">Captina</span>
+                    </motion.div>
+                    
+                    <div className="space-y-1">
+                        <motion.h1 variants={itemVariants} className={`text-3xl font-black px-2 transition-colors ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {t('createNewAccount')}
+                        </motion.h1>
+                        <motion.p variants={itemVariants} className={`text-xs font-bold px-4 transition-colors ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>
+                            {language === 'ar' ? 'انضم إلينا الآن وابدأ رحلة التغيير' : 'Join us now and start your change journey'}
                         </motion.p>
-                    </div>
-
-                    <div className="relative z-10 p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
-                         <p className="text-white font-black mb-2 italic">"{language === 'ar' ? 'كابتينا غيرت حياتي تماماً!' : 'Captina changed my life!'}"</p>
-                         <div className="flex items-center gap-3">
-                            <img src="https://i.pravatar.cc/100?u=9" className="w-8 h-8 rounded-full" alt="avatar" />
-                            <span className="text-white/40 text-xs font-bold font-tajawal">سارة أحمد</span>
-                         </div>
                     </div>
                 </div>
 
-                {/* Form Section */}
-                <div className="w-full md:w-7/12 bg-white flex flex-col p-6 md:p-12 relative">
-                    <div className="mb-6 md:mb-8 text-start">
-                        <motion.h1 variants={itemVariants} className="text-2xl md:text-5xl font-black text-[#001f3f] mb-1 md:mb-2 tracking-tight">
-                            {t('createNewAccount')}
-                        </motion.h1>
-                        <motion.p variants={itemVariants} className="text-xs md:text-base text-gray-400 font-bold">
-                            {language === 'ar' ? 'سجل بياناتك للانضمام إلى نخبة الرياضيين' : 'Register to join elite athletes'}
-                        </motion.p>
-                    </div>
-
-                    <form className="space-y-4 md:space-y-5 flex-grow" onSubmit={handleRegister}>
+                {/* Glass Content Card */}
+                <motion.div
+                    variants={itemVariants}
+                    className={`w-full backdrop-blur-[25px] border rounded-[2rem] py-8 px-6 md:px-10 shadow-2xl relative overflow-hidden transition-colors duration-500 ${darkMode ? 'bg-white/5 border-white/10' : 'bg-white/60 border-black/5'}`}
+                >
+                    {/* Decorative Background Glow */}
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#E51B24]/10 blur-3xl rounded-full"></div>
+                    
+                    <form className="flex flex-col gap-4 relative z-10" onSubmit={handleRegister}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">{language === 'ar' ? 'الاسم كاملاً' : 'Full Name'}</label>
+                                <label className={`text-[10px] font-black uppercase tracking-widest px-2 ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{language === 'ar' ? 'الاسم كاملاً' : 'Full Name'}</label>
                                 <div className="relative group">
                                     <input 
                                         type="text" 
                                         required
                                         value={formData.fullName}
                                         onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-3.5 md:py-4 px-5 md:px-6 focus:border-primary outline-none transition-all font-black text-[#001f3f] text-sm md:text-base" 
+                                        className={`w-full border rounded-xl py-3.5 px-5 md:px-6 outline-none transition-all font-black text-sm ${darkMode ? 'bg-white/5 border-white/10 text-white focus:border-[#E51B24] focus:bg-white/10' : 'bg-black/5 border-black/5 text-gray-900 focus:border-[#E51B24] focus:bg-black/10'}`} 
                                         placeholder="John Doe" 
                                     />
-                                    <User className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-300`} />
+                                    <User className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-white/20' : 'text-gray-400'}`} />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">{t('phone')}</label>
+                                <label className={`text-[10px] font-black uppercase tracking-widest px-2 ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{t('phone')}</label>
                                 <div className="relative group">
                                     <input 
                                         type="tel" 
                                         required
                                         value={formData.phone}
                                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                        className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-3.5 md:py-4 px-5 md:px-6 focus:border-primary outline-none transition-all font-black text-[#001f3f] text-sm md:text-base" 
+                                        className={`w-full border rounded-xl py-3.5 px-5 md:px-6 outline-none transition-all font-black text-sm ${darkMode ? 'bg-white/5 border-white/10 text-white focus:border-[#E51B24] focus:bg-white/10' : 'bg-black/5 border-black/5 text-gray-900 focus:border-[#E51B24] focus:bg-black/10'}`} 
                                         placeholder="05xxxxxxxx" 
                                     />
-                                    <Phone className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-300`} />
+                                    <Phone className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-white/20' : 'text-gray-400'}`} />
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">{t('email')}</label>
+                            <label className={`text-[10px] font-black uppercase tracking-widest px-2 ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{t('email')}</label>
                             <div className="relative group">
                                 <input 
                                     type="email" 
                                     required
                                     value={formData.email}
                                     onChange={(e) => setFormData({...formData, email: e.target.value})}
-                                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-3.5 md:py-4 px-5 md:px-6 focus:border-primary outline-none transition-all font-black text-[#001f3f] text-sm md:text-base" 
+                                    className={`w-full border rounded-xl py-3.5 px-5 md:px-6 outline-none transition-all font-black text-sm ${darkMode ? 'bg-white/5 border-white/10 text-white focus:border-[#E51B24] focus:bg-white/10' : 'bg-black/5 border-black/5 text-gray-900 focus:border-[#E51B24] focus:bg-black/10'}`} 
                                     placeholder="mail@example.com" 
                                 />
-                                <Mail className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-300`} />
+                                <Mail className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-white/20' : 'text-gray-400'}`} />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400 px-2">{t('password')}</label>
+                            <label className={`text-[10px] font-black uppercase tracking-widest px-2 ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{t('password')}</label>
                             <div className="relative group">
                                 <input 
                                     type="password" 
                                     required
                                     value={formData.password}
                                     onChange={(e) => setFormData({...formData, password: e.target.value})}
-                                    className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-3.5 md:py-4 px-5 md:px-6 focus:border-primary outline-none transition-all font-black text-[#001f3f] text-sm md:text-base" 
+                                    className={`w-full border rounded-xl py-3.5 px-5 md:px-6 outline-none transition-all font-black text-sm ${darkMode ? 'bg-white/5 border-white/10 text-white focus:border-[#E51B24] focus:bg-white/10' : 'bg-black/5 border-black/5 text-gray-900 focus:border-[#E51B24] focus:bg-black/10'}`} 
                                     placeholder="••••••••" 
                                 />
-                                <Lock className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-gray-300`} />
+                                <Lock className={`absolute ${language === 'en' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${darkMode ? 'text-white/20' : 'text-gray-400'}`} />
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 px-2">
+                        <div className="flex items-center gap-3 px-2 py-1">
                             <input 
                                 type="checkbox" 
                                 id="terms" 
                                 checked={formData.acceptTerms}
                                 onChange={(e) => setFormData({...formData, acceptTerms: e.target.checked})}
-                                className="w-4 h-4 accent-primary rounded cursor-pointer" 
+                                className="w-4 h-4 accent-[#E51B24] rounded cursor-pointer" 
                             />
-                            <label htmlFor="terms" className="text-xs font-bold text-gray-500 cursor-pointer">{t('acceptTerms')}</label>
+                            <label htmlFor="terms" className={`text-[11px] font-bold cursor-pointer transition-colors ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>{t('acceptTerms')}</label>
                         </div>
 
                         <button 
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-[#001f3f] text-white font-black py-3.5 md:py-4 rounded-2xl shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-base md:text-lg group mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-[#E51B24] text-white font-black py-4 rounded-xl shadow-lg shadow-[#E51B24]/20 hover:bg-[#ff1f2d] active:scale-95 transition-all flex items-center justify-center gap-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (language === 'ar' ? 'جاري التحميل...' : 'Loading...') : t('createNewAccount')}
-                            {!loading && <ChevronLeft className={`w-4 h-4 md:w-5 md:h-5 group-hover:-translate-x-1 transition-transform ${language === 'en' ? 'rotate-180' : ''}`} />}
+                            {!loading && <ChevronLeft className={`w-4 h-4 ${language === 'en' ? 'rotate-180' : ''}`} />}
                         </button>
                     </form>
+                </motion.div>
 
-                    <p className="text-center text-gray-400 mt-8 font-bold text-sm">
-                        {language === 'ar' ? 'لديك حساب بالفعل؟' : 'Already have an account?'} <Link href="/login" className="text-primary font-black hover:underline underline-offset-4">{t('login')}</Link>
-                    </p>
-                </div>
+                <p className={`text-center font-bold text-xs mb-8 transition-colors ${darkMode ? 'text-white/40' : 'text-gray-500'}`}>
+                    {language === 'ar' ? 'لديك حساب بالفعل؟' : 'Already have an account?'} <Link href="/login" className="text-[#E51B24] font-black hover:underline underline-offset-4">{t('login')}</Link>
+                </p>
             </motion.div>
+
+            {/* Global Dynamic Lights */}
+            <div className={`absolute top-0 right-0 w-[400px] h-[400px] blur-[120px] -z-10 rounded-full transition-opacity ${darkMode ? 'bg-[#E51B24]/5 opacity-100' : 'bg-[#E51B24]/10 opacity-50'}`}></div>
+            <div className={`absolute bottom-0 left-0 w-[300px] h-[300px] blur-[100px] -z-10 rounded-full transition-opacity ${darkMode ? 'bg-blue-500/5 opacity-100' : 'bg-blue-500/10 opacity-50'}`}></div>
         </div>
     );
 }

@@ -107,33 +107,51 @@ export default function NotificationsPage() {
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/10 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
 
-            {/* Premium Compact Header */}
-            <header className="sticky top-0 z-[100] bg-[#0a0f1a]/80 backdrop-blur-3xl border-b border-white/5 px-4 py-3">
-                <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                        <Link href="/" className="p-2 bg-white/5 rounded-lg text-white hover:bg-primary transition-all border border-white/10 active:scale-95 group">
-                            {language === 'ar' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-                        </Link>
-                        <div className="flex flex-col">
-                            <h1 className="text-base font-black text-white uppercase tracking-tighter">
-                                {language === 'ar' ? 'الإشعارات' : 'Notifications'}
-                            </h1>
-                            <div className="flex items-center gap-1.5">
-                                <Sparkles className="w-2.5 h-2.5 text-primary" />
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">{language === 'ar' ? 'تحديثات النظام' : 'System Briefings'}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={markAllAsRead}
-                        className="text-[8px] font-black text-primary uppercase bg-primary/10 px-4 py-2 rounded-lg hover:bg-primary hover:text-white transition-all border border-primary/20 active:scale-95 whitespace-nowrap tracking-widest"
+            {/* Header / Breadcrumbs - Compact Version */}
+            <header className="relative z-20 pt-6 px-4">
+                <div className="max-w-4xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
                     >
-                        {language === 'ar' ? 'تحديد الكل' : 'Mark All Read'}
-                    </button>
+                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{language === 'ar' ? 'الإشعارات' : 'Notifications'}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line - Horizontal */}
+                    <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-3 mb-4"
+                        >
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                            <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter italic uppercase text-center">
+                                {language === 'ar' 
+                                    ? '( تفاعل لحظي - إشعارات كابتينة )' 
+                                    : '( Real-time Updates - Captina Notifications )'}
+                            </h1>
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        </motion.div>
+
+                        <motion.button 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            onClick={markAllAsRead}
+                            className="text-[8px] font-black text-primary uppercase bg-primary/10 px-6 py-2.5 rounded-xl hover:bg-primary hover:text-white transition-all border border-primary/20 active:scale-95 whitespace-nowrap tracking-[0.2em] mb-4"
+                        >
+                            {language === 'ar' ? 'تحديد الكل كمقروء' : 'Mark All as Read'}
+                        </motion.button>
+                    </div>
                 </div>
             </header>
 
-            <main className="max-w-4xl mx-auto px-4 py-6 relative z-10">
+            <main className="max-w-4xl mx-auto px-4 pt-1 pb-6 relative z-10">
                 {/* Compact Filters */}
                 <div className="flex gap-1.5 mb-6 bg-[#1a2235]/60 backdrop-blur-3xl p-1 rounded-xl border border-white/5 w-fit mx-auto md:mx-0 shadow-sm">
                     <button 

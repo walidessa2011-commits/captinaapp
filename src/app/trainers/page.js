@@ -1,31 +1,29 @@
 "use client";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Search, Star, MessageCircle, ChevronLeft, ChevronRight, 
     Crown, Filter, Users, Award, Trophy, GraduationCap, 
     UserCheck, Shield, HeartPulse, Baby, Dumbbell, 
     UserPlus, CheckCircle2, Heart, Medal, MapPin, 
-    Briefcase, Calendar, ArrowLeft, Sparkles
+    Briefcase, Calendar, ArrowLeft, Sparkles, Activity, Target, Zap, ArrowRight
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import Link from 'next/link';
-import React, { useState } from 'react';
-
 import { trainersData } from '@/lib/trainersData';
 
 export default function Trainers() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedSport, setSelectedSport] = useState("all");
 
-    // Transform trainersData object into arrays for the UI
     const allTrainersList = Object.entries(trainersData).map(([id, info]) => ({
         id,
         name: info.name[language],
         image: info.profileImage,
         specialties: info.specialty[language].split(' - '),
         rating: info.rating,
-        students: parseInt(info.stats[0].val),
+        students: parseInt(info.stats[0]?.val || "0"),
         exp: info.experience[language],
         bio: info.bio[language],
         premium: id === 'ahmed-hussaini' || id === 'mohammed-otaibi',
@@ -33,10 +31,11 @@ export default function Trainers() {
     }));
 
     const sportsList = [
-        { id: 'karate', name: language === 'ar' ? 'كاراتيه' : 'Karate', count: 45, color: 'bg-red-500' },
-        { id: 'taekwondo', name: language === 'ar' ? 'تايكوندو' : 'Taekwondo', count: 38, color: 'bg-blue-500' },
-        { id: 'boxing', name: language === 'ar' ? 'ملاكمة' : 'Boxing', count: 52, color: 'bg-orange-500' },
-        { id: 'kickbox', name: language === 'ar' ? 'كيك بوكس' : 'Kickbox', count: 41, color: 'bg-purple-500' }
+        { id: 'all', name: language === 'ar' ? 'الكل' : 'All', icon: <Activity className="w-4 h-4" /> },
+        { id: 'karate', name: language === 'ar' ? 'كاراتيه' : 'Karate', icon: <Target className="w-4 h-4" /> },
+        { id: 'taekwondo', name: language === 'ar' ? 'تايكوندو' : 'Taekwondo', icon: <Medal className="w-4 h-4" /> },
+        { id: 'boxing', name: language === 'ar' ? 'ملاكمة' : 'Boxing', icon: <Award className="w-4 h-4" /> },
+        { id: 'kickbox', name: language === 'ar' ? 'كيك بوكس' : 'Kickbox', icon: <Zap className="w-4 h-4" /> }
     ];
 
     const filteredTrainers = allTrainersList.filter(trainer => {
@@ -46,178 +45,174 @@ export default function Trainers() {
     });
 
     return (
-        <div className="min-h-screen bg-[#0a0f1a] pb-40 transition-colors duration-500 overflow-x-hidden relative">
-            {/* Background Decorative Blobs */}
-            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[150px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-40 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
+            
+            {/* Header / Breadcrumbs - Mobile Premium Alignment */}
+            <header className="relative z-20 pt-8 px-6">
+                <div className="max-w-7xl mx-auto flex flex-col items-start">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, x: language === 'ar' ? 20 : -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center gap-2 mb-4 text-[11px] font-black uppercase tracking-[0.2em] opacity-60"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors text-slate-900 dark:text-white">
+                            {language === 'ar' ? 'الرئيسية' : 'Home'}
+                        </Link>
+                        <span className="text-gray-400">
+                            {language === 'ar' ? ' / ' : ' / '}
+                        </span>
+                        <span className="text-primary font-black">
+                            {language === 'ar' ? 'المدربين' : 'Trainers'}
+                        </span>
+                    </motion.div>
 
-            {/* Premium Ultra-Compact Header */}
-            <section className="relative pt-4 pb-2 px-4 z-20 max-w-7xl mx-auto">
-                <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-white/5 pb-2"
-                >
-                    <div className="flex flex-col text-start">
-                        <h1 className="text-base md:text-lg font-black text-white tracking-tighter flex items-center gap-2">
-                            <span className="opacity-50 text-[10px] font-bold uppercase tracking-widest">{t('main') || 'الرئيسية'}</span>
-                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                            <span className="opacity-50 text-[10px] font-bold uppercase tracking-widest">{language === 'ar' ? 'المدربون' : 'Trainers'}</span>
-                            <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                            <span className="text-primary">{language === 'ar' ? 'مدربو كابتينة' : 'Captina Trainers'}</span>
-                        </h1>
-                        <p className="text-gray-500 text-[8px] font-bold uppercase tracking-wider">
-                            {language === 'ar' ? 'نخبة من أفضل المدربين في متناول يدك' : "Elite trainers at your fingertips"}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-1 md:max-w-xs justify-end">
-                        <div className="relative group flex-1 max-w-[160px]">
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
-                                className="w-full bg-[#1a2235]/60 backdrop-blur-3xl border border-white/5 rounded-lg py-1.5 px-3 ps-8 transition-all outline-none text-white font-bold text-[9px] text-start"
-                            />
-                            <Search className={`absolute ${language === 'en' ? 'left-2.5' : 'right-2.5'} top-1/2 -translate-y-1/2 w-3 h-3 text-white/40 group-focus-within:text-primary transition-colors`} />
-                        </div>
-                        <button className="p-2 bg-white/5 rounded-lg border border-white/5 text-gray-400 hover:text-primary transition-all active:scale-95">
-                            <Filter className="w-3 h-3" />
-                        </button>
-                    </div>
-                </motion.div>
-            </section>
-
-            <div className="max-w-7xl mx-auto px-4 mt-6 relative z-10">
-                {/* Sports Mini Scroll - More Compact */}
-                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-6">
-                    {sportsList.map((sport) => (
-                        <button
-                            key={sport.id}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all duration-300 border ${sport.id === selectedSport ? 'bg-primary text-white border-primary shadow-sm' : 'bg-[#1a2235]/40 text-gray-500 border-white/5 hover:border-white/10'}`}
-                            onClick={() => setSelectedSport(sport.id)}
-                        >
-                            <span className="text-xs">
-                                {sport.id === 'boxing' ? '🥊' : sport.id === 'karate' ? '🥋' : sport.id === 'taekwondo' ? '🥋' : '💪'}
-                            </span>
-                            <span className="text-[8px] font-black uppercase tracking-wider">{sport.name}</span>
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <Users className="w-3.5 h-3.5 text-primary" />
-                        <h2 className="text-[11px] font-black text-white tracking-[0.1em] uppercase">
-                            {language === 'ar' ? 'فريقنا المعتمد' : 'Certified Team'}
-                        </h2>
-                    </div>
-                </div>
-
-                {/* Trainers Grid - Extreme Density */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                    {filteredTrainers.map((trainer, idx) => (
+                    <div className="w-full flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        {/* Titling Section */}
                         <motion.div
-                            key={trainer.id}
                             initial={{ opacity: 0, y: 10 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: idx * 0.05 }}
-                            className="group bg-[#1a2235]/30 backdrop-blur-3xl rounded-xl overflow-hidden border border-white/5 shadow-sm hover:border-primary/20 transition-all duration-500 flex flex-col h-full"
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex flex-col gap-1"
                         >
-                            <div className="relative aspect-[4/5] overflow-hidden shrink-0">
-                                <img src={trainer.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 opacity-80" alt={trainer.name} />
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-transparent to-transparent opacity-90"></div>
-                                {trainer.premium && (
-                                    <div className="absolute top-1.5 right-1.5 bg-amber-500/90 backdrop-blur-md p-1 rounded-sm shadow-xl border border-white/10">
-                                        <Crown className="w-2 h-2 text-white" />
-                                    </div>
-                                )}
-                                <div className="absolute bottom-1.5 left-2 right-2 flex justify-between items-end text-white">
-                                    <div className="flex flex-col">
-                                        <h3 className="text-[10px] font-black tracking-tight leading-tight line-clamp-1">{trainer.name}</h3>
-                                        <div className="flex items-center gap-0.5 mt-0.5">
-                                            <Star className="w-2 h-2 text-amber-500 fill-amber-500" />
-                                            <span className="text-[7px] font-black">{trainer.rating}</span>
-                                        </div>
-                                    </div>
-                                    <div className="w-5 h-5 bg-white/10 backdrop-blur-md rounded flex items-center justify-center border border-white/10 mb-0.5">
-                                        <ChevronRight className={`w-3 h-3 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 p-2 flex flex-col justify-between">
-                                <div className="space-y-2">
-                                    <div className="flex flex-wrap gap-1">
-                                        {trainer.specialties.slice(0, 2).map((s, i) => (
-                                            <span key={i} className="text-[6px] font-black text-gray-500 uppercase tracking-widest px-1 py-0.5 bg-white/5 rounded-sm border border-white/5">{s}</span>
-                                        ))}
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between py-1 border-t border-white/5">
-                                        <div className="flex flex-col">
-                                            <span className="text-[5px] font-black text-gray-600 uppercase tracking-widest leading-none mb-0.5">{language === 'ar' ? 'الطلاب' : 'STUDENTS'}</span>
-                                            <span className="text-[8px] font-black text-white">{trainer.students}</span>
-                                        </div>
-                                        <div className="flex flex-col text-end">
-                                            <span className="text-[5px] font-black text-gray-600 uppercase tracking-widest leading-none mb-0.5">{language === 'ar' ? 'الخبرة' : 'EXP'}</span>
-                                            <span className="text-[8px] font-black text-white">{trainer.exp}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 mt-2">
-                                    <Link 
-                                        href={`/trainers/${trainer.id}`}
-                                        className="flex-1 bg-white text-[#0a0f1a] hover:bg-primary hover:text-white py-1 rounded-md font-black text-[7px] text-center shadow transition-all uppercase tracking-widest active:scale-95"
-                                    >
-                                        {language === 'ar' ? 'عرض الملف' : 'View Profile'}
-                                    </Link>
-                                </div>
+                            <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">
+                                {language === 'ar' ? 'نخبة المدربين' : 'Elite Trainers'}
+                            </h1>
+                            <div className="flex items-center gap-2">
+                                <div className="h-1 w-12 bg-primary rounded-full"></div>
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest opacity-80">
+                                    {language === 'ar' ? 'تدريب احترافي يصل بك للقمة' : 'Professional training taking you to the top'}
+                                </p>
                             </div>
                         </motion.div>
-                    ))}
-                </div>
-            </div>
 
-            {/* Stats Compact Grid - Reduced height and padding */}
-            <section className="mt-20 py-10 px-6 bg-[#05080f]/50 border-y border-white/5">
-                <div className="max-w-4xl mx-auto grid grid-cols-4 gap-4 text-center">
-                    {[
-                        { icon: UserCheck, val: "150+", label: language === 'ar' ? 'مدرب' : 'Coaches', color: 'text-blue-500' },
-                        { icon: Star, val: "4.9", label: language === 'ar' ? 'تقييم' : 'Rating', color: 'text-amber-500' },
-                        { icon: Dumbbell, val: "12", label: language === 'ar' ? 'رياضة' : 'Sports', color: 'text-primary' },
-                        { icon: Users, val: "10K+", label: language === 'ar' ? 'متدرب' : 'Members', color: 'text-emerald-500' }
-                    ].map((stat, i) => (
-                        <div key={i} className="flex flex-col items-center">
-                            <stat.icon className={`w-5 h-5 ${stat.color} mb-1.5`} />
-                            <div className="text-xl font-black text-white tracking-tighter mb-0.5">{stat.val}</div>
-                            <div className="text-[7px] font-black text-gray-500 uppercase tracking-widest">{stat.label}</div>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Why Us Compact Section - Optimized into single line on desktop */}
-            <section className="py-16 px-6 max-w-7xl mx-auto">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                        { icon: Award, title: language === 'ar' ? 'شهادات دولية' : 'Global Certs', color: 'text-rose-500' },
-                        { icon: GraduationCap, title: language === 'ar' ? 'خلفية أكاديمية' : 'Pro Background', color: 'text-blue-500' },
-                        { icon: Trophy, title: language === 'ar' ? 'أبطال معتمدون' : 'Elite Medalists', color: 'text-amber-500' },
-                        { icon: UserCheck, title: language === 'ar' ? 'تقييم دوري' : 'Strict Quality', color: 'text-emerald-500' }
-                    ].map((item, i) => (
-                        <div key={i} className="bg-[#1a2235]/40 backdrop-blur-3xl p-6 rounded-2xl border border-white/5 text-center group hover:bg-white/5 transition-all">
-                            <div className={`w-10 h-10 ${item.color} bg-white/5 rounded-lg flex items-center justify-center mx-auto mb-3 border border-white/5 group-hover:scale-105 transition-transform`}>
-                                <item.icon className="w-5 h-5" />
+                        {/* Search & Filter Component */}
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-2 w-full md:w-auto"
+                        >
+                            <div className="relative flex-1 md:w-80 group">
+                                <Search className={`absolute ${language === 'en' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors`} />
+                                <input 
+                                    type="text"
+                                    placeholder={language === 'ar' ? 'ابحث عن بطلك...' : 'Search your hero...'}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-4 h-12 px-12 text-xs font-black text-slate-900 dark:text-white outline-none focus:border-primary transition-all placeholder:opacity-50"
+                                />
                             </div>
-                            <h3 className="text-[9px] font-black text-white tracking-tight uppercase">{item.title}</h3>
-                        </div>
-                    ))}
+                            <button className="h-12 w-12 rounded-2xl bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary transition-all active:scale-95">
+                                <Filter className="w-5 h-5" />
+                            </button>
+                        </motion.div>
+                    </div>
+
+                    {/* Specialty Tabs */}
+                    <div className="flex gap-2 mt-8 overflow-x-auto no-scrollbar py-2 w-full">
+                        {sportsList.map((sport) => (
+                            <button
+                                key={sport.id}
+                                onClick={() => setSelectedSport(sport.id)}
+                                className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap active:scale-95 ${
+                                    selectedSport === sport.id 
+                                    ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-105' 
+                                    : 'bg-white dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-transparent dark:border-white/5 hover:border-primary/30'
+                                }`}
+                            >
+                                <span className={`${selectedSport === sport.id ? 'text-white' : 'text-primary'}`}>{sport.icon}</span>
+                                {sport.name}
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </section>
+            </header>
+
+            <main className="max-w-7xl mx-auto px-6 mt-12 relative z-10">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    <AnimatePresence mode="popLayout">
+                        {filteredTrainers.map((trainer, idx) => (
+                            <motion.div
+                                key={trainer.id}
+                                layout
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className="group"
+                            >
+                                <Link href={`/trainers/${trainer.id}`}>
+                                    <div className="relative bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium transition-all duration-500 hover:shadow-active hover:-translate-y-2 flex flex-col h-full active:scale-[0.98]">
+                                        {/* Profile Media */}
+                                        <div className="relative aspect-[4/5] overflow-hidden m-1.5 rounded-[2.2rem]">
+                                            <img 
+                                                src={trainer.image || `https://i.pravatar.cc/800?u=${trainer.id}`}
+                                                alt={trainer.name}
+                                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                                            
+                                            {/* Top Icons */}
+                                            <div className="absolute top-4 start-4 end-4 flex justify-between items-center">
+                                                <div className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-black flex items-center gap-1.5 border border-white/30 shadow-lg">
+                                                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                                                    <span>{trainer.rating}</span>
+                                                </div>
+                                                {trainer.premium && (
+                                                    <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-[0_4px_15px_rgba(255,0,0,0.4)]">
+                                                        <Crown className="w-4 h-4 text-white" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Name & Specialty Over Image */}
+                                            <div className="absolute bottom-6 start-6 end-6">
+                                                <h3 className="text-xl font-black text-white tracking-tight leading-tight group-hover:text-primary transition-colors mb-1 truncate">
+                                                    {trainer.name}
+                                                </h3>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-1 w-4 bg-primary rounded-full"></div>
+                                                    <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest truncate">
+                                                        {trainer.specialties[0]}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Bottom Actions/Stats */}
+                                        <div className="p-4 pt-1 flex items-center justify-between">
+                                            <div className="flex items-center gap-2 bg-gray-50 dark:bg-white/5 py-2 px-3 rounded-2xl border border-gray-100 dark:border-white/10 flex-1">
+                                                <Users className="w-3.5 h-3.5 text-primary" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none">{language === 'ar' ? 'طلاب' : 'Students'}</span>
+                                                    <span className="text-[11px] font-black text-slate-900 dark:text-white leading-none mt-0.5">{trainer.students}+</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 flex items-center justify-center ms-2 group-hover:bg-primary group-hover:text-white transition-all shadow-lg shadow-black/5">
+                                                <ArrowRight className={`w-4 h-4 transition-transform ${language === 'ar' ? 'rotate-180 group-hover:-translate-x-1' : 'group-hover:translate-x-1'}`} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+            </main>
+
+            {/* Empty State */}
+            {filteredTrainers.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-40 opacity-50">
+                    <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
+                        <Search className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic text-center">
+                        {language === 'ar' ? 'لم يتم العثور على مدربين بهذا الاسم' : 'No coaches found with this name'}
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

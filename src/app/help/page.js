@@ -13,7 +13,7 @@ import { addDoc, collection } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 
 export default function HelpCenter() {
-    const { language } = useApp();
+    const { language, t } = useApp();
     const [searchQuery, setSearchQuery] = useState("");
     const [openFaq, setOpenFaq] = useState(null);
     const [activeTab, setActiveTab] = useState('faq'); // 'faq' or 'contact'
@@ -25,28 +25,20 @@ export default function HelpCenter() {
 
     const faqs = [
         {
-            q: language === 'ar' ? 'كيف يمكنني حجز حصة تدريبية؟' : 'How can I book a training session?',
-            a: language === 'ar' 
-                ? 'يمكنك حجز حصة من خلال الذهاب لصفحة المدربين، اختيار المدرب المفضل، ثم الضغط على زر "احجز الآن" واختيار اليوم والوقت المناسب.' 
-                : 'You can book a session by going to the Trainers page, selecting your preferred trainer, then clicking the "Book Now" button and choosing a suitable day and time.'
+            q: t('helpPage.faqs.booking.q'),
+            a: t('helpPage.faqs.booking.a')
         },
         {
-            q: language === 'ar' ? 'هل يمكنني إلغاء الحجز؟' : 'Can I cancel my booking?',
-            a: language === 'ar'
-                ? 'نعم، يمكنك إلغاء الحجز قبل بدء الحصة بـ 24 ساعة على الأقل من خلال صفحة "حجوزاتي" في ملفك الشخصي.'
-                : 'Yes, you can cancel your booking at least 24 hours before the session starts through the "My Bookings" page in your profile.'
+            q: t('helpPage.faqs.cancel.q'),
+            a: t('helpPage.faqs.cancel.a')
         },
         {
-            q: language === 'ar' ? 'كيف أقوم بتجديد الباقة؟' : 'How do I renew my package?',
-            a: language === 'ar'
-                ? 'عند اقتراب انتهاء باقتك، سيظهر لك تنبيه في صفحة الملف الشخصي. يمكنك الضغط على "تجديد الباقة" وإتمام عملية الدفع.'
-                : 'When your package is near expiration, a notification will appear on your Profile page. You can click "Renew Package" and complete the payment process.'
+            q: t('helpPage.faqs.renew.q'),
+            a: t('helpPage.faqs.renew.a')
         },
         {
-            q: language === 'ar' ? 'هل التطبيق يدعم لغات أخرى؟' : 'Does the app support other languages?',
-            a: language === 'ar'
-                ? 'نعم، التطبيق يدعم اللغتين العربية والإنجليزية. يمكنك تغيير اللغة من صفحة الإعدادات.'
-                : 'Yes, the app supports both Arabic and English. You can change the language from the Settings page.'
+            q: t('helpPage.faqs.lang.q'),
+            a: t('helpPage.faqs.lang.a')
         }
     ];
 
@@ -72,7 +64,7 @@ export default function HelpCenter() {
             setTimeout(() => setSuccess(false), 5000);
         } catch (error) {
             console.error("Error submitting ticket:", error);
-            alert(language === 'ar' ? 'حدث خطأ أثناء الإرسال' : 'Error submitting');
+            alert(t('helpPage.form.submitError') || (language === 'ar' ? 'حدث خطأ أثناء الإرسال' : 'Error submitting'));
         } finally {
             setLoading(false);
         }
@@ -84,23 +76,44 @@ export default function HelpCenter() {
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[140px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-[120px] -z-0"></div>
 
-            {/* Premium Ultra-Compact Header */}
-            <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0a0f1a]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5">
-                <div className="container mx-auto px-4 h-12 flex items-center justify-between max-w-3xl">
-                    <div className="flex items-center gap-3">
-                        <Link href="/settings" className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                            {language === 'ar' ? <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" /> : <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
-                        </Link>
-                        <h1 className="text-sm font-black text-gray-900 dark:text-white tracking-tighter flex items-center gap-2">
-                            <span className="opacity-50 text-[9px] font-bold uppercase tracking-widest">{language === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-white/20"></span>
-                            <span className="text-primary">{language === 'ar' ? 'مركز المساعدة' : 'Help Center'}</span>
-                        </h1>
+            {/* Header / Breadcrumbs - Compact Version */}
+            <header className="relative z-20 pt-6 px-4">
+                <div className="max-w-3xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{t('helpPage.breadcrumbs.home')}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <Link href="/settings" className="hover:text-primary transition-colors">{t('helpPage.breadcrumbs.settings')}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{t('helpPage.breadcrumbs.help')}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line - Horizontal */}
+                    <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-3 mb-4"
+                        >
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                            <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter italic uppercase text-center">
+                                {t('helpPage.heroTitle')}
+                            </h1>
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        </motion.div>
                     </div>
                 </div>
             </header>
 
-            <main className="container mx-auto px-6 py-12 max-w-3xl">
+            <main className="container mx-auto px-6 max-w-3xl">
                 {/* Premium Hero Search Section */}
                 <div className="text-center mb-16">
                     <motion.div 
@@ -111,7 +124,7 @@ export default function HelpCenter() {
                         <LifeBuoy className="w-12 h-12 text-white" />
                     </motion.div>
                     <h2 className="text-4xl md:text-5xl font-black text-white mb-8 tracking-tighter leading-tight">
-                        {language === 'ar' ? 'كيف يمكننا مساعدتك اليوم؟' : 'How can we help you today?'}
+                        {t('helpPage.heroHeader')}
                     </h2>
                     
                     <div className="relative max-w-xl mx-auto group">
@@ -120,7 +133,7 @@ export default function HelpCenter() {
                         <input 
                             type="text" 
                             className="w-full bg-white/10 backdrop-blur-md border border-white/10 rounded-[2rem] py-6 pl-16 pr-6 text-lg text-white shadow-2xl focus:ring-4 focus:ring-primary/20 outline-none transition-all placeholder:text-gray-500"
-                            placeholder={language === 'ar' ? 'ابحث عن إجابات سريعة...' : 'Search for rapid answers...'}
+                            placeholder={t('helpPage.searchPlaceholder')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -133,13 +146,13 @@ export default function HelpCenter() {
                         onClick={() => setActiveTab('faq')}
                         className={`flex-1 py-4 rounded-[2rem] text-sm font-black uppercase transition-all duration-500 ${activeTab === 'faq' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-gray-400 hover:text-white'}`}
                     >
-                        {language === 'ar' ? 'الأسئلة الشائعة' : 'FAQs'}
+                        {t('helpPage.tabs.faq')}
                     </button>
                     <button 
                         onClick={() => setActiveTab('contact')}
                         className={`flex-1 py-4 rounded-[2rem] text-sm font-black uppercase transition-all duration-500 ${activeTab === 'contact' ? 'bg-primary text-white shadow-xl shadow-primary/30' : 'text-gray-400 hover:text-white'}`}
                     >
-                        {language === 'ar' ? 'تواصل معنا' : 'Contact Us'}
+                        {t('helpPage.tabs.contact')}
                     </button>
                 </div>
 
@@ -150,39 +163,44 @@ export default function HelpCenter() {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 20 }}
-                            className="space-y-6"
+                            className="space-y-4"
                         >
-                            {filteredFaqs.length > 0 ? (
-                                filteredFaqs.map((faq, idx) => (
-                                    <div key={idx} className="bg-white dark:bg-slate-800 rounded-[3rem] overflow-hidden border border-gray-100 dark:border-white/5 shadow-premium hover:translate-y-[-2px] transition-all">
-                                        <button 
-                                            onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                                            className="w-full p-8 flex items-center justify-between gap-6 text-start"
-                                        >
-                                            <span className="text-lg font-black text-gray-900 dark:text-white leading-tight">{faq.q}</span>
-                                            <div className={`shrink-0 w-12 h-12 rounded-2xl bg-gray-50 dark:bg-white/5 flex items-center justify-center transition-all duration-500 ${openFaq === idx ? 'rotate-180 bg-primary/10 text-primary' : 'text-gray-400'}`}>
-                                                <ChevronDown className="w-6 h-6" />
-                                            </div>
-                                        </button>
-                                        <AnimatePresence>
-                                            {openFaq === idx && (
-                                                <motion.div 
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    className="overflow-hidden"
-                                                >
-                                                    <div className="px-8 pb-8 pt-0 text-base font-bold text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-50 dark:border-white/5 py-6">
-                                                        {faq.a}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-20 bg-white/5 rounded-[3rem] border border-dashed border-white/10">
-                                    <p className="text-xl text-gray-500 font-bold tracking-tight">{language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results found'}</p>
+                            {filteredFaqs.length > 0 ? filteredFaqs.map((faq, index) => (
+                                <motion.div 
+                                    key={index}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="bg-white/5 backdrop-blur-md rounded-[2rem] border border-white/5 overflow-hidden group hover:border-primary/30 transition-all shadow-xl"
+                                >
+                                    <button 
+                                        onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                                        className="w-full px-8 py-6 flex items-center justify-between text-left"
+                                    >
+                                        <span className={`text-lg font-black tracking-tight transition-colors ${openFaq === index ? 'text-primary' : 'text-white group-hover:text-primary'}`}>
+                                            {faq.q}
+                                        </span>
+                                        <ChevronDown className={`w-6 h-6 text-primary transition-transform duration-500 ${openFaq === index ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    <AnimatePresence>
+                                        {openFaq === index && (
+                                            <motion.div 
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                className="px-8 pb-8"
+                                            >
+                                                <div className="pt-4 border-t border-white/5 text-gray-400 leading-relaxed text-lg font-medium">
+                                                    {faq.a}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            )) : (
+                                <div className="text-center py-20 opacity-40">
+                                    <Search className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                                    <p className="text-xl font-black uppercase tracking-widest">{t('helpPage.noResults') || (language === 'ar' ? 'لا توجد نتائج مطابقة' : 'No matching results found')}</p>
                                 </div>
                             )}
                         </motion.div>
@@ -192,87 +210,75 @@ export default function HelpCenter() {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
-                            className="space-y-10"
+                            className="space-y-8 pb-20"
                         >
+                            {/* Contact Options Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] border border-gray-100 dark:border-white/5 text-center transition-all hover:shadow-2xl hover:translate-y-[-4px] group">
-                                    <div className="w-16 h-16 bg-primary shadow-lg shadow-primary/20 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-all">
-                                        <Mail className="w-8 h-8 text-white" />
+                                <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 shadow-2xl group hover:border-primary/30 transition-all">
+                                    <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                        <ShieldCheck className="w-8 h-8 text-primary" />
                                     </div>
-                                    <h4 className="text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Premium Support</h4>
-                                    <p className="text-xl font-black text-gray-900 dark:text-white">support@captina.sa</p>
+                                    <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">{t('helpPage.contactItems.premium')}</h3>
+                                    <p className="text-gray-500 font-medium">{t('helpPage.contactItems.premiumDesc')}</p>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] border border-gray-100 dark:border-white/5 text-center transition-all hover:shadow-2xl hover:translate-y-[-4px] group">
-                                    <div className="w-16 h-16 bg-blue-500 shadow-lg shadow-blue-500/20 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-all">
-                                        <Phone className="w-8 h-8 text-white" />
+                                <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 shadow-2xl group hover:border-primary/30 transition-all">
+                                    <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                        <Mail className="w-8 h-8 text-primary" />
                                     </div>
-                                    <h4 className="text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Hotline 24/7</h4>
-                                    <p className="text-xl font-black text-gray-900 dark:text-white">+966 9200 0000</p>
+                                    <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">{t('helpPage.contactItems.hotline')}</h3>
+                                    <p className="text-gray-500 font-medium">{t('helpPage.contactItems.hotlineDesc')}</p>
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-[3.5rem] p-10 md:p-14 border border-gray-100 dark:border-white/5 shadow-2xl space-y-8 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                            {/* Direct Contact Form */}
+                            <div className="bg-white/5 backdrop-blur-xl p-10 rounded-[3rem] border border-white/5 shadow-2xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full translate-x-16 -translate-y-16"></div>
+                                <h3 className="text-2xl font-black text-white mb-8 tracking-tighter uppercase italic">{t('helpPage.form.title')}</h3>
                                 
-                                <h3 className="text-3xl font-black text-gray-900 dark:text-white mb-4 text-start tracking-tighter">
-                                    {language === 'ar' ? 'أرسل لنا رسالة خاصة' : 'Send us a direct message'}
-                                </h3>
-
-                                {success && (
+                                {success ? (
                                     <motion.div 
                                         initial={{ opacity: 0, scale: 0.9 }}
                                         animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-emerald-500 text-white p-6 rounded-[2rem] text-sm font-black flex items-center gap-4 shadow-xl"
+                                        className="bg-primary/20 border border-primary/30 text-primary p-8 rounded-3xl text-center font-black"
                                     >
-                                        <CheckCircle2 className="w-6 h-6" />
-                                        {language === 'ar' ? 'تم إرسال رسالتك بنجاح! سنرد عليك قريباً.' : 'Message received! Our team will contact you shortly.'}
+                                        <ShieldCheck className="w-12 h-12 mx-auto mb-4" />
+                                        {t('helpPage.form.success')}
                                     </motion.div>
+                                ) : (
+                                    <form onSubmit={handleSubmit} className="space-y-6">
+                                        <div>
+                                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">{t('helpPage.form.subject')}</label>
+                                            <input 
+                                                type="text" 
+                                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-gray-600 font-medium"
+                                                placeholder={t('helpPage.form.subjectPlaceholder')}
+                                                required
+                                                value={formData.subject}
+                                                onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">{t('helpPage.form.message')}</label>
+                                            <textarea 
+                                                rows="5"
+                                                className="w-full bg-white/5 border border-white/10 rounded-3xl py-5 px-6 text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-gray-600 font-medium resize-none"
+                                                placeholder={t('helpPage.form.messagePlaceholder')}
+                                                required
+                                                value={formData.message}
+                                                onChange={(e) => setFormData({...formData, message: e.target.value})}
+                                            ></textarea>
+                                        </div>
+                                        <button 
+                                            type="submit"
+                                            disabled={loading}
+                                            className="w-full bg-primary hover:bg-primary-dark text-white font-black uppercase py-6 rounded-[2rem] shadow-2xl shadow-primary/40 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
+                                        >
+                                            <Send className="w-6 h-6" />
+                                            <span>{loading ? t('contactPage.form.loading') : t('helpPage.form.submit')}</span>
+                                        </button>
+                                    </form>
                                 )}
-
-                                <div className="space-y-6">
-                                    <div>
-                                        <label className="block text-xs font-black text-gray-400 uppercase mb-3 px-2 tracking-widest">
-                                            {language === 'ar' ? 'موضوع الاستفسار' : 'Inquiry Subject'}
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            className="w-full bg-gray-50 dark:bg-slate-700/50 border-0 rounded-[2rem] p-6 text-gray-900 dark:text-white text-lg focus:ring-4 focus:ring-primary/20 transition-all outline-none"
-                                            placeholder={language === 'ar' ? 'حدد موضوع رسالتك هنا...' : 'Define your subject here...'}
-                                            value={formData.subject}
-                                            onChange={(e) => setFormData({...formData, subject: e.target.value})}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-black text-gray-400 uppercase mb-3 px-2 tracking-widest">
-                                            {language === 'ar' ? 'تفاصيل الرسالة' : 'Message Details'}
-                                        </label>
-                                        <textarea 
-                                            className="w-full bg-gray-50 dark:bg-slate-700/50 border-0 rounded-[2rem] p-8 text-gray-900 dark:text-white text-lg focus:ring-4 focus:ring-primary/20 transition-all outline-none min-h-[200px] resize-none"
-                                            placeholder={language === 'ar' ? 'اشرح لنا ما يدور في ذهنك بالتفصيل...' : 'Explain in detail how we can help...'}
-                                            value={formData.message}
-                                            onChange={(e) => setFormData({...formData, message: e.target.value})}
-                                            required
-                                        />
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full h-20 bg-primary text-white rounded-[2rem] text-xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/30 hover:shadow-primary/50 hover:translate-y-[-2px] active:scale-95 transition-all flex items-center justify-center gap-4 group"
-                                    >
-                                        {loading ? (
-                                            <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        ) : (
-                                            <>
-                                                <span>{language === 'ar' ? 'إرسال الرسالة' : 'Send Message'}</span>
-                                                <Send className="w-6 h-6 transition-transform group-hover:translate-x-2 group-hover:-translate-y-2" />
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </form>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>

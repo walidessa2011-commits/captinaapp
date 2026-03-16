@@ -22,23 +22,40 @@ export default function Contact() {
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[140px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-[120px] -z-0"></div>
 
-            {/* Premium Ultra-Compact Header */}
-            <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0a0f1a]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5">
-                <div className="container mx-auto px-4 h-12 flex items-center justify-between max-w-4xl">
-                    <div className="flex items-center gap-3">
-                        <Link href="/" className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                            {language === 'ar' ? <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" /> : <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
-                        </Link>
-                        <h1 className="text-sm font-black text-gray-900 dark:text-white tracking-tighter flex items-center gap-2">
-                            <span className="opacity-50 text-[9px] font-bold uppercase tracking-widest">{t('main') || 'الرئيسية'}</span>
-                            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-white/20"></span>
-                            <span className="text-primary">{language === 'ar' ? 'تواصل معنا' : 'Contact Us'}</span>
-                        </h1>
+            {/* Header / Breadcrumbs - Compact Version */}
+            <header className="relative z-20 pt-6 px-4">
+                <div className="max-w-4xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{t('contactPage.breadcrumbs.home')}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{t('contactPage.breadcrumbs.contact')}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line - Horizontal */}
+                    <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-3 mb-4"
+                        >
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                            <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter italic uppercase text-center">
+                                {t('contactPage.heroTitle')}
+                            </h1>
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        </motion.div>
                     </div>
                 </div>
             </header>
 
-            <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <div className="container mx-auto px-4 max-w-4xl">
                 <div className="grid md:grid-cols-5 gap-6">
                     {/* Contact Info */}
                     <div className="md:col-span-2 space-y-4">
@@ -48,18 +65,18 @@ export default function Contact() {
                             className="bg-gradient-to-br from-primary to-blue-700 rounded-3xl p-6 text-white shadow-xl shadow-primary/20 text-start relative overflow-hidden"
                         >
                             <h2 className="text-xl font-black mb-4">
-                                {language === 'ar' ? 'نحن هنا لمساعدتك' : "We're Here to Help"}
+                                {t('contactPage.infoTitle')}
                             </h2>
                             <p className="text-white/70 text-sm font-bold mb-6 leading-relaxed">
-                                {language === 'ar' ? 'فريقنا جاهز للإجابة على جميع استفساراتك حول الدورات والمدربين' : 'Our team is ready to answer all your questions about courses and trainers'}
+                                {t('contactPage.infoDesc')}
                             </p>
                             
                             <div className="space-y-4">
                                 {[
-                                    { icon: MapPin, label: language === 'ar' ? 'الموقع' : 'Location', value: language === 'ar' ? 'الرياض، حي المونسية' : 'Riyadh, Al-Monsiya' },
-                                    { icon: Phone, label: language === 'ar' ? 'الجوال' : 'Phone', value: '0551447768' },
-                                    { icon: Mail, label: language === 'ar' ? 'البريد' : 'Email', value: 'support@captina.sa' },
-                                    { icon: Clock, label: language === 'ar' ? 'ساعات العمل' : 'Working Hours', value: language === 'ar' ? '8 ص - 10 م' : '8 AM - 10 PM' }
+                                    { icon: MapPin, label: t('contactPage.labels.location'), value: t('contactPage.values.address') },
+                                    { icon: Phone, label: t('contactPage.labels.phone'), value: '0551447768' },
+                                    { icon: Mail, label: t('contactPage.labels.email'), value: 'support@captina.sa' },
+                                    { icon: Clock, label: t('contactPage.labels.hours'), value: t('contactPage.values.hours') }
                                 ].map((item, i) => (
                                     <div key={i} className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10">
@@ -89,14 +106,14 @@ export default function Contact() {
                                     <MessageCircle className="w-5 h-5 text-primary" />
                                 </div>
                                 <h3 className="text-lg font-black text-gray-900 dark:text-white">
-                                    {language === 'ar' ? 'أرسل لنا رسالة' : 'Send us a message'}
+                                    {t('contactPage.formTitle')}
                                 </h3>
                             </div>
 
                             <form className="space-y-4" onSubmit={handleSubmit}>
                                 <div className="space-y-1.5 text-start">
                                     <label className="text-[10px] font-black text-gray-400 uppercase px-2">
-                                        {language === 'ar' ? 'الاسم بالكامل' : 'Full Name'}
+                                        {t('contactPage.labels.fullName')}
                                     </label>
                                     <input 
                                         type="text" 
@@ -104,12 +121,12 @@ export default function Contact() {
                                         value={formData.name}
                                         onChange={(e) => setFormData({...formData, name: e.target.value})}
                                         className="w-full bg-gray-50 dark:bg-white/5 border-2 border-gray-100 dark:border-white/5 rounded-2xl p-4 focus:border-primary outline-none transition-all text-sm font-bold text-gray-900 dark:text-white" 
-                                        placeholder={language === 'ar' ? "أدخل اسمك" : "Enter your name"} 
+                                        placeholder={t('contactPage.placeholders.name')} 
                                     />
                                 </div>
                                 <div className="space-y-1.5 text-start">
                                     <label className="text-[10px] font-black text-gray-400 uppercase px-2">
-                                        {language === 'ar' ? 'رقم الجوال' : 'Phone Number'}
+                                        {t('contactPage.labels.phone')}
                                     </label>
                                     <input 
                                         type="tel" 
@@ -122,14 +139,14 @@ export default function Contact() {
                                 </div>
                                 <div className="space-y-1.5 text-start">
                                     <label className="text-[10px] font-black text-gray-400 uppercase px-2">
-                                        {language === 'ar' ? 'الرسالة' : 'Message'}
+                                        {t('contactPage.labels.message')}
                                     </label>
                                     <textarea 
                                         required
                                         value={formData.message}
                                         onChange={(e) => setFormData({...formData, message: e.target.value})}
                                         className="w-full bg-gray-50 dark:bg-white/5 border-2 border-gray-100 dark:border-white/5 rounded-2xl p-4 focus:border-primary outline-none transition-all h-32 text-sm font-bold text-gray-900 dark:text-white resize-none" 
-                                        placeholder={language === 'ar' ? "كيف يمكننا مساعدتك؟" : "How can we help you?"}
+                                        placeholder={t('contactPage.placeholders.message')}
                                     ></textarea>
                                 </div>
                                 <button 
@@ -138,8 +155,8 @@ export default function Contact() {
                                 >
                                     <Send className="w-4 h-4" />
                                     {submitted 
-                                        ? (language === 'ar' ? 'تم الإرسال بنجاح ✓' : 'Sent Successfully ✓')
-                                        : (language === 'ar' ? 'إرسال الرسالة' : 'Send Message')
+                                        ? t('contactPage.status.sent')
+                                        : t('contactPage.status.send')
                                     }
                                 </button>
                             </form>

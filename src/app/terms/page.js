@@ -51,23 +51,46 @@ export default function TermsAndConditions() {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] transition-colors duration-300 pb-12">
-            {/* Premium Ultra-Compact Header */}
-            <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0a0f1a]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5">
-                <div className="container mx-auto px-4 h-12 flex items-center justify-between max-w-2xl">
-                    <div className="flex items-center gap-3">
-                        <Link href="/settings" className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg transition-colors">
-                            {language === 'ar' ? <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" /> : <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
-                        </Link>
-                        <h1 className="text-sm font-black text-gray-900 dark:text-white tracking-tighter flex items-center gap-2">
-                            <span className="opacity-50 text-[9px] font-bold uppercase tracking-widest">{language === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-white/20"></span>
-                            <span className="text-primary">{language === 'ar' ? 'الشروط والأحكام' : 'Terms & Conditions'}</span>
-                        </h1>
+            {/* Header / Breadcrumbs - Compact Version */}
+            <header className="relative z-20 pt-6 px-4">
+                <div className="max-w-2xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <Link href="/settings" className="hover:text-primary transition-colors">{language === 'ar' ? 'الإعدادات' : 'Settings'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{language === 'ar' ? 'الشروط والأحكام' : 'Terms & Conditions'}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line - Horizontal */}
+                    <div className="flex flex-col items-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-3 mb-4"
+                        >
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                            <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter italic uppercase text-center">
+                                {language === 'ar' 
+                                    ? '( حقوقك والتزاماتك - الشروط والأحكام )' 
+                                    : '( Your Rights and Obligations - Terms & Conditions )'}
+                            </h1>
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        </motion.div>
                     </div>
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-2xl">
+            <main className="container mx-auto px-4 max-w-2xl">
                 <div className="text-center mb-10">
                     <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Scale className="w-10 h-10 text-primary" />

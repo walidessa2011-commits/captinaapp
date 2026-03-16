@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function MyBookings() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     const [bookings, setBookings] = useState([]);
@@ -77,19 +77,15 @@ export default function MyBookings() {
         );
     }
 
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pb-24 transition-colors">
-            <div className="bg-primary pt-12 pb-24 text-center text-white rounded-b-[3rem] relative overflow-hidden">
-                <div className="relative z-10 px-4 flex items-center justify-between container mx-auto">
-                    <Link href="/profile" className="bg-white/10 backdrop-blur-md p-3 rounded-2xl text-white border border-white/20 hover:bg-white/20 transition-all">
-                        {language === 'ar' ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
-                    </Link>
-                    <h1 className="text-2xl md:text-4xl font-black">{content.title}</h1>
-                    <div className="w-12"></div>
-                </div>
-            </div>
+    const textClass = darkMode ? "text-white" : "text-slate-900";
 
-            <div className="container mx-auto px-4 -mt-12 relative z-20 max-w-5xl">
+    return (
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-24 transition-colors relative overflow-hidden`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorative Blobs */}
+            <div className={`absolute top-0 right-0 w-[500px] h-[500px] ${darkMode ? 'bg-primary/20' : 'bg-primary/10'} rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
+
+
+            <div className="container mx-auto px-4 pt-10 relative z-20 max-w-5xl">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {bookings.length > 0 ? bookings.map((booking, idx) => (
                         <motion.div
@@ -97,7 +93,7 @@ export default function MyBookings() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.1 }}
-                            className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-white/5 flex flex-col md:flex-row gap-6 items-center"
+                            className={`${darkMode ? 'bg-[#1a2235]/40 backdrop-blur-3xl' : 'bg-white shadow-xl'} rounded-[2.5rem] p-6 border ${darkMode ? 'border-white/5' : 'border-gray-100'} flex flex-col md:flex-row gap-6 items-center`}
                         >
                             <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary shrink-0">
                                 <Calendar className="w-10 h-10" />

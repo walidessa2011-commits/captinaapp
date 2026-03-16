@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function MyOrders() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     const [orders, setOrders] = useState([]);
@@ -72,19 +72,15 @@ export default function MyOrders() {
         );
     }
 
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pb-24 transition-colors">
-            <div className="bg-emerald-500 pt-12 pb-24 text-center text-white rounded-b-[3rem] relative overflow-hidden">
-                <div className="relative z-10 px-4 flex items-center justify-between container mx-auto">
-                    <Link href="/profile" className="bg-white/10 backdrop-blur-md p-3 rounded-2xl text-white border border-white/20 hover:bg-white/20 transition-all">
-                        {language === 'ar' ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
-                    </Link>
-                    <h1 className="text-2xl md:text-4xl font-black">{content.title}</h1>
-                    <div className="w-12"></div>
-                </div>
-            </div>
+    const textClass = darkMode ? "text-white" : "text-slate-900";
 
-            <div className="container mx-auto px-4 -mt-12 relative z-20">
+    return (
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-24 transition-colors relative overflow-hidden`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorative Blobs */}
+            <div className={`absolute top-0 right-0 w-[500px] h-[500px] ${darkMode ? 'bg-emerald-500/20' : 'bg-emerald-500/10'} rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
+
+
+            <div className="container mx-auto px-4 pt-10 relative z-20">
                 <div className="space-y-4">
                     {orders.length > 0 ? orders.map((order, idx) => (
                         <motion.div
@@ -92,7 +88,7 @@ export default function MyOrders() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: idx * 0.1 }}
-                            className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-6 shadow-xl border border-gray-100 dark:border-white/5"
+                            className={`${darkMode ? 'bg-[#1a2235]/40 backdrop-blur-3xl' : 'bg-white shadow-xl'} rounded-[2.5rem] p-6 border ${darkMode ? 'border-white/5' : 'border-gray-100'}`}
                         >
                             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                                 <div className="flex items-center gap-4 bg-gray-50 dark:bg-white/5 px-4 py-2 rounded-2xl order-2 md:order-1">

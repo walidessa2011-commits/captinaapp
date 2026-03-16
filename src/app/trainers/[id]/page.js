@@ -18,7 +18,7 @@ const iconMap = {
 };
 
 export default function TrainerProfile({ params }) {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const resolvedParams = use(params);
     const id = resolvedParams.id;
 
@@ -63,34 +63,54 @@ export default function TrainerProfile({ params }) {
         price: trainerInfo.price || 150
     };
 
+    const textClass = darkMode ? "text-white" : "text-slate-900";
+
     return (
-        <div className="min-h-screen bg-[#0a0f1a] pb-32 transition-colors duration-500 overflow-x-hidden relative">
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-32 transition-colors duration-500 overflow-x-hidden relative`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Background Decorative Blobs */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
+            <div className={`absolute top-0 right-0 w-[500px] h-[500px] ${darkMode ? 'bg-primary/20' : 'bg-primary/10'} rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
             
-            {/* Header / Banner Section - Reduced Height */}
-            <div className="relative h-[200px] md:h-[240px] w-full overflow-hidden">
+            {/* Immersive Header */}
+            <header className="relative z-20 pt-16 pb-6 px-6">
+                <div className="max-w-7xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <Link href="/trainers" className="hover:text-primary transition-colors">{language === 'ar' ? 'المدربين' : 'Trainers'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{trainer.name}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-3 mb-4"
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        <h1 className={`text-xl md:text-2xl font-black ${textClass} tracking-tighter italic uppercase text-center`}>
+                            {language === 'ar' 
+                                ? `( ${trainer.name} - ملف المدرب )` 
+                                : `( ${trainer.name} - Expert Profile )`}
+                        </h1>
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                    </motion.div>
+                </div>
+            </header>
+
+            {/* Banner Section - Compact */}
+            <div className="relative h-[180px] md:h-[220px] w-full overflow-hidden mx-auto max-w-5xl rounded-[2.5rem] border border-white/5">
                 <img src={trainer.coverImage} className="w-full h-full object-cover opacity-60" alt="Cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-[#0a0f1a]/40 to-transparent"></div>
-                
-                {/* Back Button */}
-                <div className="max-w-4xl mx-auto px-6 pt-6">
-                    <Link 
-                        href="/trainers"
-                        className="inline-flex items-center justify-center w-10 h-10 bg-[#1a2235]/60 backdrop-blur-xl rounded-xl text-white hover:bg-white/10 transition-all border border-white/10 relative z-20"
-                    >
-                        <ArrowLeft className={`w-5 h-5 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                    </Link>
-                </div>
-
-                <div className="absolute top-6 right-6 flex gap-2 z-20">
-                    <button className="w-10 h-10 bg-[#1a2235]/60 backdrop-blur-xl rounded-xl flex items-center justify-center text-white/60 hover:text-white transition-all border border-white/10">
-                        <Share2 className="w-4 h-4" />
-                    </button>
-                    <button className="w-10 h-10 bg-[#1a2235]/60 backdrop-blur-xl rounded-xl flex items-center justify-center text-white/60 hover:text-rose-500 transition-all border border-white/10">
-                        <Heart className="w-4 h-4" />
-                    </button>
-                </div>
             </div>
 
             {/* Profile Info Card - Overlapping */}

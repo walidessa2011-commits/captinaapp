@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function MyAchievements() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     const [achievements, setAchievements] = useState([]);
@@ -83,20 +83,16 @@ export default function MyAchievements() {
         );
     }
 
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pb-24 transition-colors">
-            <div className="bg-amber-500 pt-12 pb-24 text-center text-white rounded-b-[3rem] relative overflow-hidden">
-                <div className="relative z-10 px-4 flex items-center justify-between container mx-auto">
-                    <Link href="/profile" className="bg-white/10 backdrop-blur-md p-3 rounded-2xl text-white border border-white/20 hover:bg-white/20 transition-all">
-                        {language === 'ar' ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
-                    </Link>
-                    <h1 className="text-2xl md:text-4xl font-black">{content.title}</h1>
-                    <div className="w-12"></div>
-                </div>
-            </div>
+    const textClass = darkMode ? "text-white" : "text-slate-900";
 
-            <div className="container mx-auto px-4 -mt-12 relative z-20">
-                <div className="bg-white dark:bg-slate-800 rounded-[3rem] p-8 shadow-2xl border border-gray-100 dark:border-white/5 mb-8 text-center flex flex-col items-center">
+    return (
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-24 transition-colors relative overflow-hidden`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorative Blobs */}
+            <div className={`absolute top-0 right-0 w-[500px] h-[500px] ${darkMode ? 'bg-amber-500/20' : 'bg-amber-500/10'} rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
+
+
+            <div className="container mx-auto px-4 pt-10 relative z-20">
+                <div className={`${darkMode ? 'bg-[#1a2235]/40 backdrop-blur-3xl' : 'bg-white shadow-2xl'} rounded-[3rem] p-8 border ${darkMode ? 'border-white/5' : 'border-gray-100'} mb-8 text-center flex flex-col items-center`}>
                     <div className="w-24 h-24 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
                         <Award className="w-12 h-12 text-amber-500" />
                     </div>
@@ -110,7 +106,7 @@ export default function MyAchievements() {
                             key={idx}
                             initial={{ opacity: 0, x: idx % 2 === 0 ? -20 : 20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className={`p-6 rounded-[2.5rem] border shadow-lg flex items-center gap-6 transition-all ${achievement.unlocked ? 'bg-white dark:bg-slate-800 border-gray-100 dark:border-white/10' : 'bg-gray-50/50 dark:bg-slate-900/50 border-gray-100 dark:border-white/5 grayscale opacity-60'}`}
+                            className={`p-6 rounded-[2.5rem] border shadow-lg flex items-center gap-6 transition-all ${achievement.unlocked ? (darkMode ? 'bg-[#1a2235]/40 backdrop-blur-3xl border-white/10' : 'bg-white border-gray-100') : (darkMode ? 'bg-[#0a0f1a]/50 border-white/5 grayscale opacity-60' : 'bg-gray-50/50 border-gray-100 grayscale opacity-60')}`}
                         >
                             <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center shrink-0 ${achievement.bg}`}>
                                 <achievement.icon className={`w-8 h-8 ${achievement.color}`} />

@@ -1,6 +1,5 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Plane, MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Splash({ onComplete }) {
@@ -12,7 +11,7 @@ export default function Splash({ onComplete }) {
             if (onComplete) {
                 setTimeout(onComplete, 800); // Allow exit animation to finish
             }
-        }, 3000); // 3 seconds splash
+        }, 2200); // 2.2 seconds splash
 
         return () => clearTimeout(timer);
     }, [onComplete]);
@@ -22,102 +21,92 @@ export default function Splash({ onComplete }) {
             {isVisible && (
                 <motion.div
                     initial={{ opacity: 1 }}
-                    exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
+                    exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
                     transition={{ duration: 0.8, ease: "easeInOut" }}
-                    className="fixed inset-0 z-[1000] flex flex-col items-center justify-center overflow-hidden bg-[#001f3f]"
+                    className="fixed inset-0 z-[1000] flex flex-col items-center justify-center overflow-hidden bg-[#0E1320]"
                 >
-                    {/* Background Decorative Elements */}
-                    <div className="absolute inset-0 overflow-hidden">
+                    {/* Premium Animated Background */}
+                    <div className="absolute inset-0">
                         <motion.div
                             animate={{ 
                                 scale: [1, 1.2, 1],
-                                opacity: [0.1, 0.2, 0.1]
+                                opacity: [0.1, 0.2, 0.1],
                             }}
-                            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                            className="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-primary/30 blur-[120px]"
+                            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                            className="absolute top-[-20%] right-[-10%] w-[100%] h-[100%] rounded-full bg-[#E51B24]/10 blur-[120px]"
                         ></motion.div>
                         <motion.div
                             animate={{ 
                                 scale: [1, 1.3, 1],
-                                opacity: [0.1, 0.15, 0.1]
+                                opacity: [0.05, 0.1, 0.05],
                             }}
-                            transition={{ duration: 12, repeat: Infinity, ease: "linear", delay: 2 }}
-                            className="absolute bottom-[-20%] left-[-10%] w-[80%] h-[80%] rounded-full bg-primary-light/10 blur-[150px]"
+                            transition={{ duration: 20, repeat: Infinity, ease: "linear", delay: 2 }}
+                            className="absolute bottom-[-30%] left-[-20%] w-[120%] h-[120%] rounded-full bg-blue-500/5 blur-[150px]"
                         ></motion.div>
                     </div>
 
+                    {/* Logo Container */}
                     <div className="relative z-10 flex flex-col items-center">
                         <motion.div
-                            initial={{ scale: 0, rotate: -180 }}
-                            animate={{ scale: 1, rotate: 0 }}
+                            initial={{ opacity: 0, scale: 0.7, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
                             transition={{ 
-                                type: "spring",
-                                stiffness: 260,
-                                damping: 20,
-                                delay: 0.2 
+                                duration: 1,
+                                ease: [0.16, 1, 0.3, 1]
                             }}
-                            className="w-24 h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl relative"
+                            className="relative"
                         >
+                            <div className="w-32 h-32 md:w-40 md:h-40 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl p-6">
+                                <motion.img 
+                                    src="/logo_captina.jpg" 
+                                    alt="Captina Logo"
+                                    className="w-full h-full object-cover rounded-2xl"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.5 }}
+                                />
+                            </div>
+
+                            {/* Glow behind logo */}
                             <motion.div
                                 animate={{ 
-                                    rotateY: [0, 360],
+                                    opacity: [0.3, 0.6, 0.3],
+                                    scale: [1, 1.1, 1]
                                 }}
-                                transition={{ 
-                                    duration: 3, 
-                                    repeat: Infinity, 
-                                    ease: "linear" 
-                                }}
-                            >
-                                <Globe className="w-12 h-12 text-white" />
-                            </motion.div>
-                            
-                            {/* Pulse orbits */}
-                            {[1, 2, 3].map((i) => (
-                                <motion.div
-                                    key={i}
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ 
-                                        opacity: [0, 0.3, 0],
-                                        scale: [1, 2 + i * 0.5],
-                                    }}
-                                    transition={{ 
-                                        duration: 2, 
-                                        repeat: Infinity, 
-                                        delay: i * 0.4,
-                                        ease: "easeOut"
-                                    }}
-                                    className="absolute inset-0 border border-white/20 rounded-[2.5rem]"
-                                ></motion.div>
-                            ))}
+                                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                className="absolute inset-0 bg-[#E51B24]/10 blur-3xl rounded-full -z-10"
+                            />
                         </motion.div>
 
+                        {/* Text Content */}
                         <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5, duration: 0.8 }}
+                            transition={{ delay: 0.8, duration: 0.8 }}
                             className="text-center"
                         >
-                            <h1 className="text-5xl font-black text-white tracking-widest mb-4">
+                            <h1 className="text-4xl md:text-6xl font-black text-white tracking-[0.2em] mb-2 uppercase">
                                 CAPTINA
                             </h1>
+                            <div className="h-0.5 w-12 bg-[#E51B24] mx-auto rounded-full mb-4"></div>
                             <motion.p
                                 initial={{ opacity: 0 }}
-                                animate={{ opacity: 0.7 }}
-                                transition={{ delay: 1, duration: 1 }}
-                                className="text-white/80 font-bold tracking-[0.3em] uppercase text-xs"
+                                animate={{ opacity: 0.6 }}
+                                transition={{ delay: 1.2, duration: 1 }}
+                                className="text-white font-bold tracking-[0.3em] uppercase text-[10px] md:text-xs"
                             >
-                                Your Personal Coach Anywhere
+                                Your Professional Coach
                             </motion.p>
                         </motion.div>
                     </div>
 
                     {/* Progress indicator */}
-                    <div className="absolute bottom-12 w-48 h-[2px] bg-white/10 rounded-full overflow-hidden">
+                    <div className="absolute bottom-12 w-48 h-[1px] bg-white/10 rounded-full overflow-hidden">
                         <motion.div
-                            initial={{ width: "0%" }}
-                            animate={{ width: "100%" }}
-                            transition={{ duration: 2.5, ease: "easeInOut" }}
-                            className="h-full bg-white shadow-[0_0_10px_#fff]"
+                            initial={{ x: "-100%" }}
+                            animate={{ x: "0%" }}
+                            transition={{ duration: 2.2, ease: "easeInOut" }}
+                            className="h-full bg-[#E51B24] shadow-[0_0_15px_#E51B24]"
                         ></motion.div>
                     </div>
                 </motion.div>

@@ -1,5 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
 
 const AppContext = createContext();
 
@@ -9,11 +11,14 @@ export const translations = {
         goodDay: "نهارك سعيد",
         profile: "الملف الشخصي",
         settings: "الضبط",
-        home: "الرئيسية",
-        sports: "الرياضات",
-        trainers: "مدربينا",
-        store: "المتجر",
-        offers: "العروض",
+        gymsPageTitle: "نوادي كابتنا المعتمدة",
+        "home": "الرئيسية",
+        "all": "الكل",
+        "sports": "الرياضات",
+        "trainers": "المدربين",
+        "store": "المتجر",
+        "offers": "العروض",
+        "main": "الرئيسية",
         viewAll: "عرض الكل",
         bookNow: "احجز الآن",
         activeMember: "عضو نشط",
@@ -32,7 +37,7 @@ export const translations = {
         useOffer: "استفيد من العرض",
         notifications: "الإشعارات",
         accountSecurity: "الحساب والأمان",
-        appearance: "المظهر الإشعار",
+        appearance: "المظهر والإشعارات",
         support: "الدعم والمساعدة",
         personalInfo: "المعلومات الشخصية",
         changePassword: "تغيير كلمة المرور",
@@ -88,6 +93,7 @@ export const translations = {
             { name: "محمد", role: "بناء أجسام" },
             { name: "ليلى", role: "تخسيس" }
         ],
+        gymsPageTitle: "نوادي كابتنا المعتمدة",
         offersPageTitle: "عروض كابتينا",
         activateOffer: "تفعيل العرض الآن",
         allOffersData: [
@@ -467,6 +473,199 @@ export const translations = {
             waitingForConfirmation: "في انتظار تأكيد الحجز...",
             sentToAdmin: "تم إرسال طلب الحجز للإدارة، سنقوم بالتأكيد معك خلال دقائق.",
             sportsList: ["كاراتيه", "تايكوندو", "ملاكمة", "كيك بوكسينغ", "لياقة بدنية", "يوغا", "كروس فت", "بناء أجسام"]
+        },
+        aboutPage: {
+            title: "عن كابتينة - بوابتك الرياضية",
+            breadcrumbs: {
+                home: "الرئيسية",
+                settings: "الإعدادات",
+                about: "عن التطبيق"
+            },
+            heroTitle: "تعرف علينا - عن كابتينة",
+            heroTagline: "منصتك المتكاملة للتدريب الشخصي الاحترافي أينما كنت.",
+            storyTitle: "قصتنا",
+            storyContent: "ولدت كابتينة من فكرة بسيطة لكنها قوية: جعل اللياقة البدنية الاحترافية متاحة للجميع في كل مكان. نحن نؤمن بأن العوائق مثل الوقت أو المكان لا يجب أن تقف في طريق أهدافك الصحية. منصتنا تربطك بنخبة من المدربين المعتمدين، وتوفر لك حلولاً تدريبية متنوعة في المنزل أو النادي مصممة لتناسب رحلتك الخاصة.",
+            stats: {
+                trainees: "متدرب",
+                trainers: "مدرب محترف",
+                years: "سنوات نجاح"
+            },
+            valuesTitle: "لماذا كابتينة؟",
+            values: {
+                quality: {
+                    title: "الجودة أولاً",
+                    desc: "نختار فقط أفضل المدربين المعتمدين لضمان سلامتك ونتائجك."
+                },
+                innovation: {
+                    title: "حلول ذكية",
+                    desc: "أنظمة حجز متطورة ومتابعة شخصية دقيقة بين يديك."
+                },
+                commitment: {
+                    title: "دعم مستمر",
+                    desc: "نحن معك في كل خطوة من رحلة التغيير الخاصة بك."
+                }
+            }
+        },
+        contactPage: {
+            title: "تواصل معنا - نحن هنا لمساعدتك",
+            breadcrumbs: {
+                home: "الرئيسية",
+                contact: "تواصل معنا"
+            },
+            heroTitle: "نحن هنا لمساعدتك - تواصل معنا",
+            heroDesc: "لديك استفسار أو ملاحظة؟ يسعدنا سماع صوتك. فريقنا مخصص لتزويدك بأفضل تجربة ممكنة.",
+            infoTitle: "نحن هنا للمساعدة",
+            infoDesc: "تواصل مع فريق الدعم لدينا لأي استفسارات تتعلق بخدماتنا، المدربين، أو الدعم الفني.",
+            items: {
+                location: "الموقع",
+                locationVal: "الرياض، حي المونسية",
+                phone: "رقم الهاتف",
+                email: "البريد الإلكتروني",
+                workingHours: "ساعات العمل",
+                workingHoursVal: "يومياً: 9:00 صباحاً - 10:00 مساءً"
+            },
+            form: {
+                title: "أرسل لنا رسالة",
+                name: "الاسم بالكامل",
+                phone: "رقم الهاتف",
+                message: "كيف يمكننا مساعدتك؟",
+                placeholder: "اكتب رسالتك هنا...",
+                submit: "إرسال الرسالة",
+                loading: "جاري الإرسال...",
+                success: "تم إرسال رسالتك بنجاح!"
+            }
+        },
+        helpPage: {
+            title: "مركز المساعدة - دعم فني متكامل",
+            breadcrumbs: {
+                home: "الرئيسية",
+                settings: "الإعدادات",
+                help: "مركز المساعدة"
+            },
+            heroTitle: "دعم فني متكامل - مركز المساعدة",
+            heroHeader: "كيف يمكننا مساعدتك اليوم؟",
+            heroSub: "ابحث عن إجابات سريعة أو تواصل مع فريق الدعم المتخصص لدينا.",
+            searchPlaceholder: "ابحث عن مواضيع المساعدة...",
+            tabs: {
+                faqs: "الأسئلة الشائعة",
+                contact: "تواصل معنا"
+            },
+            contactItems: {
+                premium: "الدعم الذهبي",
+                premiumDesc: "مدير حساب مخصص للمشتركين المتميزين",
+                hotline: "الخط الساخن 24/7",
+                hotlineDesc: "استجابة فورية للاستفسارات العاجلة"
+            },
+            form: {
+                title: "أرسل لنا رسالة مباشرة",
+                subject: "الموضوع",
+                subjectPlaceholder: "عن ماذا يدور استفسارك؟",
+                message: "تفاصيل الرسالة",
+                messagePlaceholder: "اشرح المشكلة بالتفصيل...",
+                submit: "إرسال الطلب",
+                loading: "جاري الإرسال...",
+                success: "تم إرسال طلبك! سنقوم بالرد عليك في أقرب وقت.",
+                submitError: "حدث خطأ أثناء الإرسال، يرجى المحاولة مرة أخرى",
+                noResults: "لا توجد نتائج مطابقة لما تبحث عنه",
+                faqs: {
+                    booking: {
+                        q: "كيف يمكنني حجز حصة تدريبية؟",
+                        a: "يمكنك حجز حصة من خلال الذهاب لصفحة المدربين، اختيار المدرب المفضل، ثم الضغط على زر 'احجز الآن' واختيار اليوم والوقت المناسب."
+                    },
+                    cancel: {
+                        q: "هل يمكنني إلغاء الحجز؟",
+                        a: "نعم، يمكنك إلغاء الحجز قبل بدء الحصة بـ 24 ساعة على الأقل من خلال صفحة 'حجوزاتي' في ملفك الشخصي."
+                    },
+                    renew: {
+                        q: "كيف أقوم بتجديد الباقة؟",
+                        a: "عند اقتراب انتهاء باقتك، سيظهر لك تنبيه في صفحة الملف الشخصي. يمكنك الضغط على 'تجديد الباقة' وإتمام عملية الدفع."
+                    },
+                    lang: {
+                        q: "هل التطبيق يدعم لغات أخرى؟",
+                        a: "نعم، التطبيق يدعم اللغتين العربية والإنجليزية. يمكنك تغيير اللغة من صفحة الإعدادات."
+                    }
+                }
+            }
+        },
+        registerPage: {
+            heroTitle: "ابدأ رحلتك الرياضية",
+            heroTagline: "كابتينا غيرت حياتي تماماً!",
+            formTitle: "إنشاء حساب جديد",
+            formSub: "سجل بياناتك للانضمام إلى نخبة الرياضيين",
+            fullNameLabel: "الاسم كاملاً",
+            acceptTerms: "أوافق على الشروط والأحكام",
+            alreadyHaveAccount: "لديك حساب بالفعل؟",
+            login: "تسجيل الدخول",
+            loading: "جاري إنشاء الحساب...",
+            agreeToTermsAlert: "يرجى الموافقة على الشروط"
+        },
+        termsPage: {
+            title: "الشروط والأحكام - حقوقك والتزاماتك",
+            breadcrumbs: {
+                home: "الرئيسية",
+                settings: "الإعدادات",
+                terms: "الشروط والأحكام"
+            },
+            heroTitle: "( حقوقك والتزاماتك - الشروط والأحكام )",
+            headerTitle: "اتفاقية الاستخدام",
+            lastUpdated: "آخر تحديث: 1 مارس 2026",
+            sections: {
+                acceptance: {
+                    title: "قبول الشروط",
+                    content: "باستخدامك لتطبيق كابتينا، فإنك توافق على الالتزام بشروط الاستخدام الموضحة هنا. إذا كنت لا توافق على هذه الشروط، يرجى عدم استخدام التطبيق."
+                },
+                responsibility: {
+                    title: "مسؤولية المستخدم",
+                    content: "المستخدم مسؤول عن دقة البيانات المقدمة وصحة حالته الصحية لممارسة الرياضة. كابتينا ليست مسؤولة عن أي إصابات ناتجة عن التدريب."
+                },
+                cancellation: {
+                    title: "سياسة الإلغاء والاسترجاع",
+                    content: "يمكن إلغاء الحجز قبل 24 ساعة من الموعد. الاسترجاع المالي يخضع لسياسات الباقات المشترك بها والموضحة وقت الشراء."
+                },
+                property: {
+                    title: "حقوق الملكية الفكرية",
+                    content: "جميع المحتويات المتوفرة في التطبيق هي ملك لمنصة كابتينا. لا يجوز نسخ أو توزيع أي جزء من المحتوى بدون إذن مسبق."
+                },
+                privacy: {
+                    title: "الخصوصية",
+                    content: "نحن نلتزم بحماية خصوصية بياناتك. يمكنك مراجعة سياسة الخصوصية الكاملة لمعرفة كيفية التعامل مع بياناتك الشخصية."
+                }
+            },
+            footerTitle: "هل لديك أسئلة؟",
+            footerDesc: "إذا كان لديك أي استفسار حول هذه الشروط، لا تتردد في التواصل معنا.",
+            contactUs: "اتصل بنا"
+        },
+        gymsPage: {
+            subTitle: "تغطية واسعة في كافة أنحاء الرياض",
+            breadcrumbs: {
+                home: "الرئيسية",
+                gyms: "صالاتنا"
+            },
+            trainers: "المدربين",
+            pros: "أبطال",
+            explore: "استكشاف الموقع",
+            features: {
+                gear: "أحدث الأجهزة",
+                areas: "مساحات واسعة",
+                team: "أبطال معتمدون",
+                deals: "عروض حصرية"
+            }
+        },
+        notificationsPage: {
+            title: "إشعارات كابتينة - تفاعل لحظي",
+            heroTitle: "( تفاعل لحظي - إشعارات كابتينة )",
+            breadcrumbs: {
+                home: "الرئيسية",
+                notifications: "الإشعارات"
+            },
+            markAllReadLabel: "تحديد الكل كمقروء",
+            filters: {
+                all: "عرض الكل",
+                unread: "غير مقروء"
+            },
+            syncing: "جاري التحميل...",
+            emptyTitle: "لا يوجد تنبيهات حالياً",
+            emptyDesc: "سوف تظهر التنبيهات الخاصة بك هنا فور صدورها."
         }
     },
     en: {
@@ -474,11 +673,14 @@ export const translations = {
         goodDay: "Good Day",
         profile: "Profile",
         settings: "Settings",
+        gymsPageTitle: "Captina Certified Gyms",
         home: "Home",
+        all: "All",
         sports: "Sports",
         trainers: "Trainers",
         store: "Store",
         offers: "Offers",
+        main: "Home",
         viewAll: "View All",
         bookNow: "Book Now",
         activeMember: "Active Member",
@@ -932,6 +1134,208 @@ export const translations = {
             waitingForConfirmation: "Waiting for confirmation...",
             sentToAdmin: "Booking request sent to admin, we will confirm with you within minutes.",
             sportsList: ["Karate", "Taekwondo", "Boxing", "Kickboxing", "Fitness", "Yoga", "Crossfit", "Bodybuilding"]
+        },
+        aboutPage: {
+            title: "Get to Know Us - About Captina",
+            breadcrumbs: {
+                home: "Home",
+                settings: "Settings",
+                about: "About App"
+            },
+            heroTitle: "Get to Know Us - About Captina",
+            heroTagline: "Your integrated platform for professional personal training wherever you are.",
+            storyTitle: "Our Story",
+            storyContent: "Captina was born from a simple yet powerful idea: making professional fitness accessible to everyone, anywhere. We believe that constraints like time or location shouldn't hinder your health goals. Our platform connects you with elite certified coaches, providing both home-based and gym-based training solutions tailored to your unique journey.",
+            stats: {
+                trainees: "Trainees",
+                trainers: "Trainers",
+                years: "Years Success"
+            },
+            valuesTitle: "Why Captina?",
+            values: {
+                quality: {
+                    title: "Quality First",
+                    desc: "We select only the best certified trainers to ensure your safety and results."
+                },
+                innovation: {
+                    title: "Smart Solutions",
+                    desc: "Advanced booking systems and personalized tracking at your fingertips."
+                },
+                commitment: {
+                    title: "Endless Support",
+                    desc: "We are with you at every step of your transformation journey."
+                }
+            }
+        },
+        contactPage: {
+            title: "We Are Here to Help - Contact Us",
+            breadcrumbs: {
+                home: "Home",
+                contact: "Contact Us"
+            },
+            heroTitle: "We Are Here to Help - Contact Us",
+            heroDesc: "Have a question or feedback? We'd love to hear from you. Our team is dedicated to providing you with the best experience possible.",
+            infoTitle: "We're Here to Help",
+            infoDesc: "Contact our support team for any inquiries regarding our services, trainers, or technical support.",
+            items: {
+                location: "Location",
+                locationVal: "Riyadh, Al-Monsiya Dist",
+                phone: "Phone",
+                email: "Email",
+                workingHours: "Working Hours",
+                workingHoursVal: "Daily: 9:00 AM - 10:00 PM"
+            },
+            form: {
+                title: "Send us a message",
+                name: "Full Name",
+                phone: "Phone Number",
+                message: "How can we help you?",
+                placeholder: "Enter your message here...",
+                submit: "Send Message",
+                loading: "Sending...",
+                success: "Message sent successfully!"
+            }
+        },
+        helpPage: {
+            title: "Integrated Support - Help Center",
+            breadcrumbs: {
+                home: "Home",
+                settings: "Settings",
+                help: "Help Center"
+            },
+            heroTitle: "Integrated Support - Help Center",
+            heroHeader: "How can we help you today?",
+            heroSub: "Search for rapid answers or contact our specialized support team.",
+            searchPlaceholder: "Search for topics...",
+            tabs: {
+                faqs: "FAQs",
+                contact: "Contact Us"
+            },
+            contactItems: {
+                premium: "Premium Support",
+                premiumDesc: "Dedicated account manager for elite subscribers",
+                hotline: "Hotline 24/7",
+                hotlineDesc: "Instant response for urgent inquiries"
+            },
+            form: {
+                title: "Send us a direct message",
+                subject: "Subject",
+                subjectPlaceholder: "What is your inquiry about?",
+                message: "Message Details",
+                messagePlaceholder: "Describe your issue in detail...",
+                submit: "Submit Request",
+                loading: "Sending...",
+                success: "Your request has been sent! We will get back to you soon.",
+                submitError: "An error occurred while sending, please try again",
+                noResults: "No results match your search",
+                faqs: {
+                    booking: {
+                        q: "How can I book a training session?",
+                        a: "You can book a session by going to the Trainers page, selecting your preferred trainer, then clicking the 'Book Now' button and choosing a suitable day and time."
+                    },
+                    cancel: {
+                        q: "Can I cancel my booking?",
+                        a: "Yes, you can cancel your booking at least 24 hours before the session starts through the 'My Bookings' page in your profile."
+                    },
+                    renew: {
+                        q: "How do I renew my package?",
+                        a: "When your package is near expiration, a notification will appear on your Profile page. You can click 'Renew Package' and complete the payment process."
+                    },
+                    lang: {
+                        q: "Does the app support other languages?",
+                        a: "Yes, the app supports both Arabic and English. You can change the language from the Settings page."
+                    }
+                }
+            }
+        },
+        registerPage: {
+            heroTitle: "Start Your Fitness Journey",
+            heroTagline: "Captina changed my life!",
+            formTitle: "Create New Account",
+            formSub: "Register to join elite athletes",
+            fullNameLabel: "Full Name",
+            acceptTerms: "I agree to the terms and conditions",
+            alreadyHaveAccount: "Already have an account?",
+            login: "Login",
+            loading: "Creating account...",
+            agreeToTermsAlert: "Please accept terms"
+        },
+        termsPage: {
+            title: "Terms & Conditions",
+            breadcrumbs: {
+                home: "Home",
+                settings: "Settings",
+                terms: "Terms & Conditions"
+            },
+            heroTitle: "( Your Rights and Obligations - Terms & Conditions )",
+            headerTitle: "User Agreement",
+            lastUpdated: "Last Updated: March 1, 2026",
+            sections: {
+                acceptance: {
+                    title: "Acceptance of Terms",
+                    content: "By using the Captina application, you agree to comply with the terms of use outlined here. If you do not agree to these terms, please do not use the application."
+                },
+                responsibility: {
+                    title: "User Responsibility",
+                    content: "The user is responsible for the accuracy of the data provided and the correctness of their health status for exercising. Captina is not responsible for any injuries resulting from training."
+                },
+                cancellation: {
+                    title: "Cancellation & Refund Policy",
+                    content: "Bookings can be cancelled 24 hours before the appointment. Refunds are subject to the policies of the subscribed packages shared at the time of purchase."
+                },
+                property: {
+                    title: "Intellectual Property Rights",
+                    content: "All contents available in the application are the property of Captina platform. No part of the content may be copied or distributed without prior permission."
+                },
+                privacy: {
+                    title: "Privacy",
+                    content: "We are committed to protecting the privacy of your data. You can review the full privacy policy to know how your personal data is handled."
+                }
+            },
+            footerTitle: "Have questions?",
+            footerDesc: "If you have any questions about these terms, feel free to contact us.",
+            contactUs: "Contact Us"
+        },
+        gymsPageTitle: "Captina Certified Gyms",
+        gymsPage: {
+            gymsData: [
+            { id: 1, name: "Al-Monsiya Branch", type: 'Internal', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
+            { id: 2, name: "Al-Yasmin Branch", type: 'Internal', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
+            { id: 3, name: "Gold's Gym", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
+            { id: 4, name: "Fitness First", type: 'Partner', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
+            { id: 5, name: "Titan Academy", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800" },
+            { id: 6, name: "The Cage", type: 'Partner', rating: '4.7', image: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=800" }
+        ],
+            subTitle: "Wide coverage across Riyadh",
+            breadcrumbs: {
+                home: "Home",
+                gyms: "Our Gyms"
+            },
+            trainers: "Trainers",
+            pros: "Pros",
+            explore: "Explore Location",
+            features: {
+                gear: "Elite Gear",
+                areas: "Wide Areas",
+                team: "Certified Team",
+                deals: "Exclusive Deals"
+            }
+        },
+        notificationsPage: {
+            title: "Captina Notifications",
+            heroTitle: "( Real-time Updates - Captina Notifications )",
+            breadcrumbs: {
+                home: "Home",
+                notifications: "Notifications"
+            },
+            markAllReadLabel: "Mark All as Read",
+            filters: {
+                all: "All",
+                unread: "Unread"
+            },
+            syncing: "Syncing...",
+            emptyTitle: "Zero Transmission.",
+            emptyDesc: "Safe and quiet. Elite briefings will emerge here when necessary."
         }
     }
 };
@@ -939,44 +1343,169 @@ export const translations = {
 export function AppProvider({ children }) {
     const [language, setLanguage] = useState('ar');
     const [darkMode, setDarkMode] = useState(false);
+    const [gyms, setGyms] = useState([]);
+    const [packages, setPackages] = useState([]);
+    const [loadingGyms, setLoadingGyms] = useState(true);
+    const [loadingPackages, setLoadingPackages] = useState(true);
 
     useEffect(() => {
-        const savedLang = localStorage.getItem('lang') || 'ar';
-        const savedTheme = localStorage.getItem('theme') === 'true';
-        setLanguage(savedLang);
-        setDarkMode(savedTheme);
-
-        // Apply to document
-        document.documentElement.dir = savedLang === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = savedLang;
-        if (savedTheme) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
+        if (typeof window !== 'undefined') {
+            const savedLang = localStorage.getItem('lang') || 'ar';
+            const savedTheme = localStorage.getItem('theme') === 'true';
+            setLanguage(savedLang);
+            setDarkMode(savedTheme);
         }
     }, []);
 
-    const toggleLanguage = () => {
-        const newLang = language === 'ar' ? 'en' : 'ar';
+    useEffect(() => {
+        const fetchGyms = async () => {
+            try {
+                const q = query(collection(db, "gyms"));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    const initialGyms = [
+                        { name_ar: "فرع المونسية", name_en: "Al-Monsiya Branch", type: 'Internal', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
+                        { name_ar: "فرع الياسمين", name_en: "Al-Yasmin Branch", type: 'Internal', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
+                        { name_ar: "جولدز جيم", name_en: "Gold's Gym", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
+                        { name_ar: "فيتنس فيرست", name_en: "Fitness First", type: 'Partner', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
+                        { name_ar: "أكاديمية تيتان", name_en: "Titan Academy", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800" },
+                        { name_ar: "ذا كيج", name_en: "The Cage", type: 'Partner', rating: '4.7', image: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=800" }
+                    ];
+                    for (const gym of initialGyms) {
+                        await addDoc(collection(db, "gyms"), gym);
+                    }
+                    setGyms(initialGyms.map((g, i) => ({ 
+                        ...g, id: `seed-${i}`, name: language === 'ar' ? g.name_ar : g.name_en 
+                    })));
+                } else {
+                    setGyms(querySnapshot.docs.map(doc => ({
+                        id: doc.id, ...doc.data(), name: language === 'ar' ? doc.data().name_ar : doc.data().name_en
+                    })));
+                }
+            } catch (error) {
+                console.error("Error fetching gyms:", error);
+            } finally {
+                setLoadingGyms(false);
+            }
+        };
+
+        const fetchPackages = async () => {
+            try {
+                const q = query(collection(db, "packages"), orderBy("order", "asc"));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    const initialPackages = [
+                        {
+                            order: 1,
+                            name_ar: "الحصة التجريبية",
+                            name_en: "Trial Session",
+                            price: "50",
+                            price_en: "15",
+                            currency_ar: "ر.س",
+                            currency_en: "$",
+                            desc_ar: "أفضل طريقة للبدء وتجربة البيئة التدريبية.",
+                            desc_en: "Perfect way to start and test our elite environment.",
+                            features_ar: ["مدة الجلسة 60 دقيقة", "تقييم بدني أولي", "استشارة مع مدرب"],
+                            features_en: ["60 Min Session", "Initial Assessment", "Coach Consultation"],
+                            badge_ar: "مجاناً للمشتركين",
+                            badge_en: "Free for first use",
+                            featured: false
+                        },
+                        {
+                            order: 2,
+                            name_ar: "الباقة الشهرية",
+                            name_en: "Monthly Pro",
+                            price: "599",
+                            price_en: "159",
+                            currency_ar: "ر.س",
+                            currency_en: "$",
+                            desc_ar: "مثالية للملتزمين الذين يسعون لنتائج حقيقية.",
+                            desc_en: "Ideal for committed athletes seeking real results.",
+                            features_ar: ["12 جلسة تدريبية", "خطة غذائية", "متابعة واتساب", "خصم 10%"],
+                            features_en: ["12 Sessions", "Nutritional Plan", "WhatsApp Follow-up", "10% Discount"],
+                            badge_ar: "الأكثر طلباً",
+                            badge_en: "Most Popular",
+                            featured: true
+                        },
+                        {
+                            order: 3,
+                            name_ar: "الباقة الملكية VIP",
+                            name_en: "VIP Elite",
+                            price: "1499",
+                            price_en: "399",
+                            currency_ar: "ر.س",
+                            currency_en: "$",
+                            desc_ar: "التجربة القصوى للتدريب الشخصي الفاخر.",
+                            desc_en: "The ultimate luxury performance training experience.",
+                            features_ar: ["جلسات غير محدودة", "مدرب خاص متفرغ", "وجبات صحية", "خصم 25%"],
+                            features_en: ["Unlimited Sessions", "Dedicated Private Coach", "Healthy Meals", "25% Discount"],
+                            badge_ar: "تجربة متميزة",
+                            badge_en: "Premium Experience",
+                            featured: false
+                        }
+                    ];
+                    for (const pkg of initialPackages) {
+                        await addDoc(collection(db, "packages"), pkg);
+                    }
+                    setPackages(initialPackages.map((p, i) => ({ 
+                        ...p, id: `seed-pkg-${i}`, 
+                        name: language === 'ar' ? p.name_ar : p.name_en,
+                        price: language === 'ar' ? p.price : p.price_en,
+                        currency: language === 'ar' ? p.currency_ar : p.currency_en,
+                        description: language === 'ar' ? p.desc_ar : p.desc_en,
+                        features: language === 'ar' ? p.features_ar : p.features_en,
+                        badge: language === 'ar' ? p.badge_ar : p.badge_en
+                    })));
+                } else {
+                    setPackages(querySnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            name: language === 'ar' ? data.name_ar : data.name_en,
+                            price: language === 'ar' ? data.price : data.price_en,
+                            currency: language === 'ar' ? data.currency_ar : data.currency_en,
+                            description: language === 'ar' ? data.desc_ar : data.desc_en,
+                            features: language === 'ar' ? data.features_ar : data.features_en,
+                            badge: language === 'ar' ? data.badge_ar : data.badge_en
+                        };
+                    }));
+                }
+            } catch (error) {
+                console.error("Error fetching packages:", error);
+            } finally {
+                setLoadingPackages(false);
+            }
+        };
+
+        fetchGyms();
+        fetchPackages();
+    }, [language]);
+
+    const changeLanguage = (newLang) => {
         setLanguage(newLang);
         localStorage.setItem('lang', newLang);
-        document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = newLang;
+    };
+
+    const toggleLanguage = () => {
+        changeLanguage(language === 'ar' ? 'en' : 'ar');
+    };
+
+    const changeDarkMode = (newMode) => {
+        setDarkMode(newMode);
+        localStorage.setItem('theme', newMode);
     };
 
     const toggleDarkMode = () => {
-        const newMode = !darkMode;
-        setDarkMode(newMode);
-        localStorage.setItem('theme', newMode);
-        if (newMode) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
+        changeDarkMode(!darkMode);
     };
 
     const t = (key) => {
         if (!key) return '';
+        if (key === 'gymsData') return gyms;
+        if (key === 'packagesData') return packages;
         const keys = key.split('.');
         let value = translations[language];
         
@@ -991,7 +1520,19 @@ export function AppProvider({ children }) {
     };
 
     return (
-        <AppContext.Provider value={{ language, toggleLanguage, darkMode, toggleDarkMode, t }}>
+        <AppContext.Provider value={{ 
+            language, 
+            setLanguage: changeLanguage, 
+            toggleLanguage, 
+            darkMode, 
+            setDarkMode: changeDarkMode, 
+            toggleDarkMode, 
+            t,
+            gyms,
+            packages,
+            loadingGyms,
+            loadingPackages
+        }}>
             {children}
         </AppContext.Provider>
     );

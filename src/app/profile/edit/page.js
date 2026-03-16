@@ -14,7 +14,7 @@ import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function EditProfile() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     const [profileData, setProfileData] = useState({
@@ -96,22 +96,15 @@ export default function EditProfile() {
     const inputClasses = "w-full bg-slate-100 dark:bg-white/5 border-0 rounded-2xl p-4 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary/50 transition-all outline-none";
     const labelClasses = "block text-[10px] font-black text-gray-400 uppercase mb-2 px-1";
 
-    return (
-        <div className="min-h-screen bg-slate-50 dark:bg-[#001f3f] pb-24 transition-colors duration-300">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#001f3f]/80 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 p-4">
-                <div className="container mx-auto max-w-2xl flex items-center justify-between">
-                    <Link href="/profile" className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors">
-                        {language === 'ar' ? <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" /> : <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />}
-                    </Link>
-                    <h1 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">
-                        {language === 'ar' ? 'تعديل الملف الشخصي' : 'Edit Profile'}
-                    </h1>
-                    <div className="w-10"></div>
-                </div>
-            </header>
+    const textClass = darkMode ? "text-white" : "text-slate-900";
 
-            <main className="container mx-auto px-4 py-8 max-w-2xl">
+    return (
+        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-24 transition-colors duration-300 relative overflow-hidden`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorative Blobs */}
+            <div className={`absolute top-0 right-0 w-[500px] h-[500px] ${darkMode ? 'bg-primary/20' : 'bg-primary/10'} rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
+
+
+            <main className="container mx-auto px-4 pt-4 pb-8 max-w-2xl relative z-10">
                 <form onSubmit={handleSave} className="space-y-6">
                     {/* Basic Info Section */}
                     <div className="space-y-4">

@@ -5,44 +5,79 @@ import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
 
 export default function BoxingPage() {
-    const { t, language } = useApp();
+    const { t, language, darkMode } = useApp();
     const content = t('boxingContent');
 
     if (!content) return null;
 
     return (
-        <div className="min-h-screen bg-[#0a0f1a] pb-32 transition-colors relative">
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] pb-20 transition-colors relative overflow-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Background Decorative Blobs */}
+            <div className={`absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
+            <div className={`absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -z-0 -translate-x-1/2 translate-y-1/2`}></div>
+            
+            {/* Immersive Header */}
+            <header className="relative z-20 pt-16 pb-6 px-6">
+                <div className="max-w-7xl mx-auto flex flex-col items-center">
+                    {/* Breadcrumbs */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                    >
+                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <Link href="/sports" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرياضات' : 'Sports'}</Link>
+                        <span className="text-gray-500">
+                            {language === 'ar' ? ' < ' : ' > '}
+                        </span>
+                        <span className="text-primary">{content.title}</span>
+                    </motion.div>
+
+                    {/* Consolidated Title Line */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-3 mb-4"
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                        <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase text-center">
+                            {language === 'ar' 
+                                ? `( ${content.title} - كابتنية )` 
+                                : `( ${content.title} - Captina )`}
+                        </h1>
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                    </motion.div>
+                </div>
+            </header>
             {/* Hero Image - Compact */}
-            <div className="relative h-[30vh] md:h-[40vh] overflow-hidden">
+            <div className="relative h-[20vh] md:h-[25vh] overflow-hidden mx-6 rounded-[2.5rem] border border-white/5 shadow-2xl mt-4">
                 <img 
                     src={content.heroImg}
-                    className="w-full h-full object-cover opacity-70"
+                    className="w-full h-full object-cover opacity-90 dark:opacity-70"
                     alt={content.title}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f1a] via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/80 dark:from-[#0a0f1a] via-transparent opacity-80"></div>
                 
-                {/* Back Button - Top Left */}
-                <Link href="/sports" className="absolute top-4 left-4 w-8 h-8 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/10 hover:bg-white/20 transition-all">
-                    <ChevronLeft className={`w-5 h-5 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                </Link>
-
                 {/* Actions - Top Right */}
-                <div className="absolute top-4 right-4 flex gap-2">
-                    <button className="w-8 h-8 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/10">
-                        <Star className="w-4 h-4" />
+                <div className={`absolute top-4 ${language === 'en' ? 'right-4' : 'left-4'} flex gap-2`}>
+                    <button className="w-7 h-7 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center text-white border border-white/10">
+                        <Star className="w-3.5 h-3.5" />
                     </button>
-                    <button className="w-8 h-8 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/10">
-                        <Award className="w-4 h-4" />
+                    <button className="w-7 h-7 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center text-white border border-white/10">
+                        <Award className="w-3.5 h-3.5" />
                     </button>
                 </div>
             </div>
 
             <div className="container mx-auto px-4 -mt-8 relative z-10 max-w-6xl">
                 {/* Info Card - Compact */}
-                <div className="bg-[#1a2235]/60 backdrop-blur-xl rounded-3xl p-5 md:p-8 border border-white/5 mb-6 shadow-2xl">
+                <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-xl rounded-3xl p-5 md:p-8 border border-gray-100 dark:border-white/5 mb-6 shadow-premium">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                         <div>
-                            <h1 className="text-xl md:text-3xl font-black text-white mb-1 tracking-tight">{content.title}</h1>
+                            <h1 className="text-xl md:text-3xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">{content.title}</h1>
                             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Boxing Elite Club, Newbridge</p>
                         </div>
                         <div className="text-start md:text-end">
@@ -51,7 +86,7 @@ export default function BoxingPage() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-6 py-3 border-y border-white/5">
+                    <div className="flex items-center gap-6 py-3 border-y border-gray-100 dark:border-white/5">
                         <div className="flex items-center gap-2">
                             <Clock className="w-3.5 h-3.5 text-gray-500" />
                             <span className="text-[10px] font-bold text-gray-400">60 Min</span>
@@ -67,13 +102,13 @@ export default function BoxingPage() {
                     </div>
 
                     {/* Compact Trainer Profile */}
-                    <div className="mt-6 flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="mt-6 flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl overflow-hidden border border-primary/20">
                                 <img src="https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200" alt="Trainer" className="w-full h-full object-cover" />
                             </div>
                             <div>
-                                <p className="text-[11px] font-black text-white">Captain Ahmed</p>
+                                <p className="text-[11px] font-black text-slate-900 dark:text-white">Captain Ahmed</p>
                                 <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Head Coach / Elite Trainer</p>
                             </div>
                         </div>
@@ -86,23 +121,23 @@ export default function BoxingPage() {
                 {/* Description & Features - Compact */}
                 <div className="grid lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6 text-start">
-                        <div className="bg-[#1a2235]/40 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/5">
-                            <h2 className="text-lg font-black text-white mb-3 tracking-tight">{content.descTitle}</h2>
-                            <p className="text-[11px] md:text-[13px] text-gray-400 font-bold leading-relaxed">
+                        <div className="bg-white dark:bg-[#1a2235]/40 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-gray-100 dark:border-white/5 shadow-premium">
+                            <h2 className="text-lg font-black text-slate-900 dark:text-white mb-3 tracking-tight">{content.descTitle}</h2>
+                            <p className="text-[11px] md:text-[13px] text-gray-600 dark:text-gray-400 font-bold leading-relaxed">
                                 {content.description}
                                 <span className="text-primary font-black cursor-pointer ml-1">...read more</span>
                             </p>
                         </div>
 
-                        <div className="bg-[#1a2235]/40 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/5">
-                            <h2 className="text-lg font-black text-white mb-4 tracking-tight">{content.benefitsTitle}</h2>
+                        <div className="bg-white dark:bg-[#1a2235]/40 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-gray-100 dark:border-white/5 shadow-premium">
+                            <h2 className="text-lg font-black text-slate-900 dark:text-white mb-4 tracking-tight">{content.benefitsTitle}</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {content.benefits.map((benefit, i) => (
                                     <div key={i} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
                                         <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
                                             <Shield className="w-3.5 h-3.5" />
                                         </div>
-                                        <span className="text-[10px] font-black text-gray-300">{benefit}</span>
+                                        <span className="text-[10px] font-black text-gray-600 dark:text-gray-300">{benefit}</span>
                                     </div>
                                 ))}
                             </div>
