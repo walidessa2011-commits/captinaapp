@@ -12,9 +12,10 @@ import { useRouter } from "next/navigation";
 import { updateDoc, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { updateProfile } from "firebase/auth";
 
 export default function EditProfile() {
-    const { t, language, darkMode } = useApp();
+    const { t, language, darkMode, setAlert } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     const [profileData, setProfileData] = useState({
@@ -76,10 +77,19 @@ export default function EditProfile() {
                 ...profileData,
                 updatedAt: new Date().toISOString()
             });
+
+            // Update Auth Profile
+            if (profileData.fullName) {
+                await updateProfile(user, { displayName: profileData.fullName });
+            }
             router.push('/profile');
         } catch (error) {
             console.error("Error updating profile:", error);
-            alert(language === 'ar' ? 'حدث خطأ أثناء حفظ البيانات' : 'Error saving data');
+            setAlert({
+                title: language === 'ar' ? 'خطأ' : 'Error',
+                message: language === 'ar' ? 'حدث خطأ أثناء حفظ البيانات' : 'Error saving data',
+                type: 'error'
+            });
         } finally {
             setSaving(false);
         }

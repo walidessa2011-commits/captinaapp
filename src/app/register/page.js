@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation';
 import { Mail, Lock, Phone, User, Globe, ChevronLeft } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export default function Register() {
-    const { t, language, darkMode } = useApp();
+    const { t, language, darkMode, setAlert } = useApp();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -24,7 +24,11 @@ export default function Register() {
     const handleRegister = async (e) => {
         if (e) e.preventDefault();
         if (!formData.acceptTerms) {
-            alert(language === 'ar' ? "يرجى الموافقة على الشروط" : "Please accept terms");
+            setAlert({
+                title: language === 'ar' ? 'تنبيه' : 'Alert',
+                message: language === 'ar' ? "يرجى الموافقة على الشروط والأحكام للمتابعة" : "Please accept our terms and conditions to continue",
+                type: 'info'
+            });
             return;
         }
 
@@ -43,10 +47,17 @@ export default function Register() {
                 uid: user.uid
             });
 
+            // Update Auth Profile
+            await updateProfile(user, { displayName: formData.fullName });
+
             router.push('/');
         } catch (error) {
             console.error("Registration error:", error);
-            alert(error.message);
+            setAlert({
+                title: language === 'ar' ? 'فشل التسجيل' : 'Registration Failed',
+                message: error.message,
+                type: 'error'
+            });
         } finally {
             setLoading(false);
         }

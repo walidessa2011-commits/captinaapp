@@ -3,66 +3,64 @@ import { motion } from "framer-motion";
 import { Star, Target, Zap, Clock, Shield, ChevronLeft, ChevronRight, Award, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
+import { useRouter } from 'next/navigation';
+import SportTrainers from "@/components/SportTrainers";
 
 export default function CrossfitPage() {
     const { t, language, darkMode } = useApp();
+    const router = useRouter();
     const content = t('crossfitContent');
 
     if (!content) return null;
-
-    const textClass = "text-white";
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] pb-20 transition-colors duration-500 overflow-hidden relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Background Decorations */}
             <div className={`absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
             
-            {/* Immersive Header */}
-            <header className="relative z-20 pt-16 pb-6 px-6">
-                <div className="max-w-7xl mx-auto flex flex-col items-center">
-                    {/* Breadcrumbs */}
-                    <div className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50">
-                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
-                        <ChevronLeft className={`w-3 h-3 ${language === 'en' ? 'rotate-180' : ''}`} />
-                        <Link href="/sports" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرياضات' : 'Sports'}</Link>
-                        <ChevronLeft className={`w-3 h-3 ${language === 'en' ? 'rotate-180' : ''}`} />
-                        <span className="text-primary">{content.title}</span>
-                    </div>
-
-                    {/* Consolidated Title Line */}
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                        <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase text-center">
-                            {language === 'ar' 
-                                ? `( ${content.title} - كابتنية )` 
-                                : `( ${content.title} - Captina )`}
-                        </h1>
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Hero Section - Compact */}
-            <div className="relative h-[20vh] md:h-[25vh] overflow-hidden mx-4 md:mx-10 rounded-[2.5rem] border border-white/5">
+            {/* Immersive Cover Image */}
+            <div className="relative h-[30vh] md:h-[45vh] w-full overflow-hidden shadow-2xl">
                 <img 
                     src={content.heroImg}
-                    className="w-full h-full object-cover opacity-90 dark:opacity-60"
+                    className="w-full h-full object-cover"
                     alt={content.title}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/80 dark:from-[#0a0f1a] via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-[#0a0f1a] via-black/20 to-transparent text-start"></div>
                 
-                <div className={`absolute bottom-6 ${language === 'en' ? 'left-6 text-left' : 'right-6 text-right'} text-white`}>
-                    <div className={`flex flex-wrap gap-2 mb-2 ${language === 'ar' ? 'justify-end' : 'justify-start'}`}>
-                        {[
-                            { icon: Clock, text: language === 'ar' ? '60 دقيقة' : '60 min', color: 'text-orange-400' },
-                            { icon: Target, text: language === 'ar' ? 'تحدي يومي' : 'Daily Challenge', color: 'text-orange-400' },
-                            { icon: Zap, text: language === 'ar' ? '1200 سعرة' : '1200 kcal', color: 'text-orange-400' }
-                        ].map((item, i) => (
-                            <div key={i} className="bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-white/5">
-                                <item.icon className={`w-3 h-3 ${item.color}`} />
-                                <span className="text-[9px] font-black uppercase tracking-wider">{item.text}</span>
-                            </div>
-                        ))}
+                {/* Back Button */}
+                <button 
+                    onClick={() => router.back()}
+                    className={`absolute top-8 ${language === 'en' ? 'left-6' : 'right-6'} z-30 w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-all shadow-xl`}
+                >
+                    <ChevronLeft className={`w-6 h-6 ${language === 'en' ? '' : 'rotate-180'}`} />
+                </button>
+
+                {/* Actions - Top Right */}
+                <div className={`absolute top-8 ${language === 'en' ? 'right-6' : 'left-6'} flex gap-3 z-30`}>
+                    <button className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-xl">
+                        <Star className="w-5 h-5" />
+                    </button>
+                    <button className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-xl">
+                        <Award className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Title Overlay */}
+                <div className="absolute bottom-12 inset-x-0 px-6 z-20">
+                    <div className="max-w-7xl mx-auto flex flex-col items-start gap-2">
+                        <motion.div
+                            initial={{ opacity: 0, x: language === 'ar' ? 20 : -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-2"
+                        >
+                            <span className="w-8 h-[2px] bg-primary"></span>
+                            <span className="text-[10px] md:text-xs font-black text-white uppercase tracking-[0.3em] drop-shadow-lg">
+                                {language === 'ar' ? 'تحدي القوة' : 'STRENGTH CHALLENGE'}
+                            </span>
+                        </motion.div>
+                            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase italic drop-shadow-2xl">
+                                {content.title}
+                            </h1>
                     </div>
                 </div>
             </div>
@@ -134,6 +132,9 @@ export default function CrossfitPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* All Coaches for this sport */}
+                <SportTrainers sportId="crossfit" sportName={content.title} />
             </div>
         </div>
     );

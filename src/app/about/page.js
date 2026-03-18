@@ -39,12 +39,12 @@ export default function AboutApp() {
         <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] transition-colors duration-300 pb-12">
             {/* Header / Breadcrumbs - Compact Version */}
             <header className="relative z-20 pt-6 px-4">
-                <div className="max-w-2xl mx-auto flex flex-col items-center">
+                <div className="max-w-2xl mx-auto flex flex-col items-start">
                     {/* Breadcrumbs */}
                     <motion.div 
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center justify-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
+                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
                     >
                         <Link href="/" className="hover:text-primary transition-colors">{t('aboutPage.breadcrumbs.home')}</Link>
                         <span className="text-gray-500">
@@ -58,14 +58,14 @@ export default function AboutApp() {
                     </motion.div>
 
                     {/* Consolidated Title Line - Horizontal */}
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-start">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             className="flex items-center gap-3 mb-4"
                         >
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                            <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter italic uppercase text-center">
+                            <h1 className={`text-xl md:text-2xl font-black ${language === 'ar' ? 'text-slate-900 dark:text-white' : 'text-white'} tracking-tighter italic uppercase`}>
                                 {t('aboutPage.heroTitle')}
                             </h1>
                             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
@@ -80,7 +80,7 @@ export default function AboutApp() {
                     <div className="w-24 h-24 bg-primary rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-primary/30 rotate-3">
                         <img src="/logo.png" alt="Captina" className="w-16 h-16 object-contain brightness-0 invert" />
                     </div>
-                    <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4">Captina</h2>
+                    <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-4">كابتينا</h2>
                     <p className="text-sm font-bold text-gray-500 dark:text-gray-400 leading-relaxed max-w-md mx-auto italic">
                         {t('aboutPage.heroTagline')}
                     </p>

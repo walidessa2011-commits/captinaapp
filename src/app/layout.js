@@ -1,26 +1,55 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
 import Link from 'next/link';
-import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2 } from 'lucide-react';
+import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2, LogOut, Lock, Settings, Shield } from 'lucide-react';
 import { AppProvider, useApp } from "@/context/AppContext";
 import { usePathname, useRouter } from 'next/navigation';
 import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { doc, getDoc, onSnapshot, collection, query, where } from "firebase/firestore";
 import { motion, AnimatePresence } from 'framer-motion';
+import GlobalModal from "@/components/GlobalModal";
+import CartDrawer from "@/components/CartDrawer";
 
 function LayoutContent({ children }) {
-    const { t, language, darkMode } = useApp();
+    const { t, language, darkMode, setAlert, user, userData, loadingAuth } = useApp();
     const pathname = usePathname();
-    const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/intro';
-    const [user, loadingAuth] = useAuthState(auth);
-    const [userData, setUserData] = useState(null);
+    const isAdminPage = pathname.startsWith('/admin');
+    const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/intro' || pathname === '/forgot-password' || pathname.includes('/forgot-password');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [greeting, setGreeting] = useState('');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const router = useRouter();
+    const menuRef = useRef(null);
+    const profileRef = useRef(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setIsMenuOpen(false);
+            }
+            if (profileRef.current && !profileRef.current.contains(event.target)) {
+                setIsProfileOpen(false);
+            }
+        };
+
+        if (isMenuOpen || isProfileOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, [isMenuOpen, isProfileOpen]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -38,35 +67,21 @@ function LayoutContent({ children }) {
         }
     }, [language]);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            if (darkMode) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) {
+            return language === 'ar' ? 'صباح الخير ☀️' : 'Good Morning ☀️';
+        } else if (hour >= 12 && hour < 17) {
+            return language === 'ar' ? 'نهارك سعيد 👋' : 'Hi, Good day 👋';
+        } else {
+            return language === 'ar' ? 'مساء الخير 🌙' : 'Good Evening 🌙';
         }
-    }, [darkMode]);
+    };
 
     useEffect(() => {
-        if (!user) {
-            setUserData(null);
-            return;
-        }
+        setGreeting(getGreeting());
+    }, [language]);
 
-        const docRef = doc(db, "users", user.uid);
-        const unsubscribe = onSnapshot(docRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setUserData(docSnap.data());
-            } else {
-                setUserData({ fullName: user.displayName, photoURL: user.photoURL });
-            }
-        }, (error) => {
-            console.error("Error listening to user data:", error);
-        });
-
-        return () => unsubscribe();
-    }, [user]);
 
     useEffect(() => {
         if (!user) {
@@ -90,15 +105,17 @@ function LayoutContent({ children }) {
     const displayName = userData?.fullName || user?.displayName || (language === 'ar' ? "ضيف" : "Guest");
     const profileImg = user?.photoURL || "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100";
 
-    const getGreeting = () => {
-        const hour = new Date().getHours();
-        if (hour >= 5 && hour < 12) {
-            return language === 'ar' ? 'صباح الخير ☀️' : 'Good Morning ☀️';
-        } else if (hour >= 12 && hour < 17) {
-            return language === 'ar' ? 'نهارك سعيد 👋' : 'Hi, Good day 👋';
-        } else {
-            return language === 'ar' ? 'مساء الخير 🌙' : 'Good Evening 🌙';
-        }
+    const handleLogout = () => {
+        setAlert({
+            title: language === 'ar' ? 'تسجيل الخروج' : 'Logout',
+            message: language === 'ar' ? 'هل أنت متأكد من رغبتك في تسجيل الخروج؟' : 'Are you sure you want to log out?',
+            type: 'confirm',
+            onConfirm: async () => {
+                await auth.signOut();
+                router.push('/login');
+                setIsProfileOpen(false);
+            }
+        });
     };
 
     return (
@@ -109,15 +126,15 @@ function LayoutContent({ children }) {
                 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
             </head>
             <body className="antialiased flex flex-col min-h-screen bg-background dark:bg-background transition-colors duration-300">
-                {!isAuthPage && (
+                {(!isAuthPage && !isAdminPage && user) && (
                     <header className="sticky top-0 z-50 w-full bg-background/80 dark:bg-background/80 backdrop-blur-xl transition-all duration-300">
                         <div className="container mx-auto px-6 h-16 md:h-24 flex items-center justify-between">
                             {/* Right Side - Dropdown & Greeting */}
-                            <div className="flex items-center gap-4">
+                            <div ref={menuRef} className="flex items-center gap-4 relative">
                                 {/* Toggle Button for Dropdown */}
                                 <button 
                                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                                    className="p-3 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-premium hover:shadow-active transition-all group relative z-[60]"
+                                    className="p-3 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-premium hover:shadow-active transition-all group relative z-[60] lg:hidden"
                                 >
                                     {isMenuOpen ? (
                                         <X className="w-5 h-5 text-primary" />
@@ -169,11 +186,17 @@ function LayoutContent({ children }) {
                                                     </Link>
                                                 ))}
                                                 
-                                                <div className="pt-2 mt-2 border-t border-gray-50 dark:border-white/5">
+                                                <div className="pt-2 mt-2 border-t border-gray-50 dark:border-white/5 space-y-2">
                                                     <Link href="/profile" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all">
                                                         <User className="w-5 h-5" />
                                                         <span className="font-bold">{t('profile')}</span>
                                                     </Link>
+                                                    {userData?.role === 'admin' && (
+                                                        <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl text-primary bg-primary/5 hover:bg-primary/10 transition-all font-black border border-primary/10">
+                                                            <Shield className="w-5 h-5" />
+                                                            <span>{language === 'ar' ? 'لوحة تحكم الإدارة' : 'Admin Panel'}</span>
+                                                        </Link>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         </>
@@ -182,22 +205,22 @@ function LayoutContent({ children }) {
 
                                 <div className="flex flex-col text-start">
                                     <p className="text-[10px] md:text-xs font-black text-gray-400 dark:text-gray-500 leading-none mb-1 uppercase tracking-wider">
-                                        {getGreeting()}
+                                        {greeting}
                                     </p>
                                     <h2 className="font-black text-gray-900 dark:text-white leading-tight capitalize flex items-center gap-1">
-                                        <span className="text-lg md:text-2xl">{language === 'ar' ? 'مرحباً' : 'Welcome'}</span>
+                                        <span className="text-base md:text-xl">{language === 'ar' ? 'مرحباً' : 'Welcome'}</span>
                                         <span className="text-gray-300 dark:text-gray-700">/</span>
-                                        <span className="text-sm md:text-lg opacity-90">{displayName}</span>
+                                        <span className="text-xs md:text-base opacity-90">{displayName}</span>
                                     </h2>
                                 </div>
                             </div>
 
                             {/* Center Section (Desktop Navigation) */}
-                            <div className="hidden xl:block">
+                            <div className="hidden lg:block">
                                 <Navigation />
                             </div>
 
-                            {/* Left Side - Notifications & Profile */}
+                            {/* Left Side - Notifications & Profile Dropdown */}
                             <div className="flex items-center gap-4">
                                 <Link href="/notifications" className="relative p-3 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm hover:shadow-md transition-all group">
                                     <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300 group-hover:text-primary" />
@@ -206,25 +229,105 @@ function LayoutContent({ children }) {
                                     )}
                                 </Link>
                                 
-                                <Link href="/profile" className="w-11 h-11 md:w-14 md:h-14 rounded-2xl overflow-hidden border-2 border-white dark:border-white/5 shadow-premium hover:border-primary transition-all flex items-center justify-center bg-gray-50 dark:bg-white/5">
-                                    {userData?.photoURL || user?.photoURL ? (
-                                        <img src={userData?.photoURL || user?.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full bg-primary flex items-center justify-center text-white">
-                                            <User className="w-6 h-6 md:w-8 md:h-8" />
-                                        </div>
-                                    )}
-                                </Link>
+                                <div ref={profileRef} className="relative">
+                                    <button 
+                                        onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                        className={`w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden border-2 shadow-premium transition-all flex items-center justify-center bg-white dark:bg-white/5 relative group ${isProfileOpen ? 'border-primary ring-4 ring-primary/20' : 'border-white dark:border-white/5 hover:border-primary/50'}`}
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                        {userData?.photoURL || user?.photoURL ? (
+                                            <img src={userData?.photoURL || user?.photoURL} alt="Profile" className="w-full h-full aspect-square object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white">
+                                                <User className="w-6 h-6 md:w-8 md:h-8" />
+                                            </div>
+                                        )}
+                                    </button>
+
+                                    {/* Profile Dropdown Menu */}
+                                    <AnimatePresence>
+                                        {isProfileOpen && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, scale: 0.95, y: 10, x: language === 'ar' ? -10 : 10 }}
+                                                animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                                                exit={{ opacity: 0, scale: 0.95, y: 10, x: language === 'ar' ? -10 : 10 }}
+                                                className={`absolute top-[calc(100%+12px)] ${language === 'ar' ? 'left-0' : 'right-0'} w-64 bg-white dark:bg-[#1a2235] rounded-[2rem] shadow-2xl border border-gray-100 dark:border-white/10 p-3 z-[60] overflow-hidden`}
+                                            >
+                                                {/* Header Info */}
+                                                <div className="p-4 mb-2 bg-slate-50 dark:bg-white/5 rounded-[1.5rem] flex items-center gap-3 border border-gray-100 dark:border-white/5">
+                                                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/20 bg-primary/5 shadow-inner flex items-center justify-center">
+                                                        {userData?.photoURL || user?.photoURL ? (
+                                                            <img src={userData?.photoURL || user?.photoURL} alt="Dropdown Profile" className="w-full h-full aspect-square object-cover" />
+                                                        ) : (
+                                                            <User className="w-6 h-6 text-primary" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col text-start overflow-hidden">
+                                                        <span className="text-sm font-black text-slate-900 dark:text-white truncate tracking-tight">{displayName}</span>
+                                                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate opacity-70">{user?.email}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <Link 
+                                                        href="/profile" 
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="flex items-center gap-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold"
+                                                    >
+                                                        <User className="w-4 h-4 text-primary" />
+                                                        <span>{language === 'ar' ? 'الصفحة الشخصية' : 'Personal Profile'}</span>
+                                                    </Link>
+                                                    <Link 
+                                                        href="/settings" 
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="flex items-center gap-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold"
+                                                    >
+                                                        <Settings className="w-4 h-4 text-emerald-500" />
+                                                        <span>{language === 'ar' ? 'الاعدادات' : 'Settings'}</span>
+                                                    </Link>
+                                                    <Link 
+                                                        href="/settings/password" 
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                        className="flex items-center gap-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold"
+                                                    >
+                                                        <Lock className="w-4 h-4 text-blue-500" />
+                                                        <span>{language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}</span>
+                                                    </Link>
+                                                    
+                                                    {userData?.role === 'admin' && (
+                                                        <Link 
+                                                            href="/admin/dashboard" 
+                                                            onClick={() => setIsProfileOpen(false)}
+                                                            className="flex items-center gap-3 p-3 rounded-xl text-primary bg-primary/5 hover:bg-primary/10 transition-all text-sm font-black border border-primary/10"
+                                                        >
+                                                            <Shield className="w-4 h-4" />
+                                                            <span>{language === 'ar' ? 'لوحة تحكم الإدارة' : 'Admin Panel'}</span>
+                                                        </Link>
+                                                    )}
+                                                    <div className="pt-1 mt-1 border-t border-gray-100 dark:border-white/5">
+                                                        <button 
+                                                            onClick={handleLogout}
+                                                            className="w-full flex items-center gap-3 p-3 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all text-sm font-bold"
+                                                        >
+                                                            <LogOut className="w-4 h-4" />
+                                                            <span>{language === 'ar' ? 'تسجيل الخروج' : 'Log Out'}</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             </div>
                         </div>
                     </header>
                 )}
 
-                <main className="flex-grow pb-28 md:pb-0 dark:text-white">
+                <main className="flex-grow pb-28 lg:pb-0 dark:text-white">
                     {children}
                 </main>
 
-                {!isAuthPage && (
+                {(!isAuthPage && !isAdminPage && user) && (
                     <footer className="footer-section bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-white/5 pt-4 pb-16 hidden lg:block transition-all">
                         <div className="container mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 text-start">
                             <div className="space-y-6">
@@ -261,7 +364,9 @@ function LayoutContent({ children }) {
                     </footer>
                 )}
 
-                {!isAuthPage && pathname !== '/booking' && <MobileNav />}
+                {(!isAuthPage && !isAdminPage && user) && pathname !== '/booking' && <MobileNav />}
+                <GlobalModal />
+                <CartDrawer />
             </body>
         </html>
     );

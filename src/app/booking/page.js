@@ -11,7 +11,7 @@ import {
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from "@/context/AppContext";
 import { db, auth } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import Link from 'next/link';
 import HorizontalDatePicker from '@/components/HorizontalDatePicker';
 
@@ -44,6 +44,21 @@ function BookingContent() {
         notes: ''
     });
 
+    const [dbTrainers, setDbTrainers] = useState([]);
+
+    useEffect(() => {
+        const fetchTrainers = async () => {
+            try {
+                const q = query(collection(db, "trainers"), where("status", "==", "active"));
+                const snap = await getDocs(q);
+                setDbTrainers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (err) {
+                console.error("Error fetching trainers:", err);
+            }
+        };
+        fetchTrainers();
+    }, []);
+
     const steps = [
         { id: 1, label: t('booking.selectSport') },
         { id: 2, label: t('booking.selectLocation') },
@@ -59,11 +74,7 @@ function BookingContent() {
     const nextStep = () => setStep(s => Math.min(s + 1, 4));
     const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
-    const gyms = [
-        { id: 1, name: language === 'ar' ? 'نادي الفتح الرياضي' : 'Al-Fateh Sports Club', area: language === 'ar' ? 'حي العليا' : 'Olaya District', distance: `1.2 ${language === 'ar' ? 'كم' : 'km'}`, rating: 4.8, trainers: 12, color: 'from-blue-500 to-indigo-600' },
-        { id: 2, name: language === 'ar' ? 'نادي الأبطال' : 'Champions Gym', area: language === 'ar' ? 'حي الملقا' : 'Al-Malqa District', distance: `2.8 ${language === 'ar' ? 'كم' : 'km'}`, rating: 4.7, trainers: 8, color: 'from-purple-500 to-pink-600' },
-        { id: 3, name: language === 'ar' ? 'فيتنس بلس' : 'Fitness Plus', area: language === 'ar' ? 'حي النرجس' : 'An-Narjis District', distance: `3.5 ${language === 'ar' ? 'كم' : 'km'}`, rating: 4.9, trainers: 15, color: 'from-orange-500 to-red-600' }
-    ];
+    const gyms = t('gymsData') || [];
 
     const sportsOptions = t('booking.sportsList') || [];
 
@@ -92,11 +103,7 @@ function BookingContent() {
         }
     };
 
-    const trainers = [
-        { id: 1, name: language === 'ar' ? 'الكابتن أحمد الحسيني' : 'Captain Ahmed Al-Husseini', rating: 4.9, trainees: 280, image: 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200' },
-        { id: 2, name: language === 'ar' ? 'الكابتن محمد العتيبي' : 'Captain Mohammed Al-Otaibi', rating: 5.0, trainees: 312, image: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=200' },
-        { id: 3, name: language === 'ar' ? 'الكابتن سارة علي' : 'Captain Sara Ali', rating: 4.8, trainees: 195, image: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=200' }
-    ];
+    const trainers = dbTrainers.length > 0 ? dbTrainers : (t('pageTrainersData') || []);
 
     const textClass = darkMode ? "text-white" : "text-slate-900";
 
@@ -362,8 +369,12 @@ function BookingContent() {
                                                     className={`bg-white dark:bg-slate-800 rounded-[32px] p-6 flex flex-col gap-4 border-2 transition-all text-start group ${bookingData.selectedGym?.id === gym.id ? 'border-primary shadow-xl shadow-primary/10' : 'border-transparent shadow-sm hover:border-gray-200'}`}
                                                 >
                                                     <div className="flex items-start justify-between w-full">
-                                                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${gym.color} flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform`}>
-                                                            <Dumbbell className="w-8 h-8 text-white" />
+                                                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${gym.color || 'from-blue-500 to-indigo-600'} flex items-center justify-center flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform`}>
+                                                            {gym.image ? (
+                                                                <img src={gym.image} className="w-full h-full object-cover rounded-2xl" alt="" />
+                                                            ) : (
+                                                                <Dumbbell className="w-8 h-8 text-white" />
+                                                            )}
                                                         </div>
                                                         {bookingData.selectedGym?.id === gym.id && (
                                                             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg">
@@ -376,7 +387,7 @@ function BookingContent() {
                                                         <div className="space-y-3">
                                                             <div className="flex items-center gap-2 text-gray-400 text-[10px] font-bold">
                                                                 <MapPin className="w-4 h-4 text-primary" />
-                                                                {gym.area} • {gym.distance}
+                                                                {gym.area || (language === 'ar' ? 'حي العليا' : 'Olaya')} • {gym.distance || `1.2 ${language === 'ar' ? 'كم' : 'km'}`}
                                                             </div>
                                                             <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest pt-3 border-t border-gray-50 dark:border-white/5">
                                                                 <div className="flex items-center gap-1.5 text-amber-500">
@@ -385,7 +396,7 @@ function BookingContent() {
                                                                 </div>
                                                                 <div className="text-gray-400 flex items-center gap-1.5">
                                                                     <User className="w-3.5 h-3.5" />
-                                                                    {gym.trainers} {t('trainers')}
+                                                                    {gym.trainersCount || 10} {t('trainers')}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -419,14 +430,14 @@ function BookingContent() {
                                                 className={`flex-shrink-0 w-32 md:w-full bg-white dark:bg-slate-800 rounded-[28px] p-3 border-2 transition-all flex flex-col items-center gap-2 ${bookingData.trainer?.id === trainer.id ? 'border-primary shadow-lg shadow-primary/5' : 'border-transparent shadow-sm'}`}
                                             >
                                                 <div className="relative">
-                                                    <img src={trainer.image} className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={trainer.name} />
+                                                    <img src={trainer.image || trainer.profileImage || 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200'} referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={typeof trainer.name === 'string' ? trainer.name : trainer.name?.[language]} />
                                                     {bookingData.trainer?.id === trainer.id && (
                                                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
                                                             <CheckCircle2 className="w-2.5 h-2.5 text-white" />
                                                         </div>
                                                     )}
                                                 </div>
-                                                <h4 className="text-[10px] font-black text-gray-900 dark:text-white text-center line-clamp-1">{trainer.name}</h4>
+                                                <h4 className="text-[10px] font-black text-gray-900 dark:text-white text-center line-clamp-1">{typeof trainer.name === 'string' ? trainer.name : trainer.name?.[language]}</h4>
                                                 <div className="flex items-center gap-1">
                                                     <CheckCircle2 className="w-2 h-2 text-amber-500 fill-amber-500" />
                                                     <span className="text-[8px] font-black text-gray-500">{trainer.rating}</span>
@@ -524,7 +535,7 @@ function BookingContent() {
                                             {[
                                                 { label: t('booking.service'), value: bookingData.sport, icon: Dumbbell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
                                                 { label: t('booking.selectLocation'), value: bookingData.locationType === 'home' ? (`${t('booking.atHome')} (+50)`) : (bookingData.selectedGym?.name || '-'), icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                                                { label: t('booking.selectTrainer'), value: bookingData.trainer?.name || '-', icon: User, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                                                { label: t('booking.selectTrainer'), value: bookingData.trainer ? (typeof bookingData.trainer.name === 'string' ? bookingData.trainer.name : bookingData.trainer.name?.[language]) : '-', icon: User, color: 'text-amber-500', bg: 'bg-amber-500/10' },
                                                 { label: t('booking.selectDateTime'), value: `${bookingData.date} • ${bookingData.time}`, icon: Calendar, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
                                             ].map((item, i) => (
                                                 <div key={i} className="flex items-center gap-4 text-start group">

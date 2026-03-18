@@ -13,7 +13,7 @@ import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function ChangePassword() {
-    const { language, t } = useApp();
+    const { language, t, darkMode } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     
@@ -76,72 +76,63 @@ export default function ChangePassword() {
 
     if (loadingAuth) {
         return (
-            <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
+            <div className={`min-h-screen ${darkMode ? 'bg-[#0a0f1a]' : 'bg-slate-50'} flex items-center justify-center`}>
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
         );
     }
 
-    const inputClasses = "w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-12 text-white text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all outline-none placeholder:text-gray-600";
+    const inputClasses = `w-full ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-slate-100 border-gray-200 text-slate-900'} border rounded-2xl py-4 px-12 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all outline-none placeholder:text-gray-400`;
     const labelClasses = "block text-[10px] font-black text-primary uppercase mb-3 px-1 tracking-widest";
 
-    const textClass = "text-white";
+    const textClass = darkMode ? "text-white" : "text-slate-900";
 
     return (
-        <div className="min-h-screen bg-[#0a0f1a] pb-20 transition-colors duration-500 overflow-hidden relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className={`min-h-screen ${darkMode ? 'bg-[#0a0f1a]' : 'bg-slate-50'} pb-20 transition-colors duration-500 overflow-hidden relative`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Background Decorations */}
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
             
-            {/* Immersive Header */}
-            <header className="relative z-20 pt-16 pb-6 px-6">
-                <div className="max-w-7xl mx-auto flex flex-col items-center">
-                    {/* Breadcrumbs */}
-                    <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
-                    >
-                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
-                        <span className="text-gray-500">
-                            {language === 'ar' ? ' < ' : ' > '}
-                        </span>
-                        <Link href="/settings" className="hover:text-primary transition-colors">{language === 'ar' ? 'الإعدادات' : 'Settings'}</Link>
-                        <span className="text-gray-500">
-                            {language === 'ar' ? ' < ' : ' > '}
-                        </span>
-                        <span className="text-primary">{language === 'ar' ? 'كلمة المرور' : 'Password'}</span>
-                    </motion.div>
+            {/* Minimal Spacer */}
+            <div className="h-4 md:h-8"></div>
 
-                    {/* Consolidated Title Line */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex items-center gap-3 mb-4"
-                    >
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                        <h1 className={`text-xl md:text-2xl font-black ${textClass} tracking-tighter italic uppercase text-center`}>
-                            {language === 'ar' 
-                                ? '( حماية الدخول - كلمة مرور كابتينة )' 
-                                : '( Access Security - Captina Key )'}
-                        </h1>
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                    </motion.div>
+            <main className="max-w-xl mx-auto px-4 pb-6 relative z-10">
+                {/* Top Action Bar - Title & Back */}
+                <div className="mb-2 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
+                    <div className="flex items-center gap-1">
+                        <button 
+                            onClick={() => router.back()}
+                            className="w-10 h-10 flex items-center justify-center text-slate-900 dark:text-white hover:text-primary transition-colors active:scale-95"
+                        >
+                            {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                        </button>
+                        
+                        <div className="flex items-center gap-3 px-2 py-2 text-slate-900 dark:text-white">
+                            <Shield className="w-4 h-4 text-primary" />
+                            <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] whitespace-nowrap">
+                                {language === 'ar' ? 'حماية الدخول' : 'Access Security'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="hidden sm:flex items-center gap-2 px-6 opacity-30">
+                        <p className="text-[8px] font-black uppercase tracking-[0.3em]">
+                            {language === 'ar' ? 'كلمة المرور / الأمان' : 'Key Protocol / Access'}
+                        </p>
+                    </div>
                 </div>
-            </header>
 
-            <main className="max-w-xl mx-auto px-4 py-4 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-12"
+                    className="text-center mb-8"
                 >
-                    <div className="w-20 h-20 bg-primary/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-primary/20 shadow-lg shadow-primary/5">
-                        <Shield className="w-10 h-10 text-primary" />
+                    <div className="w-16 h-16 bg-primary/10 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 border border-primary/20 shadow-lg shadow-primary/5">
+                        <Shield className="w-8 h-8 text-primary" />
                     </div>
-                    <h2 className="text-2xl font-black text-white mb-2 tracking-tight">
+                    <h2 className={`text-xl font-black ${textClass} mb-1 tracking-tight`}>
                         {language === 'ar' ? 'تأمين حسابك' : 'Secure Your Identity'}
                     </h2>
-                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                         {language === 'ar' ? 'تحديث بروتوكول الوصول الخاص بك' : 'Update your access protocol'}
                     </p>
                 </motion.div>
@@ -169,7 +160,7 @@ export default function ChangePassword() {
                         </motion.div>
                     )}
 
-                    <div className="bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-white/10 shadow-2xl relative overflow-hidden">
+                    <div className={`${darkMode ? 'bg-[#1a2235]/60 border-white/10' : 'bg-white border-gray-100'} backdrop-blur-3xl rounded-[2.5rem] p-8 border shadow-2xl relative overflow-hidden`}>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -z-10"></div>
                         
                         <div className="space-y-6">
@@ -236,12 +227,12 @@ export default function ChangePassword() {
                         </div>
                     </div>
 
-                    <div className="p-6 bg-amber-500/5 rounded-[1.5rem] border border-amber-500/10 backdrop-blur-md">
+                    <div className={`${darkMode ? 'bg-amber-500/5 border-amber-500/10' : 'bg-amber-50 border-amber-200'} p-5 rounded-[1.5rem] border backdrop-blur-md`}>
                         <div className="flex gap-4 items-start">
                             <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
                                 <AlertCircle className="w-4 h-4 text-amber-500" />
                             </div>
-                            <p className="text-[10px] font-black text-amber-500/80 leading-relaxed uppercase tracking-widest text-start pt-1">
+                            <p className="text-[10px] font-black text-amber-600 dark:text-amber-500 leading-relaxed uppercase tracking-widest text-start pt-1">
                                 {language === 'ar' 
                                     ? 'سيتم تسجيل خروجك من جميع الجلسات الأخرى عند تغيير كلمة المرور لأغراض أمنية.' 
                                     : 'Active sessions will be terminated across all devices upon security protocol update.'}

@@ -3,9 +3,12 @@ import { motion } from "framer-motion";
 import { Star, Target, Zap, Clock, Shield, ChevronLeft, ChevronRight, Award, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
+import { useRouter } from 'next/navigation';
+import SportTrainers from "@/components/SportTrainers";
 
 export default function BoxingPage() {
     const { t, language, darkMode } = useApp();
+    const router = useRouter();
     const content = t('boxingContent');
 
     if (!content) return null;
@@ -16,59 +19,50 @@ export default function BoxingPage() {
             <div className={`absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse`}></div>
             <div className={`absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] -z-0 -translate-x-1/2 translate-y-1/2`}></div>
             
-            {/* Immersive Header */}
-            <header className="relative z-20 pt-16 pb-6 px-6">
-                <div className="max-w-7xl mx-auto flex flex-col items-center">
-                    {/* Breadcrumbs */}
-                    <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
-                    >
-                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
-                        <span className="text-gray-500">
-                            {language === 'ar' ? ' < ' : ' > '}
-                        </span>
-                        <Link href="/sports" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرياضات' : 'Sports'}</Link>
-                        <span className="text-gray-500">
-                            {language === 'ar' ? ' < ' : ' > '}
-                        </span>
-                        <span className="text-primary">{content.title}</span>
-                    </motion.div>
-
-                    {/* Consolidated Title Line */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex items-center gap-3 mb-4"
-                    >
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                        <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase text-center">
-                            {language === 'ar' 
-                                ? `( ${content.title} - كابتنية )` 
-                                : `( ${content.title} - Captina )`}
-                        </h1>
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                    </motion.div>
-                </div>
-            </header>
-            {/* Hero Image - Compact */}
-            <div className="relative h-[20vh] md:h-[25vh] overflow-hidden mx-6 rounded-[2.5rem] border border-white/5 shadow-2xl mt-4">
+            {/* Immersive Cover Image */}
+            <div className="relative h-[30vh] md:h-[45vh] w-full overflow-hidden shadow-2xl">
                 <img 
                     src={content.heroImg}
-                    className="w-full h-full object-cover opacity-90 dark:opacity-70"
+                    className="w-full h-full object-cover"
                     alt={content.title}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-50/80 dark:from-[#0a0f1a] via-transparent opacity-80"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-[#0a0f1a] via-black/20 to-transparent"></div>
                 
+                {/* Back Button */}
+                <button 
+                    onClick={() => router.back()}
+                    className={`absolute top-8 ${language === 'en' ? 'left-6' : 'right-6'} z-30 w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-all shadow-xl`}
+                >
+                    <ChevronLeft className={`w-6 h-6 ${language === 'en' ? '' : 'rotate-180'}`} />
+                </button>
+
                 {/* Actions - Top Right */}
-                <div className={`absolute top-4 ${language === 'en' ? 'right-4' : 'left-4'} flex gap-2`}>
-                    <button className="w-7 h-7 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center text-white border border-white/10">
-                        <Star className="w-3.5 h-3.5" />
+                <div className={`absolute top-8 ${language === 'en' ? 'right-6' : 'left-6'} flex gap-3 z-30`}>
+                    <button className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-xl">
+                        <Star className="w-5 h-5" />
                     </button>
-                    <button className="w-7 h-7 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center text-white border border-white/10">
-                        <Award className="w-3.5 h-3.5" />
+                    <button className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shadow-xl">
+                        <Award className="w-5 h-5" />
                     </button>
+                </div>
+
+                {/* Title Overlay */}
+                <div className="absolute bottom-12 inset-x-0 px-6 z-20">
+                    <div className="max-w-7xl mx-auto flex flex-col items-start gap-2">
+                        <motion.div
+                            initial={{ opacity: 0, x: language === 'ar' ? 20 : -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-2"
+                        >
+                            <span className="w-8 h-[2px] bg-primary"></span>
+                            <span className="text-[10px] md:text-xs font-black text-white uppercase tracking-[0.3em] drop-shadow-lg">
+                                {language === 'ar' ? 'رياضة النخبة' : 'ELITE SPORT'}
+                            </span>
+                        </motion.div>
+                            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase italic drop-shadow-2xl">
+                                {content.title}
+                            </h1>
+                    </div>
                 </div>
             </div>
 
@@ -77,44 +71,28 @@ export default function BoxingPage() {
                 <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-xl rounded-3xl p-5 md:p-8 border border-gray-100 dark:border-white/5 mb-6 shadow-premium">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                         <div>
-                            <h1 className="text-xl md:text-3xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">{content.title}</h1>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Boxing Elite Club, Newbridge</p>
+                            <h1 className="text-lg md:text-2xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">{content.title}</h1>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{language === 'ar' ? 'نادي النخبة للملاكمة' : 'Boxing Elite Club, Riyadh'}</p>
                         </div>
                         <div className="text-start md:text-end">
                             <p className="text-2xl font-black text-primary tracking-tighter">$239<span className="text-[10px] text-gray-400 font-bold ml-1">/mo</span></p>
-                            <span className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-[8px] font-black rounded-lg mt-1 uppercase tracking-widest">Negotiable</span>
+                            <span className="inline-block px-2 py-0.5 bg-primary/10 text-primary text-[8px] font-black rounded-lg mt-1 uppercase tracking-widest">{language === 'ar' ? 'قابلة للتعديل' : 'Negotiable'}</span>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-6 py-3 border-y border-gray-100 dark:border-white/5">
                         <div className="flex items-center gap-2">
                             <Clock className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-[10px] font-bold text-gray-400">60 Min</span>
+                            <span className="text-[10px] font-bold text-gray-400">{content.duration || "60 Min"}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <Target className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-[10px] font-bold text-gray-400">High Intensity</span>
+                            <span className="text-[10px] font-bold text-gray-400">{content.intensity || "High Intensity"}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Award className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-[10px] font-bold text-gray-400">4.9 (1k+)</span>
+                            <Star className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="text-[10px] font-bold text-gray-400">4.9 (1.2k)</span>
                         </div>
-                    </div>
-
-                    {/* Compact Trainer Profile */}
-                    <div className="mt-6 flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/5">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl overflow-hidden border border-primary/20">
-                                <img src="https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200" alt="Trainer" className="w-full h-full object-cover" />
-                            </div>
-                            <div>
-                                <p className="text-[11px] font-black text-slate-900 dark:text-white">Captain Ahmed</p>
-                                <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Head Coach / Elite Trainer</p>
-                            </div>
-                        </div>
-                        <button className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                            <Zap className="w-4 h-4" />
-                        </button>
                     </div>
                 </div>
 
@@ -125,7 +103,6 @@ export default function BoxingPage() {
                             <h2 className="text-lg font-black text-slate-900 dark:text-white mb-3 tracking-tight">{content.descTitle}</h2>
                             <p className="text-[11px] md:text-[13px] text-gray-600 dark:text-gray-400 font-bold leading-relaxed">
                                 {content.description}
-                                <span className="text-primary font-black cursor-pointer ml-1">...read more</span>
                             </p>
                         </div>
 
@@ -161,27 +138,11 @@ export default function BoxingPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* All Coaches for this sport */}
+                <SportTrainers sportId="boxing" sportName={content.title} />
+
             </div>
         </div>
     );
-}
-
-function AwardIcon(props) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526" />
-      <circle cx="12" cy="8" r="6" />
-    </svg>
-  )
 }

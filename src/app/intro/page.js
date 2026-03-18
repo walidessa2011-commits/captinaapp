@@ -38,10 +38,10 @@ export default function IntroPage() {
     ];
 
     const nextSlide = () => {
-        if (currentSlide === slides.length - 1) {
+        if (currentSlide >= slides.length - 1) {
             finishIntro();
         } else {
-            setCurrentSlide(prev => prev + 1);
+            setCurrentSlide(prev => Math.min(prev + 1, slides.length - 1));
         }
     };
 
@@ -51,6 +51,8 @@ export default function IntroPage() {
         }
         router.push('/login');
     };
+
+    const activeSlide = slides[currentSlide] || slides[0] || {};
 
     if (showSplash) {
         return <Splash onComplete={() => setShowSplash(false)} />;
@@ -69,7 +71,7 @@ export default function IntroPage() {
                     className="absolute inset-0 z-0"
                 >
                     <img 
-                        src={slides[currentSlide].image} 
+                        src={activeSlide.image || ''} 
                         alt="" 
                         className={`w-full h-full object-cover transition-all duration-500 ${darkMode ? 'opacity-60 grayscale-[10%]' : 'opacity-100 brightness-[0.85] contrast-[1.1]'}`}
                     />
@@ -116,15 +118,18 @@ export default function IntroPage() {
                                 <motion.div 
                                     className="w-9 h-9 bg-[#E51B24] rounded-lg flex items-center justify-center shadow-lg"
                                 >
-                                    {React.cloneElement(slides[currentSlide].icon, { className: "w-5 h-5 text-white" })}
+                                    {activeSlide && activeSlide.icon && React.isValidElement(activeSlide.icon) ? 
+                                        React.cloneElement(activeSlide.icon, { className: "w-5 h-5 text-white" }) 
+                                        : null
+                                    }
                                 </motion.div>
                                 <h1 className={`text-lg md:text-xl font-black leading-tight mb-0 transition-colors ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                    {slides[currentSlide].title}
+                                    {activeSlide?.title || ''}
                                 </h1>
                             </div>
 
                             <p className={`text-xs md:text-sm font-medium leading-relaxed transition-colors ${darkMode ? 'text-white/60' : 'text-gray-600'}`}>
-                                {slides[currentSlide].desc}
+                                {activeSlide.desc}
                             </p>
 
                             <div className="pt-2 flex flex-col gap-4">
@@ -145,7 +150,7 @@ export default function IntroPage() {
                                     <div className="flex gap-2">
                                         {currentSlide > 0 && (
                                             <button 
-                                                onClick={() => setCurrentSlide(prev => prev - 1)}
+                                                onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
                                                 className={`w-10 h-10 border rounded-lg flex items-center justify-center transition-colors ${darkMode ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'}`}
                                             >
                                                 <ChevronLeft className={`w-4 h-4 ${language === 'ar' ? 'rotate-180' : ''} ${darkMode ? 'text-white' : 'text-gray-900'}`} />

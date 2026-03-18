@@ -14,10 +14,11 @@ export default function Navigation() {
         { name: t('trainers'), href: '/trainers' },
         { name: t('store'), href: '/store' },
         { name: t('booking.title'), href: '/booking' },
+        { name: t('contactUs'), href: '/contact' },
     ];
 
     return (
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-6">
             {links.map((link) => (
                 <Link
                     key={link.href}

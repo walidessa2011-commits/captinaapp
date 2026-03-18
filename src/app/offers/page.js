@@ -4,16 +4,12 @@ import { motion } from "framer-motion";
 import Link from 'next/link';
 import { Tag, Sparkles, Clock, ChevronLeft, ChevronRight, Gift, Percent, ArrowRight } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
+import { useRouter } from 'next/navigation';
 
 export default function Offers() {
     const { language, t, darkMode } = useApp();
+    const router = useRouter();
     const allOffers = t('allOffersData') || [];
-    const offerImages = [
-        "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1000&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=1000&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1541534741688-6078c64ec4a9?q=80&w=1000&auto=format&fit=crop"
-    ];
 
     return (
         <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-32 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -21,45 +17,35 @@ export default function Offers() {
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
             
-            {/* Header / Breadcrumbs - Mobile Premium Alignment */}
-            <header className="relative z-20 pt-8 px-6">
-                <div className="max-w-7xl mx-auto flex flex-col items-start">
-                    {/* Breadcrumbs */}
-                    <motion.div 
-                        initial={{ opacity: 0, x: language === 'ar' ? 20 : -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center gap-2 mb-4 text-[11px] font-black uppercase tracking-[0.2em] opacity-60"
-                    >
-                        <Link href="/" className="hover:text-primary transition-colors text-slate-900 dark:text-white">
-                            {language === 'ar' ? 'الرئيسية' : 'Home'}
-                        </Link>
-                        <span className="text-gray-400">
-                            {language === 'ar' ? ' / ' : ' / '}
-                        </span>
-                        <span className="text-primary font-black">
-                            {language === 'ar' ? 'العروض' : 'Offers'}
-                        </span>
-                    </motion.div>
+            {/* Minimal Spacer */}
+            <div className="h-4 md:h-8"></div>
 
-                    {/* Titling Section */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col gap-1"
-                    >
-                        <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">
-                            {language === 'ar' ? 'أقوى العروض' : 'Strongest Offers'}
-                        </h1>
-                        <div className="flex items-center gap-2">
-                            <div className="h-1 w-12 bg-primary rounded-full"></div>
-                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest opacity-80">
-                                {language === 'ar' ? 'وفر أكثر مع باقات كابتينة' : 'Save more with Captina packages'}
-                            </p>
+            <main className="max-w-7xl mx-auto px-6 relative z-10">
+                {/* Top Action Bar - Title & Back */}
+                <div className="mb-4 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
+                    <div className="flex items-center gap-1">
+                        <button 
+                            onClick={() => router.back()}
+                            className="w-10 h-10 flex items-center justify-center text-slate-900 dark:text-white hover:text-primary transition-colors active:scale-95"
+                        >
+                            {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                        </button>
+                        
+                        <div className="flex items-center gap-3 px-2 py-2 text-slate-900 dark:text-white">
+                            <Tag className="w-4 h-4 text-primary" />
+                            <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] whitespace-nowrap">
+                                {language === 'ar' ? 'أقوى العروض' : 'Strongest Offers'}
+                            </span>
                         </div>
-                    </motion.div>
-                </div>
-            </header>
+                    </div>
 
+                    <div className="hidden sm:flex items-center gap-2 px-6 opacity-30">
+                        <p className="text-[8px] font-black uppercase tracking-[0.3em]">
+                            {language === 'ar' ? 'الرئيسية / العروض' : 'Home / Offers'}
+                        </p>
+                    </div>
+                </div>
+ 
             <div className="container mx-auto px-6 mt-12 relative z-10 max-w-7xl">
                 {/* Offers Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -76,7 +62,7 @@ export default function Offers() {
                                 {/* Card Image Section */}
                                 <div className="relative w-full h-44 overflow-hidden shrink-0">
                                     <img 
-                                        src={offerImages[index % offerImages.length]} 
+                                        src={offer.image || "https://images.unsplash.com/photo-1541534741688-6078c64ec4a9?q=80&w=1000"} 
                                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
                                         alt={offer.title} 
                                     />
@@ -109,7 +95,7 @@ export default function Offers() {
                                             </span>
                                         </div>
                                         
-                                        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight leading-tight group-hover:text-primary transition-colors">
+                                        <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight group-hover:text-primary transition-colors">
                                             {offer.title}
                                         </h3>
                                         
@@ -157,7 +143,7 @@ export default function Offers() {
                                         Exclusive Reward
                                     </span>
                                 </div>
-                                <h4 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
+                                <h4 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
                                     {language === 'ar' ? 'أدخل كود الخصم المباشر' : 'Have a Promo Code?'}
                                 </h4>
                                 <p className="text-sm font-bold text-gray-500 dark:text-gray-400 leading-relaxed uppercase tracking-wider opacity-80">
@@ -175,10 +161,11 @@ export default function Offers() {
                                     {language === 'ar' ? 'تفعيل ' : 'Apply Now'}
                                 </button>
                             </div>
-                        </div>
                     </div>
-                </motion.div>
-            </div>
+                </div>
+            </motion.div>
         </div>
+    </main>
+</div>
     );
 }

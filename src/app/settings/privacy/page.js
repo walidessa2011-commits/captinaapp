@@ -120,44 +120,35 @@ export default function PrivacySettings() {
             {/* Background Decorations */}
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
             
-            {/* Immersive Header */}
-            <header className="relative z-20 pt-16 pb-6 px-6">
-                <div className="max-w-7xl mx-auto flex flex-col items-center">
-                    {/* Breadcrumbs */}
-                    <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-2 mb-4 text-[10px] font-black uppercase tracking-widest opacity-50"
-                    >
-                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
-                        <span className="text-gray-500">
-                            {language === 'ar' ? ' < ' : ' > '}
-                        </span>
-                        <Link href="/settings" className="hover:text-primary transition-colors">{language === 'ar' ? 'الإعدادات' : 'Settings'}</Link>
-                        <span className="text-gray-500">
-                            {language === 'ar' ? ' < ' : ' > '}
-                        </span>
-                        <span className="text-primary">{language === 'ar' ? 'الخصوصية' : 'Privacy'}</span>
-                    </motion.div>
+            {/* Minimal Spacer */}
+            <div className="h-4 md:h-8"></div>
 
-                    {/* Consolidated Title Line */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex items-center gap-3 mb-4"
-                    >
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                        <h1 className={`text-xl md:text-2xl font-black ${textClass} tracking-tighter italic uppercase text-center`}>
-                            {language === 'ar' 
-                                ? '( حماية بياناتك - خصوصية كابتينة )' 
-                                : '( Secure Protocol - Privacy Core )'}
-                        </h1>
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
-                    </motion.div>
+            <main className="max-w-2xl mx-auto px-4 pb-6 relative z-10">
+                {/* Top Action Bar - Title & Back */}
+                <div className="mb-2 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
+                    <div className="flex items-center gap-1">
+                        <button 
+                            onClick={() => router.back()}
+                            className="w-10 h-10 flex items-center justify-center text-slate-900 dark:text-white hover:text-primary transition-colors active:scale-95"
+                        >
+                            {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                        </button>
+                        
+                        <div className="flex items-center gap-3 px-2 py-2 text-slate-900 dark:text-white">
+                            <Shield className="w-4 h-4 text-primary" />
+                            <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] whitespace-nowrap">
+                                {language === 'ar' ? 'بروتوكول الخصوصية' : 'Privacy Core'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="hidden sm:flex items-center gap-2 px-6 opacity-30">
+                        <p className="text-[8px] font-black uppercase tracking-[0.3em]">
+                            {language === 'ar' ? 'البيانات / الخصوصية' : 'Neural / Data Privacy'}
+                        </p>
+                    </div>
                 </div>
-            </header>
 
-            <main className="max-w-2xl mx-auto px-4 py-4 relative z-10">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}

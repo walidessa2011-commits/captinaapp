@@ -4,6 +4,7 @@
 
 :root {
   --primary: #ff0000; /* Pure Red */
+  --primary-rgb: 255, 0, 0;
   --primary-light: #ff3333;
   --secondary: #ff8c00;
   --background: #ffffff; /* Pure White */
@@ -15,6 +16,7 @@
 .dark {
   --background: #0a0f1a; /* Premium Navy Dark */
   --foreground: #f8fafc;
+  --primary-rgb: 255, 0, 0;
   --card: #161b22;
   --border: #21262d;
 }

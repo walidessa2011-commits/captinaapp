@@ -19,7 +19,7 @@ export default function MobileNav() {
     ];
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-[100] px-6 pb-8 pointer-events-none">
+        <nav className="fixed bottom-0 left-0 right-0 z-[100] px-6 pb-8 pointer-events-none lg:hidden">
             <div className="bg-white/95 dark:bg-black/95 backdrop-blur-2xl border border-white/20 dark:border-white/5 rounded-[3rem] p-2 shadow-premium flex items-center justify-between relative pointer-events-auto">
                 {navItems.map((item, index) => {
                     const isActive = item.path === '/' 

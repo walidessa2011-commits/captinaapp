@@ -57,7 +57,7 @@ export default function Packages() {
                         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
                         <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase text-center">
                             {language === 'ar' 
-                                ? '( عروض محدودة - باقات اشتراك كابتينة )' 
+                                ? '( عروض محدودة - باقات اشتراك كابتينا )' 
                                 : '( Exclusive Deals - Captina Packages )'}
                         </h1>
                         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>

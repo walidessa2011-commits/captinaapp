@@ -4,7 +4,7 @@ import {
     User, Settings, Package, Calendar, LogOut, ChevronLeft, ChevronRight,
     TrendingUp, Target, MapPin, ShoppingBag, Trophy, Clock, Camera,
     Star, MessageCircle, CreditCard, ShieldCheck, Heart, Dumbbell,
-    Phone, Mail, Cake, Map
+    Phone, Mail, Cake, Map, Navigation2, Plus, Trash2, MapPinOff
 } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
@@ -17,7 +17,7 @@ import { storage, auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function Profile() {
-    const { t, language, darkMode } = useApp();
+    const { t, language, darkMode, setAlert, favorites, products } = useApp();
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
     const [profileData, setProfileData] = useState(null);
@@ -81,15 +81,26 @@ export default function Profile() {
 
         } catch (error) {
             console.error(`Error uploading ${type} image:`, error);
-            alert(language === 'ar' ? 'حدث خطأ أثناء رفع الصورة' : 'Error uploading image');
+            setAlert({
+                title: language === 'ar' ? 'خطأ' : 'Error',
+                message: language === 'ar' ? 'حدث خطأ أثناء رفع الصورة' : 'Error uploading image',
+                type: 'error'
+            });
         } finally {
             setUploading(prev => ({ ...prev, [type]: false }));
         }
     };
 
-    const handleLogout = async () => {
-        await signOut(auth);
-        router.push('/login');
+    const handleLogout = () => {
+        setAlert({
+            title: language === 'ar' ? 'تسجيل الخروج' : 'Logout',
+            message: language === 'ar' ? 'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟' : 'Are you sure you want to log out from your account?',
+            type: 'confirm',
+            onConfirm: async () => {
+                await signOut(auth);
+                router.push('/login');
+            }
+        });
     };
 
     if (loadingAuth || (user && loading)) {
@@ -158,9 +169,9 @@ export default function Profile() {
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] p-8 border border-gray-100 dark:border-white/10 mb-8 shadow-premium text-center"
+                    className="bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] p-6 md:p-8 border border-gray-100 dark:border-white/10 mb-6 shadow-premium text-center"
                 >
-                    <div className="flex flex-col items-center mb-8">
+                    <div className="flex flex-col items-center mb-6">
                         <div className="relative mb-6">
                             <div className="absolute inset-0 bg-primary/20 rounded-[2.5rem] blur-2xl"></div>
                             <img
@@ -177,15 +188,40 @@ export default function Profile() {
                             </button>
                         </div>
                         
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-2 tracking-tight">{trainee.name}</h2>
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight mb-1 tracking-tight">{trainee.name}</h2>
                         
-                        <div className="flex items-center gap-3">
+                        {/* Compact Contact Info Row */}
+                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-1 mb-4 text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-white/5 py-1 px-3 rounded-full border border-gray-100 dark:border-white/5 shadow-sm">
+                                <Mail className="w-3.5 h-3.5 text-primary" />
+                                <span className="opacity-80 lowercase">{trainee.email}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-white/5 py-1 px-3 rounded-full border border-gray-100 dark:border-white/5 shadow-sm">
+                                <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="opacity-80">{trainee.phone}</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex flex-col items-center gap-3">
                             <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-primary/20">
                                 {language === 'ar' ? 'عضو ذهبي' : 'Gold Member'}
                             </span>
-                            <div className="flex items-center gap-1.5 text-gray-400 font-bold text-[10px] uppercase tracking-wider">
-                                <Trophy className="w-3 h-3 text-amber-500" />
-                                <span>Level 12</span>
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-1.5 text-gray-400 font-bold text-[10px] uppercase tracking-wider">
+                                    <Trophy className="w-3 h-3 text-amber-500" />
+                                    <span>{language === 'ar' ? 'المستوى' : 'Level'} {Math.floor(trainee.sessionsCompleted / 5) + 1}</span>
+                                </div>
+                                {/* Level Progress Bar */}
+                                <div className="w-32 h-1.5 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden border border-gray-100 dark:border-white/5 p-[1px]">
+                                    <motion.div 
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${(trainee.sessionsCompleted % 5) / 5 * 100}%` }}
+                                        className="h-full bg-gradient-to-r from-primary to-blue-500 rounded-full"
+                                    ></motion.div>
+                                </div>
+                                <p className="text-[8px] font-black text-primary/60 uppercase tracking-tighter">
+                                    {5 - (trainee.sessionsCompleted % 5)} {language === 'ar' ? 'حصص للمستوى القادم' : 'sessions to Level Up'}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -325,63 +361,175 @@ export default function Profile() {
 
                     {/* Right Column */}
                     <div className="space-y-4">
-                        {/* Personal Information - List Premium */}
+                        {/* Achievements - Real Progress Logic */}
                         <div className="space-y-4">
-                            <div className="flex items-center gap-2 px-2">
-                                <div className="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
-                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">{content.personalInfo}</h3>
-                            </div>
-                            <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2rem] border border-gray-100 dark:border-white/10 overflow-hidden shadow-premium">
-                                {[
-                                    { icon: Mail, label: content.email, value: trainee.email, color: 'bg-blue-500', text: 'text-blue-500' },
-                                    { icon: Phone, label: content.phone, value: trainee.phone, color: 'bg-emerald-500', text: 'text-emerald-500' },
-                                    { icon: Cake, label: content.birthday, value: trainee.birthday, color: 'bg-purple-500', text: 'text-purple-500' },
-                                    { icon: MapPin, label: content.location, value: trainee.city, color: 'bg-rose-500', text: 'text-rose-500' },
-                                ].map((item, i) => (
-                                    <div key={i} className="flex items-center gap-5 p-4 text-start border-b border-gray-50 dark:border-white/5 last:border-0 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
-                                        <div className={`w-11 h-11 rounded-2xl ${item.color}/10 flex items-center justify-center border border-${item.text}/20 shrink-0 group-hover:scale-110 transition-transform`}>
-                                            <item.icon className={`w-5 h-5 ${item.text}`} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-[10px] font-black text-gray-500 uppercase leading-none mb-1.5 tracking-wider">{item.label}</p>
-                                            <p className="text-xs font-black text-slate-900 dark:text-white tracking-tight">{item.value}</p>
-                                        </div>
-                                        <button className="text-[10px] font-black text-primary opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">{language === 'ar' ? 'تعديل' : 'Edit'}</button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Achievements - Premium Badges */}
-                        <div className="space-y-4 pb-12">
                             <div className="flex items-center justify-between px-2">
                                 <div className="flex items-center gap-2">
                                     <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
                                     <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">{content.myAchievements}</h3>
                                 </div>
-                                <Link href="/profile/achievements" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">{t('viewAll')}</Link>
+                                <button 
+                                    onClick={() => setAlert({
+                                        title: language === 'ar' ? 'إنجازاتك' : 'Your Achievements',
+                                        message: language === 'ar' ? 'أكمل المزيد من الحصص والتمارين لفتح أوسمة جديدة!' : 'Complete more sessions and workouts to unlock new badges!',
+                                        type: 'info'
+                                    })}
+                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                                >
+                                    {t('viewAll')}
+                                </button>
                             </div>
                             <div className="grid grid-cols-4 gap-4">
                                 {[
-                                    { icon: TrendingUp, label: '30 d', color: 'bg-blue-500', text: 'text-blue-500' },
-                                    { icon: Trophy, label: '50 s', color: 'bg-amber-500', text: 'text-amber-500' },
-                                    { icon: Star, label: '5 r', color: 'bg-purple-500', text: 'text-purple-500' },
-                                    { icon: Dumbbell, label: '3 g', color: 'bg-orange-500', text: 'text-orange-500' }
+                                    { 
+                                        icon: TrendingUp, 
+                                        label: `${trainee.streak}d`, 
+                                        name: language === 'ar' ? 'المثابر' : 'Consistent',
+                                        desc: language === 'ar' ? 'وصلت لـ 89 يوماً متواصلة' : 'Reached 89 days streak',
+                                        color: 'bg-blue-500', text: 'text-blue-500', 
+                                        unlocked: trainee.streak >= 30 
+                                    },
+                                    { 
+                                        icon: Trophy, 
+                                        label: `${trainee.sessionsCompleted}s`, 
+                                        name: language === 'ar' ? 'الوحش' : 'The Beast',
+                                        desc: language === 'ar' ? 'أتممت 24 حصة تدريبية' : 'Completed 24 sessions',
+                                        color: 'bg-amber-500', text: 'text-amber-500', 
+                                        unlocked: trainee.sessionsCompleted >= 20 
+                                    },
+                                    { 
+                                        icon: Star, 
+                                        label: `Pro`, 
+                                        name: language === 'ar' ? 'نجم صاعد' : 'Rising Star',
+                                        desc: language === 'ar' ? 'عضوية ذهبية نشطة' : 'Active Gold Membership',
+                                        color: 'bg-purple-500', text: 'text-purple-500', 
+                                        unlocked: true 
+                                    },
+                                    { 
+                                        icon: Dumbbell, 
+                                        label: `${trainee.activeSports}`, 
+                                        name: language === 'ar' ? 'متعدد المهارات' : 'Multi-Skilled',
+                                        desc: language === 'ar' ? 'تمارس 3 رياضات مختلفة' : 'Practice 3 different sports',
+                                        color: 'bg-orange-500', text: 'text-orange-500', 
+                                        unlocked: trainee.activeSports >= 2 
+                                    },
                                 ].map((badge, i) => (
                                     <motion.div 
                                         key={i} 
                                         whileHover={{ scale: 1.1, rotate: 5 }}
-                                        className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-2xl p-4 flex flex-col items-center justify-center border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer"
+                                        onClick={() => setAlert({
+                                            title: badge.name,
+                                            message: badge.desc,
+                                            type: 'success'
+                                        })}
+                                        className={`bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-2xl p-4 flex flex-col items-center justify-center border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer ${!badge.unlocked ? 'opacity-40 grayscale' : ''}`}
                                     >
-                                        <div className={`w-10 h-10 rounded-xl ${badge.color}/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
+                                        <div className={`w-10 h-10 rounded-xl ${badge.color}/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform relative`}>
                                             <badge.icon className={`w-5 h-5 ${badge.text}`} />
+                                            {badge.unlocked && (
+                                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1a2235]"></div>
+                                            )}
                                         </div>
                                         <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase mt-1">{badge.label}</span>
                                     </motion.div>
                                 ))}
                             </div>
                         </div>
+
+                        {/* My Addresses Section - Premium Glass Card */}
+                        <div className="space-y-4 pb-4">
+                            <div className="flex items-center justify-between px-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                                    <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                        {language === 'ar' ? 'عناويني المسجلة' : 'My Saved Addresses'}
+                                    </h3>
+                                </div>
+                                <Link href="/profile/addresses" className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:underline">
+                                    {language === 'ar' ? 'إدارة العناوين' : 'Manage Addresses'}
+                                </Link>
+                            </div>
+                            
+                            <motion.div 
+                                onClick={() => router.push('/profile/addresses')}
+                                whileHover={{ scale: 1.01 }}
+                                className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-2xl p-4 border border-gray-100 dark:border-white/10 shadow-premium flex items-center justify-between group cursor-pointer"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                                        <MapPin className="w-5 h-5 text-emerald-500" />
+                                    </div>
+                                    <div className="text-start">
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
+                                            {language === 'ar' ? 'عناوين الشحن والتوصيل' : 'Shipping & Delivery'}
+                                        </h4>
+                                        <p className="text-[10px] font-bold text-gray-500 mt-0.5 leading-tight">
+                                            {language === 'ar' ? 'أضف مواقعك المفضلة لسرعة الطلب' : 'Add favorite locations for faster checkout'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                                    <Plus className="w-4 h-4" />
+                                </div>
+                            </motion.div>
+                        </div>
                     </div>
+                </div>
+                
+                {/* Wishlist / Favorites Section */}
+                <div className="mt-8 space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
+                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                {language === 'ar' ? 'المنتجات المفضلة' : 'Favorite Products'}
+                            </h3>
+                        </div>
+                        <Link href="/store" className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline">
+                            {language === 'ar' ? 'تسوق المزيد' : 'Shop More'}
+                        </Link>
+                    </div>
+
+                    {favorites.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-12">
+                            {products.filter(p => favorites.includes(p.id)).map((product) => (
+                                <motion.div 
+                                    key={product.id}
+                                    whileHover={{ y: -5 }}
+                                    onClick={() => router.push(`/store/${product.id}`)}
+                                    className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-3xl p-3 border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer"
+                                >
+                                    <div className="aspect-square rounded-2xl overflow-hidden mb-3 relative">
+                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                        <div className="absolute top-2 right-2">
+                                            <div className="w-8 h-8 rounded-xl bg-white/90 dark:bg-black/50 backdrop-blur-md flex items-center justify-center text-rose-500 shadow-lg">
+                                                <Heart className="w-4 h-4 fill-current" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-start px-1">
+                                        <h4 className="text-[11px] font-black text-slate-900 dark:text-white line-clamp-1 truncate">{product.name}</h4>
+                                        <div className="flex items-center justify-between mt-1">
+                                            <span className="text-[10px] font-black text-primary">{product.price} {language === 'ar' ? 'رس' : 'SAR'}</span>
+                                            <div className="flex items-center gap-0.5">
+                                                <Star className="w-2.5 h-2.5 text-amber-500 fill-current" />
+                                                <span className="text-[9px] font-bold text-gray-500">{product.rating}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] p-12 border border-gray-100 dark:border-white/10 text-center shadow-premium pb-12">
+                            <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Heart className="w-8 h-8 text-rose-500 opacity-20" />
+                            </div>
+                            <p className="text-sm font-bold text-gray-500">
+                                {language === 'ar' ? 'لا توجد منتجات مفضلة بعد' : 'No favorite products yet'}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

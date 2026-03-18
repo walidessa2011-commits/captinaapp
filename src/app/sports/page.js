@@ -12,13 +12,6 @@ import { useApp } from "@/context/AppContext";
 export default function Sports() {
     const { t, language, darkMode } = useApp();
     const sportsList = t('pageSportsData') || [];
-    
-    const sportsImages = {
-        'boxing': 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?q=80&w=800',
-        'karate': 'https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=800',
-        'crossfit': 'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?q=80&w=800',
-        'bodybuilding': 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800'
-    };
 
     return (
         <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-40 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -53,7 +46,7 @@ export default function Sports() {
                         className="flex flex-col gap-1"
                     >
                         <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">
-                            {language === 'ar' ? 'عالم كابتينة' : 'Captina World'}
+                            {language === 'ar' ? 'عالم كابتينا' : 'Captina World'}
                         </h1>
                         <div className="flex items-center gap-2">
                             <div className="h-1 w-12 bg-primary rounded-full"></div>
@@ -82,7 +75,7 @@ export default function Sports() {
                                     {/* Image Section */}
                                     <div className="absolute inset-0">
                                         <img 
-                                            src={sportsImages[sport.id] || Object.values(sportsImages)[0]} 
+                                            src={sport.image || "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?q=80&w=800"} 
                                             alt={sport.name}
                                             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-70 group-hover:opacity-100"
                                         />
@@ -102,7 +95,7 @@ export default function Sports() {
                                                 </div>
                                             </div>
 
-                                            <h2 className="text-3xl font-black tracking-tight group-hover:text-primary transition-colors duration-300">
+                                            <h2 className="text-2xl font-black tracking-tight group-hover:text-primary transition-colors duration-300">
                                                 {sport.name}
                                             </h2>
 
@@ -151,7 +144,7 @@ export default function Sports() {
                                 <Trophy className="w-8 h-8 text-primary" />
                                 <span className="text-xs font-black text-primary uppercase tracking-[0.4rem]">Winner Mindset</span>
                             </div>
-                            <h2 className="text-4xl md:text-6xl font-black mb-8 leading-none tracking-tighter uppercase italic">
+                            <h2 className="text-3xl md:text-5xl font-black mb-8 leading-none tracking-tighter uppercase italic">
                                 {language === 'ar' ? 'بوابتك للاحتراف' : 'Your Pro Portal'}
                             </h2>
                             <p className="text-white/60 text-lg font-bold mb-10 leading-relaxed uppercase tracking-wider opacity-80">

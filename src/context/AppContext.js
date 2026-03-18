@@ -1,7 +1,8 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, setDoc, orderBy, limit, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 const AppContext = createContext();
 
@@ -18,6 +19,7 @@ export const translations = {
         "trainers": "المدربين",
         "store": "المتجر",
         "offers": "العروض",
+        "membership_plans": "خطط العضوية",
         "main": "الرئيسية",
         viewAll: "عرض الكل",
         bookNow: "احجز الآن",
@@ -60,7 +62,15 @@ export const translations = {
         loginToAccount: "دخول للحساب",
         loginWithPhone: "تسجيل الدخول بالجوال",
         loginWithGoogle: "تسجيل الدخول بـ Google",
+        loginWithBiometrics: "الدخول بالبصمة / معرف الوجه",
         phonePlaceholder: "5xxxxxxxx",
+        verificationCode: "رمز التحقق",
+        sendCode: "إرسال الرمز",
+        verifyCode: "تحقق من الرمز",
+        biometricLogin: "بالبصمة",
+        invalidCode: "رمز التحقق غير صحيح",
+        loginSuccess: "تم تسجيل الدخول بنجاح",
+        biometricSuccess: "تم تفعيل البصمة بنجاح",
         discoverWorld: "اكتشف عالمك التدريبي الجديد",
         discoverDesc: "بوابتك للوصول لأفضل المدربين والبرامج التدريبية المخصصة عالمياً.",
         joinElite: "انضم إلى نخبة الرياضيين",
@@ -247,6 +257,30 @@ export const translations = {
                 stats: { level: 'مبتدئ - محترف', duration: '90 دقيقة', intensity: 'متوسطة' }
             },
             {
+                id: 'taekwondo',
+                name: 'تايكوندو',
+                description: 'فن قتالي كوري يركز على الركلات العالية والسريعة والتركيز العالي.',
+                stats: { level: 'أطفال - كبار', duration: '60 دقيقة', intensity: 'عالية' }
+            },
+            {
+                id: 'kickboxing',
+                name: 'كيك بوكسينغ',
+                description: 'مزيج قوي بين الملاكمة والركلات لزيادة القوة والتحمل.',
+                stats: { level: 'كافة المستويات', duration: '60 دقيقة', intensity: 'عالية' }
+            },
+            {
+                id: 'fitness',
+                name: 'لياقة بدنية',
+                description: 'تمارين شاملة لتحسين المظهر اللائق وزيادة الطاقة اليومية.',
+                stats: { level: 'مبتدئ - متقدم', duration: '45 دقيقة', intensity: 'متوسطة' }
+            },
+            {
+                id: 'yoga',
+                name: 'يوغا',
+                description: 'استرخاء ومرونة وتوازن تام بين العقل والجسد.',
+                stats: { level: 'كافة المستويات', duration: '60 دقيقة', intensity: 'خفيفة' }
+            },
+            {
                 id: 'crossfit',
                 name: 'كروس فت',
                 description: 'تحدَّ حدودك مع تمارين القوة والتحمل عالية الكثافة.',
@@ -313,6 +347,113 @@ export const translations = {
             equipment: "بدلة رياضية (Gi)، حزام",
             ageTitle: "الفئات",
             age: "أطفال، شباب، كبار"
+        },
+        taekwondoContent: {
+            title: "تايكوندو",
+            heroImg: "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1200",
+            backText: "رجوع",
+            descTitle: "عن التايكوندو",
+            description: "فن قتالي كوري يركز بشكل أساسي على الركلات العالية والقفز وتقنيات الركل السريع. التايكوندو يعزز مرونة الجسم، التوازن، والسرعة، بالإضافة إلى الانضباط الروحي.",
+            benefitsTitle: "فوائد التمرين",
+            benefits: [
+                'تطوير ركلات قوية وسريعة',
+                'تحسين التوازن العام',
+                'تعزيز الثقة بالنفس',
+                'تحسين اللياقة البدنية الشاملة'
+            ],
+            scheduleTitle: "المواعيد المتاحة",
+            schedule: [
+                { day: 'الأحد - الثلاثاء', time: '05:00 مساءً' },
+                { day: 'الخميس', time: '06:00 مساءً' }
+            ],
+            bookNow: "سجل الآن",
+            viewTrainers: "مدربينا",
+            ratingTitle: "الاحترافية",
+            ratingSub: "مدربون حاصلون على أحزمة دولية",
+            equipmentTitle: "المعدات",
+            equipment: "بدلة تايكوندو، واقيات",
+            ageTitle: "العمر",
+            age: "من 6 سنوات فأكثر"
+        },
+        kickboxingContent: {
+            title: "كيك بوكسينغ",
+            heroImg: "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1200",
+            backText: "رجوع",
+            descTitle: "عن الكيك بوكسينغ",
+            description: "مزيج حماسي بين الملاكمة التقليدية وركلات الفنون القتالية. تعتبر من أقوى الرياضات لحرق السعرات الحرارية وتطوير قوة الجسم الكامل والتحمل القلبي.",
+            benefitsTitle: "نتائج التدريب",
+            benefits: [
+                'حرق سعرات حرارية عالية',
+                'زيادة قوة العضلات والتحمل',
+                'تحسين التنسيق الحركي',
+                'تخفيف الضغوط اليومية'
+            ],
+            scheduleTitle: "حصص التمرين",
+            schedule: [
+                { day: 'يومياً', time: '08:00 مساءً' },
+                { day: 'الجمعة (VIP)', time: '04:00 مساءً' }
+            ],
+            bookNow: "انضم للتحدي",
+            viewTrainers: "أبطالنا",
+            ratingTitle: "الشدة",
+            ratingSub: "تمرين عالي الكثافة",
+            equipmentTitle: "المعدات",
+            equipment: "قفازات، واقي ساق",
+            ageTitle: "العمر",
+            age: "+14 سنة"
+        },
+        fitnessContent: {
+            title: "لياقة بدنية",
+            heroImg: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200",
+            backText: "رجوع",
+            descTitle: "عن اللياقة البدنية",
+            description: "برامج تمارين شاملة تشمل الكارديو وتمارين المقاومة والتحمل. نهدف لمساعدتك في الوصول للوزن المثالي وتحسين نمط حياتك الصحي بشكل عام.",
+            benefitsTitle: "بماذا ستتميز؟",
+            benefits: [
+                'جسم متناسق ورشيق',
+                'زيادة مستويات الطاقة',
+                'تحسين جودة النوم والتركيز',
+                'تقليل مخاطر الأمراض المزمنة'
+            ],
+            scheduleTitle: "المواعيد",
+            schedule: [
+                { day: 'يومياً', time: '06:00 ص - 10:00 م' }
+            ],
+            bookNow: "ابدأ برنامجك",
+            viewTrainers: "فريقنا",
+            ratingTitle: "التنوع",
+            ratingSub: "برامج مخصصة لكل هدف",
+            equipmentTitle: "المتطلبات",
+            equipment: "حذاء رياضي مريح، ماء",
+            ageTitle: "العمر",
+            age: "كافة الأعمار"
+        },
+        yogaContent: {
+            title: "يوغا",
+            heroImg: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1200",
+            backText: "رجوع",
+            descTitle: "عن اليوغا",
+            description: "رحلة لاكتشاف السلام الداخلي وتطوير مرونة الجسد. تتضمن حصصنا تمارين التمدد، التنفس العميق، والتأمل للوصول لحالة من التوازن التام.",
+            benefitsTitle: "ثمار اليوغا",
+            benefits: [
+                'مرونة فائقة للجسم',
+                'سلام وهدوء نفسي',
+                'تحسين وضعية الجسم والظهر',
+                'تقليل مستويات التوتر'
+            ],
+            scheduleTitle: "جلسات الاسترخاء",
+            schedule: [
+                { day: 'الاثنين - الأربعاء', time: '10:00 صباحاً' },
+                { day: 'السبت', time: '05:00 مساءً' }
+            ],
+            bookNow: "احجز جلستك",
+            viewTrainers: "مدربونا",
+            ratingTitle: "الروحانية",
+            ratingSub: "بيئة هادئة ومحفزة",
+            equipmentTitle: "المعدات",
+            equipment: "سجادة يوغا (Mat)",
+            ageTitle: "العمر",
+            age: "كافة الأعمار"
         },
         crossfitContent: {
             title: "كروس فت",
@@ -475,22 +616,22 @@ export const translations = {
             sportsList: ["كاراتيه", "تايكوندو", "ملاكمة", "كيك بوكسينغ", "لياقة بدنية", "يوغا", "كروس فت", "بناء أجسام"]
         },
         aboutPage: {
-            title: "عن كابتينة - بوابتك الرياضية",
+            title: "عن كابتينا - بوابتك الرياضية",
             breadcrumbs: {
                 home: "الرئيسية",
                 settings: "الإعدادات",
                 about: "عن التطبيق"
             },
-            heroTitle: "تعرف علينا - عن كابتينة",
+            heroTitle: "تعرف علينا - عن كابتينا",
             heroTagline: "منصتك المتكاملة للتدريب الشخصي الاحترافي أينما كنت.",
             storyTitle: "قصتنا",
-            storyContent: "ولدت كابتينة من فكرة بسيطة لكنها قوية: جعل اللياقة البدنية الاحترافية متاحة للجميع في كل مكان. نحن نؤمن بأن العوائق مثل الوقت أو المكان لا يجب أن تقف في طريق أهدافك الصحية. منصتنا تربطك بنخبة من المدربين المعتمدين، وتوفر لك حلولاً تدريبية متنوعة في المنزل أو النادي مصممة لتناسب رحلتك الخاصة.",
+            storyContent: "ولدت كابتينا من فكرة بسيطة لكنها قوية: جعل اللياقة البدنية الاحترافية متاحة للجميع في كل مكان. نحن نؤمن بأن العوائق مثل الوقت أو المكان لا يجب أن تقف في طريق أهدافك الصحية. منصتنا تربطك بنخبة من المدربين المعتمدين، وتوفر لك حلولاً تدريبية متنوعة في المنزل أو النادي مصممة لتناسب رحلتك الخاصة.",
             stats: {
                 trainees: "متدرب",
                 trainers: "مدرب محترف",
                 years: "سنوات نجاح"
             },
-            valuesTitle: "لماذا كابتينة؟",
+            valuesTitle: "لماذا كابتينا؟",
             values: {
                 quality: {
                     title: "الجودة أولاً",
@@ -652,8 +793,8 @@ export const translations = {
             }
         },
         notificationsPage: {
-            title: "إشعارات كابتينة - تفاعل لحظي",
-            heroTitle: "( تفاعل لحظي - إشعارات كابتينة )",
+            title: "إشعارات كابتينا - تفاعل لحظي",
+            heroTitle: "( تفاعل لحظي - إشعارات كابتينا )",
             breadcrumbs: {
                 home: "الرئيسية",
                 notifications: "الإشعارات"
@@ -680,6 +821,7 @@ export const translations = {
         trainers: "Trainers",
         store: "Store",
         offers: "Offers",
+        membership_plans: "Membership Plans",
         main: "Home",
         viewAll: "View All",
         bookNow: "Book Now",
@@ -722,7 +864,15 @@ export const translations = {
         loginToAccount: "Login to Account",
         loginWithPhone: "Login with Phone",
         loginWithGoogle: "Login with Google",
+        loginWithBiometrics: "FaceID / Fingerprint",
         phonePlaceholder: "5xxxxxxxx",
+        verificationCode: "Verification Code",
+        sendCode: "Send Code",
+        verifyCode: "Verify Code",
+        biometricLogin: "Biometrics",
+        invalidCode: "Invalid verification code",
+        loginSuccess: "Signed in successfully",
+        biometricSuccess: "Biometrics activated successfully",
         discoverWorld: "Discover Your New Training World",
         discoverDesc: "Your gateway to access the world's best trainers and personalized training programs.",
         joinElite: "Join Elite Athletes",
@@ -974,6 +1124,113 @@ export const translations = {
             equipment: "Sports Suit (Gi), Belt",
             ageTitle: "Categories",
             age: "Kids, Youth, Adults"
+        },
+        taekwondoContent: {
+            title: "Taekwondo",
+            heroImg: "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1200",
+            backText: "Back",
+            descTitle: "About Taekwondo",
+            description: "A Korean martial art that focuses primarily on high kicks, jumping, and fast-kicking techniques. Taekwondo enhances body flexibility, balance, and speed, in addition to spiritual discipline.",
+            benefitsTitle: "Training Benefits",
+            benefits: [
+                'Develop powerful and fast kicks',
+                'Improve overall balance',
+                'Boost self-confidence',
+                'Improve overall physical fitness'
+            ],
+            scheduleTitle: "Available Times",
+            schedule: [
+                { day: 'Sun - Tue', time: '05:00 PM' },
+                { day: 'Thu', time: '06:00 PM' }
+            ],
+            bookNow: "Register Now",
+            viewTrainers: "Our Trainers",
+            ratingTitle: "Professionalism",
+            ratingSub: "Internationally certified belt trainers",
+            equipmentTitle: "Equipment",
+            equipment: "Taekwondo uniform, Protectors",
+            ageTitle: "Age",
+            age: "6 years and older"
+        },
+        kickboxingContent: {
+            title: "Kickboxing",
+            heroImg: "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1200",
+            backText: "Back",
+            descTitle: "About Kickboxing",
+            description: "An exciting mix of traditional boxing and martial arts kicks. It is considered one of the strongest sports for burning calories and developing full body strength and cardiovascular endurance.",
+            benefitsTitle: "Training Results",
+            benefits: [
+                'High calorie burning',
+                'Increase muscle strength and endurance',
+                'Improve motor coordination',
+                'Relieve daily stress'
+            ],
+            scheduleTitle: "Training Sessions",
+            schedule: [
+                { day: 'Daily', time: '08:00 PM' },
+                { day: 'Fri (VIP)', time: '04:00 PM' }
+            ],
+            bookNow: "Join the Challenge",
+            viewTrainers: "Our Heroes",
+            ratingTitle: "Intensity",
+            ratingSub: "High-intensity training",
+            equipmentTitle: "Equipment",
+            equipment: "Gloves, Shin guards",
+            ageTitle: "Age",
+            age: "+14 years"
+        },
+        fitnessContent: {
+            title: "Fitness",
+            heroImg: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200",
+            backText: "Back",
+            descTitle: "About Fitness",
+            description: "Comprehensive exercise programs including cardio, resistance training, and endurance. We aim to help you reach your ideal weight and improve your overall healthy lifestyle.",
+            benefitsTitle: "How will you excel?",
+            benefits: [
+                'Fit and agile body',
+                'Increase energy levels',
+                'Improve sleep quality and focus',
+                'Reduce risk of chronic diseases'
+            ],
+            scheduleTitle: "Schedule",
+            schedule: [
+                { day: 'Daily', time: '06:00 AM - 10:00 PM' }
+            ],
+            bookNow: "Start Your Program",
+            viewTrainers: "Our Team",
+            ratingTitle: "Diversity",
+            ratingSub: "Customized programs for every goal",
+            equipmentTitle: "Requirements",
+            equipment: "Comfortable sports shoes, Water",
+            ageTitle: "Age",
+            age: "All ages"
+        },
+        yogaContent: {
+            title: "Yoga",
+            heroImg: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1200",
+            backText: "Back",
+            descTitle: "About Yoga",
+            description: "A journey to discover inner peace and develop body flexibility. Our classes include stretching, deep breathing, and meditation to reach a state of complete balance.",
+            benefitsTitle: "Yoga Fruits",
+            benefits: [
+                'Super body flexibility',
+                'Peace and psychological calm',
+                'Improve body posture and back',
+                'Reduce stress levels'
+            ],
+            scheduleTitle: "Relaxation Sessions",
+            schedule: [
+                { day: 'Mon - Wed', time: '10:00 AM' },
+                { day: 'Sat', time: '05:00 PM' }
+            ],
+            bookNow: "Book Your Session",
+            viewTrainers: "Our Coaches",
+            ratingTitle: "Spirituality",
+            ratingSub: "Quiet and motivating environment",
+            equipmentTitle: "Equipment",
+            equipment: "Yoga Mat",
+            ageTitle: "Age",
+            age: "All ages"
         },
         crossfitContent: {
             title: "CrossFit",
@@ -1343,10 +1600,122 @@ export const translations = {
 export function AppProvider({ children }) {
     const [language, setLanguage] = useState('ar');
     const [darkMode, setDarkMode] = useState(false);
+    const [alert, setAlert] = useState(null);
     const [gyms, setGyms] = useState([]);
     const [packages, setPackages] = useState([]);
+    const [trainers, setTrainers] = useState([]);
+    const [sports, setSports] = useState([]);
+    const [offers, setOffers] = useState([]);
+    const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [tasks, setTasks] = useState([]);
+    const [goals, setGoals] = useState({ percentage: 0, text_ar: '', text_en: '', sub_ar: '', sub_en: '' });
+    
+    const [user, loadingAuth] = useAuthState(auth);
+    const [userData, setUserData] = useState(null);
+    const [favorites, setFavorites] = useState([]);
+    const [isCartOpen, setIsCartOpen] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const savedLang = localStorage.getItem('lang');
+            const savedTheme = localStorage.getItem('theme');
+            if (savedLang) setLanguage(savedLang);
+            if (savedTheme) setDarkMode(savedTheme === 'true');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!user) {
+            setUserData(null);
+            // Load local favorites for guests
+            if (typeof window !== 'undefined') {
+                const savedFavorites = localStorage.getItem('captina_favorites');
+                if (savedFavorites) {
+                    try {
+                        setFavorites(JSON.parse(savedFavorites));
+                    } catch (e) {
+                        console.error("Error loading favorites:", e);
+                    }
+                } else {
+                    setFavorites([]);
+                }
+            }
+            return;
+        }
+
+        const docRef = doc(db, "users", user.uid);
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const defaultStats = {
+                    calories: 0,
+                    workoutsCount: 0,
+                    weight: 0,
+                    activeCoaches: 0,
+                    streak: 0,
+                    sessionsCompleted: 0
+                };
+                setUserData({ ...defaultStats, ...data });
+                if (data.favorites) {
+                    setFavorites(data.favorites);
+                }
+            } else {
+                const defaultData = { 
+                    fullName: user.displayName || '', 
+                    photoURL: user.photoURL || '',
+                    email: user.email || '',
+                    calories: 0,
+                    workoutsCount: 0,
+                    weight: 0,
+                    activeCoaches: 0,
+                    streak: 0,
+                    sessionsCompleted: 0,
+                    createdAt: serverTimestamp()
+                };
+                setUserData(defaultData);
+                // Initialize document in Firestore
+                setDoc(docRef, defaultData).catch(err => console.error("Error creating user doc:", err));
+            }
+        }, (error) => {
+            console.error("Error listening to user data:", error);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const toggleFavorite = async (productId) => {
+        const isFav = favorites.includes(productId);
+        const newFavorites = isFav 
+            ? favorites.filter(id => id !== productId)
+            : [...favorites, productId];
+        
+        setFavorites(newFavorites);
+
+        if (user) {
+            try {
+                const userRef = doc(db, "users", user.uid);
+                await updateDoc(userRef, {
+                    favorites: isFav ? arrayRemove(productId) : arrayUnion(productId)
+                });
+            } catch (error) {
+                console.error("Error updating favorites in Firestore:", error);
+            }
+        } else {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('captina_favorites', JSON.stringify(newFavorites));
+            }
+        }
+    };
+    
     const [loadingGyms, setLoadingGyms] = useState(true);
     const [loadingPackages, setLoadingPackages] = useState(true);
+    const [loadingTrainers, setLoadingTrainers] = useState(true);
+    const [loadingSports, setLoadingSports] = useState(true);
+    const [loadingOffers, setLoadingOffers] = useState(true);
+    const [loadingProducts, setLoadingProducts] = useState(true);
+    const [loadingTasks, setLoadingTasks] = useState(true);
+    const [loadingGoals, setLoadingGoals] = useState(true);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -1365,23 +1734,74 @@ export function AppProvider({ children }) {
                 
                 if (querySnapshot.empty) {
                     const initialGyms = [
-                        { name_ar: "فرع المونسية", name_en: "Al-Monsiya Branch", type: 'Internal', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
-                        { name_ar: "فرع الياسمين", name_en: "Al-Yasmin Branch", type: 'Internal', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
-                        { name_ar: "جولدز جيم", name_en: "Gold's Gym", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
-                        { name_ar: "فيتنس فيرست", name_en: "Fitness First", type: 'Partner', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
-                        { name_ar: "أكاديمية تيتان", name_en: "Titan Academy", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800" },
-                        { name_ar: "ذا كيج", name_en: "The Cage", type: 'Partner', rating: '4.7', image: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=800" }
+                        { 
+                            name_ar: "فرع المونسية", 
+                            name_en: "Al-Monsiya Branch", 
+                            type: 'Internal', 
+                            rating: '4.9', 
+                            image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800",
+                            images: [
+                                "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800",
+                                "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800",
+                                "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800"
+                            ],
+                            location_ar: "الرياض، حي المونسية، طريق الثمامة",
+                            location_en: "Riyadh, Al-Monsiya, Thumama Road",
+                            location_link: "https://goo.gl/maps/example1",
+                            phone: "+966 50 123 4567",
+                            social: { instagram: "captina_monsia", twitter: "@captina_monsia" },
+                            sports_ar: ["ملاكمة", "كاراتيه", "كروس فت", "بناء أجسام"],
+                            sports_en: ["Boxing", "Karate", "CrossFit", "Bodybuilding"],
+                            halls: 5,
+                            trainers: 12
+                        },
+                        { 
+                            name_ar: "فرع الياسمين", 
+                            name_en: "Al-Yasmin Branch", 
+                            type: 'Internal', 
+                            rating: '4.8', 
+                            image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800",
+                            images: [
+                                "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800",
+                                "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800",
+                                "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=800"
+                            ],
+                            location_ar: "الرياض، حي الياسمين، طريق الملك عبدالعزيز",
+                            location_en: "Riyadh, Al-Yasmin, King Abdulaziz Road",
+                            location_link: "https://goo.gl/maps/example2",
+                            phone: "+966 50 987 6543",
+                            social: { instagram: "captina_yasmin", twitter: "@captina_yasmin" },
+                            sports_ar: ["ملاكمة", "كروس فت", "لياقة بدنية"],
+                            sports_en: ["Boxing", "CrossFit", "Fitness"],
+                            halls: 3,
+                            trainers: 8
+                        },
+                        { name_ar: "جولدز جيم", name_en: "Gold's Gym", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800", trainers: 25 },
+                        { name_ar: "فيتنس فيرست", name_en: "Fitness First", type: 'Partner', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800", trainers: 30 },
+                        { name_ar: "أكاديمية تيتان", name_en: "Titan Academy", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800", trainers: 15 },
+                        { name_ar: "ذا كيج", name_en: "The Cage", type: 'Partner', rating: '4.7', image: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=800", trainers: 10 }
                     ];
                     for (const gym of initialGyms) {
                         await addDoc(collection(db, "gyms"), gym);
                     }
                     setGyms(initialGyms.map((g, i) => ({ 
-                        ...g, id: `seed-${i}`, name: language === 'ar' ? g.name_ar : g.name_en 
+                        ...g, 
+                        id: `seed-${i}`, 
+                        name: language === 'ar' ? g.name_ar : g.name_en,
+                        location: language === 'ar' ? g.location_ar : g.location_en,
+                        sports: language === 'ar' ? g.sports_ar : g.sports_en
                     })));
                 } else {
-                    setGyms(querySnapshot.docs.map(doc => ({
-                        id: doc.id, ...doc.data(), name: language === 'ar' ? doc.data().name_ar : doc.data().name_en
-                    })));
+                    setGyms(querySnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id, 
+                            ...data, 
+                            name: language === 'ar' ? data.name_ar : data.name_en,
+                            location: language === 'ar' ? data.location_ar : data.location_en,
+                            sports: language === 'ar' ? data.sports_ar : data.sports_en
+                        };
+                    }));
                 }
             } catch (error) {
                 console.error("Error fetching gyms:", error);
@@ -1480,9 +1900,378 @@ export function AppProvider({ children }) {
             }
         };
 
+        const fetchTrainers = async () => {
+            try {
+                const q = query(collection(db, "trainers"));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const initialTrainers = [
+                        { name_ar: "كابتن أحمد", name_en: "Captain Ahmed", specialty_ar: "خسارة الوزن وتحديد العضلات", specialty_en: "Weight loss and muscle definition", exp_ar: "12 سنة", exp_en: "12 Years", rating: 4.9, image: "https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=400" },
+                        { name_ar: "كابتن سارة", name_en: "Captain Sara", specialty_ar: "لياقة بدنية مرونة (يوغا)", specialty_en: "Fitness and Yoga flexibility", exp_ar: "8 سنوات", exp_en: "8 Years", rating: 4.8, image: "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=400" },
+                        { name_ar: "كابتن محمد", name_en: "Captain Mohamed", specialty_ar: "بناء أجسام وتضخيم", specialty_en: "Bodybuilding and bulking", exp_ar: "15 سنة", exp_en: "15 Years", rating: 5.0, image: "https://images.unsplash.com/photo-1517438476312-10d79c077509?q=80&w=400" },
+                        { name_ar: "كابتن خالد", name_en: "Captain Khaled", specialty_ar: "رفع أثقال وقوة بدنية", specialty_en: "Powerlifting and strength", exp_ar: "10 سنوات", exp_en: "10 Years", rating: 4.7, image: "https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=400" }
+                    ];
+                    for (const trainer of initialTrainers) await addDoc(collection(db, "trainers"), trainer);
+                    setTrainers(initialTrainers.map((t, i) => ({ ...t, id: `seed-${i}`, name: language === 'ar' ? t.name_ar : t.name_en, specialty: language === 'ar' ? t.specialty_ar : t.specialty_en, exp: language === 'ar' ? t.exp_ar : t.exp_en })));
+                } else {
+                    setTrainers(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), name: language === 'ar' ? doc.data().name_ar : doc.data().name_en, specialty: language === 'ar' ? doc.data().specialty_ar : doc.data().specialty_en, exp: language === 'ar' ? doc.data().exp_ar : doc.data().exp_en })));
+                }
+            } catch (e) { console.error("Error trainers:", e); } finally { setLoadingTrainers(false); }
+        };
+
+        const fetchSports = async () => {
+            try {
+                const q = query(collection(db, "sports"));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const initialSports = [
+                        { slug: 'boxing', name_ar: "الملاكمة", name_en: "Boxing", desc_ar: "تعلم فنون الدفاع عن النفس وزد من سرعة رد فعلك وقوتك البدنية.", desc_en: "Learn martial arts and increase your reaction speed and physical strength.", level_ar: "كافة المستويات", level_en: "All Levels", duration_ar: "60 دقيقة", duration_en: "60 Min", intensity_ar: "عالية", intensity_en: "High", image: "https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?q=80&w=600" },
+                        { slug: 'karate', name_ar: "الكاراتيه", name_en: "Karate", desc_ar: "الانضباط والتركيز والقوة. انضم لدروس الكاراتيه وتدرج في الأحزمة.", desc_en: "Discipline, focus and strength. Join Karate classes and progress through belts.", level_ar: "مبتدئ - محترف", level_en: "Beg - Pro", duration_ar: "90 دقيقة", duration_en: "90 Min", intensity_ar: "متوسطة", intensity_en: "Medium", image: "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=600" },
+                        { slug: 'crossfit', name_ar: "كروس فت", name_en: "CrossFit", desc_ar: "تحدَّ حدودك مع تمارين القوة والتحمل عالية الكثافة.", desc_en: "Challenge your limits with high-intensity strength and endurance exercises.", level_ar: "متقدم", level_en: "Advanced", duration_ar: "45 دقيقة", duration_en: "45 Min", intensity_ar: "قصوى", intensity_en: "Extreme", image: "https://images.unsplash.com/photo-1534367507873-d2d7e249a3fe?q=80&w=600" },
+                        { slug: 'bodybuilding', name_ar: "بناء الأجسام", name_en: "Bodybuilding", desc_ar: "خطة تدريبية متكاملة لبناء العضلات وتحسين الضخامة العضلية.", desc_en: "Integrated training plan to build muscles and improve muscle bulk.", level_ar: "كافة المستويات", level_en: "All Levels", duration_ar: "75 دقيقة", duration_en: "75 Min", intensity_ar: "عالية", intensity_en: "High", image: "https://images.unsplash.com/photo-1583454110551-21f2fa2adfcd?q=80&w=600" }
+                    ];
+                    for (const sport of initialSports) await addDoc(collection(db, "sports"), sport);
+                    setSports(initialSports.map((s, i) => ({ ...s, id: `seed-${i}`, name: language === 'ar' ? s.name_ar : s.name_en, description: language === 'ar' ? s.desc_ar : s.desc_en, stats: { level: language === 'ar' ? s.level_ar : s.level_en, duration: language === 'ar' ? s.duration_ar : s.duration_en, intensity: language === 'ar' ? s.intensity_ar : s.intensity_en } })));
+                } else {
+                    setSports(querySnapshot.docs.map(doc => {
+                        const s = doc.data();
+                        const nameAr = s.name_ar || s.name || s.slug || doc.id;
+                        const nameEn = s.name_en || s.name || s.slug || doc.id;
+                        return { 
+                            id: doc.id, 
+                            ...s, 
+                            name: language === 'ar' ? nameAr : nameEn, 
+                            description: language === 'ar' ? (s.desc_ar || s.description) : (s.desc_en || s.description), 
+                            stats: { 
+                                level: language === 'ar' ? (s.level_ar || 'كافة المستويات') : (s.level_en || 'All Levels'), 
+                                duration: language === 'ar' ? (s.duration_ar || '60 دقيقة') : (s.duration_en || '60 Min'), 
+                                intensity: language === 'ar' ? (s.intensity_ar || 'عالية') : (s.intensity_en || 'High') 
+                            } 
+                        };
+                    }));
+                }
+            } catch (e) { console.error("Error sports:", e); } finally { setLoadingSports(false); }
+        };
+
+        const fetchOffers = async () => {
+            try {
+                const q = query(collection(db, "offers"));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const initialOffers = [
+                        { 
+                            title_ar: "خصم 50% للإشتراك السنوي", 
+                            title_en: "50% Off Yearly Subscription", 
+                            sub_ar: "لفترة محدودة جداً", 
+                            sub_en: "For a very limited time", 
+                            badge_ar: "عرض خاص", 
+                            badge_en: "Special Offer", 
+                            expiry_ar: "ينتهي في 30 مارس", 
+                            expiry_en: "Ends March 30", 
+                            desc_ar: "احصل على اشتراك كامل لمدة سنة بنصف السعر. يشمل جميع الصالات والمدربين والدعم الغذائي.", 
+                            desc_en: "Get a full year subscription at half price. Includes all gyms, trainers, and nutritional support.",
+                            image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000"
+                        },
+                        { 
+                            title_ar: "حصة تجريبية مجانية", 
+                            title_en: "Free Trial Session", 
+                            sub_ar: "مع نخبة من مدربينا", 
+                            sub_en: "With our elite trainers", 
+                            badge_ar: "مجاناً", 
+                            badge_en: "Free", 
+                            expiry_ar: "متاح دائماً للأعضاء الجدد", 
+                            expiry_en: "Always available for new members", 
+                            desc_ar: "جرب خدماتنا قبل الاشتراك. احصل على تقييم بدني كامل وحصة تدريبية لمدة 60 دقيقة مجاناً.", 
+                            desc_en: "Try our services before subscribing. Get a full physical assessment and a 60-minute training session for free.",
+                            image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1000"
+                        },
+                        { 
+                            title_ar: "باقة التغذية المتكاملة", 
+                            title_en: "Integrated Nutrition Package", 
+                            sub_ar: "خصم يصل إلى 30%", 
+                            sub_en: "Discount up to 30%", 
+                            badge_ar: "الأكثر طلباً", 
+                            badge_en: "Most Popular", 
+                            expiry_ar: "لفترة محدودة", 
+                            expiry_en: "Limited time", 
+                            desc_ar: "صمم خطتك الغذائية مع خبراء التغذية لدينا بخصم حصري. الوجبات والمكملات والنصائح في مكان واحد.", 
+                            desc_en: "Design your nutritional plan with our experts at an exclusive discount. Meals, supplements, and tips in one place.",
+                            image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=1000"
+                        },
+                        { 
+                            title_ar: "شحن مجاني للمتجر", 
+                            title_en: "Free Store Shipping", 
+                            sub_ar: "على جميع الطلبات فوق 200 ريال", 
+                            sub_en: "On all orders above 200 SAR", 
+                            badge_ar: "حصري", 
+                            badge_en: "Exclusive", 
+                            expiry_ar: "ينتهي قريباً", 
+                            expiry_en: "Ending soon", 
+                            desc_ar: "لا تقلق بشأن تكاليف التوصيل. تسوق أفضل الأجهزة والمكملات والملابس الرياضية واحصل على توصيل لمنزلك مجاناً.", 
+                            desc_en: "Don't worry about delivery costs. Shop for the best equipment, supplements, and sportswear with free delivery.",
+                            image: "https://images.unsplash.com/photo-1541534741688-6078c64ec4a9?q=80&w=1000"
+                        }
+                    ];
+                    for (const offer of initialOffers) await addDoc(collection(db, "offers"), offer);
+                    setOffers(initialOffers.map((o, i) => ({ 
+                        ...o, id: `seed-${i}`, 
+                        title: language === 'ar' ? o.title_ar : o.title_en, 
+                        subtitle: language === 'ar' ? o.sub_ar : o.sub_en, 
+                        badge: language === 'ar' ? o.badge_ar : o.badge_en, 
+                        expiry: language === 'ar' ? o.expiry_ar : o.expiry_en, 
+                        description: language === 'ar' ? o.desc_ar : o.desc_en 
+                    })));
+                } else {
+                    setOffers(querySnapshot.docs.map(doc => {
+                        const o = doc.data();
+                        return { 
+                            id: doc.id, ...o, 
+                            title: language === 'ar' ? o.title_ar : o.title_en, 
+                            subtitle: language === 'ar' ? o.sub_ar : o.sub_en, 
+                            badge: language === 'ar' ? o.badge_ar : o.badge_en, 
+                            expiry: language === 'ar' ? o.expiry_ar : o.expiry_en, 
+                            description: language === 'ar' ? o.desc_ar : o.desc_en 
+                        };
+                    }));
+                }
+            } catch (e) { console.error("Error offers:", e); } finally { setLoadingOffers(false); }
+        };
+
+        const fetchProducts = async () => {
+            try {
+                const q = query(collection(db, "products"));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const initialProducts = [
+                        { 
+                            name_ar: "بدلة تايكوندو بريميوم", 
+                            name_en: "Premium Taekwondo Uniform", 
+                            category_ar: "ملابس", 
+                            category_en: "Clothing", 
+                            price: 250, 
+                            rating: 5.0, 
+                            image: "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=400",
+                            description_ar: "بدلة تايكوندو معتمدة، خفيفة الوزن ومتينة، مثالية للبطولات والتدريب اليومي.",
+                            description_en: "Certified Taekwondo uniform, lightweight and durable, perfect for tournaments and daily training.",
+                            sizes: ["80cm", "90cm", "100cm", "110cm", "120cm", "130cm", "140cm", "150cm", "160cm", "170cm", "180cm", "190cm", "200cm", "210cm", "220cm"],
+                            colors: [
+                                { name_ar: "أبيض", name_en: "White", code: "#FFFFFF" },
+                                { name_ar: "أسود", name_en: "Black", code: "#000000" }
+                            ]
+                        },
+                        { 
+                            name_ar: "بدلة كاراتيه احترافية", 
+                            name_en: "Professional Karate Gi", 
+                            category_ar: "ملابس", 
+                            category_en: "Clothing", 
+                            price: 280, 
+                            rating: 4.9, 
+                            image: "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=400",
+                            description_ar: "بدلة كاراتيه قطنية 100% توفر صوتاً قوياً عند الحركة وراحة تامة.",
+                            description_en: "100% cotton Karate Gi providing a crisp snap and complete comfort.",
+                            sizes: ["80cm", "90cm", "100cm", "110cm", "120cm", "130cm", "140cm", "150cm", "160cm", "170cm", "180cm", "190cm", "200cm", "210cm", "220cm"],
+                            colors: [
+                                { name_ar: "أبيض", name_en: "White", code: "#FFFFFF" },
+                                { name_ar: "أسود", name_en: "Black", code: "#000000" }
+                            ]
+                        },
+                        { 
+                            name_ar: "قفازات النخبة للملاكمة", 
+                            name_en: "Elite Boxing Gloves", 
+                            category_ar: "أدوات", 
+                            category_en: "Tools", 
+                            price: 399, 
+                            rating: 5.0, 
+                            image: "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=400",
+                            description_ar: "قفازات ملاكمة احترافية مصنوعة من الجلد الفاخر مع حماية مضاعفة للمعصم.",
+                            description_en: "Professional boxing gloves made of premium leather with double wrist protection.",
+                            sizes: ["04Z", "06Z", "08Z", "10Z", "12Z", "14Z", "16Z"],
+                            colors: [
+                                { name_ar: "أحمر", name_en: "Red", code: "#CC0000" },
+                                { name_ar: "أزرق", name_en: "Blue", code: "#0000CC" },
+                                { name_ar: "أسود", name_en: "Black", code: "#000000" },
+                                { name_ar: "ذهبي", name_en: "Gold", code: "#D4AF37" }
+                            ]
+                        },
+                        { 
+                            name_ar: "تيشيرت فتوة برو", 
+                            name_en: "Futwa Pro T-Shirt", 
+                            category_ar: "ملابس", 
+                            category_en: "Clothing", 
+                            price: 150, 
+                            rating: 4.9, 
+                            image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400",
+                            description_ar: "تيشيرت رياضي عالي الجودة مصمم لراحة مثالية أثناء التمارين الشاقة.",
+                            description_en: "High-quality sports T-shirt designed for optimal comfort during intense workouts.",
+                            sizes: ["S", "M", "L", "XL", "XXL"],
+                            colors: [
+                                { name_ar: "أسود", name_en: "Black", code: "#000000" },
+                                { name_ar: "أبيض", name_en: "White", code: "#FFFFFF" },
+                                { name_ar: "كحلي", name_en: "Navy", code: "#000080" }
+                            ]
+                        },
+                        { 
+                            name_ar: "حزام التدريب الجلدي", 
+                            name_en: "Leather Training Belt", 
+                            category_ar: "أدوات", 
+                            category_en: "Tools", 
+                            price: 299, 
+                            rating: 4.8, 
+                            image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400",
+                            description_ar: "حزام جلدي طبيعي يوفر دعماً استثنائياً لأسفل الظهر أثناء رفع الأثقال.",
+                            description_en: "Natural leather belt providing exceptional lower back support during heavy lifting.",
+                            sizes: ["M", "L", "XL"],
+                            colors: [
+                                { name_ar: "بني", name_en: "Brown", code: "#8B4513" },
+                                { name_ar: "أسود", name_en: "Black", code: "#000000" }
+                            ]
+                        }
+                    ];
+                    for (const prod of initialProducts) await addDoc(collection(db, "products"), prod);
+                    setProducts(initialProducts.map((p, i) => ({ 
+                        ...p, 
+                        id: `seed-${i}`, 
+                        name: language === 'ar' ? p.name_ar : p.name_en, 
+                        category: language === 'ar' ? p.category_ar : p.category_en,
+                        description: language === 'ar' ? p.description_ar : p.description_en
+                    })));
+
+                    const initialCats = [
+                        { id: 'clothing', name_ar: 'ملابس', name_en: 'Clothing', img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=150' },
+                        { id: 'shoes', name_ar: 'أحذية', name_en: 'Shoes', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=150' },
+                        { id: 'gloves', name_ar: 'قفازات', name_en: 'Gloves', img: 'https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=150' },
+                        { id: 'belts', name_ar: 'أحزمة', name_en: 'Belts', img: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=150' },
+                        { id: 'tools', name_ar: 'أدوات', name_en: 'Tools', img: 'https://images.unsplash.com/photo-1517438476312-10d79c077509?q=80&w=150' },
+                        { id: 'accessories', name_ar: 'إكسسوارات', name_en: 'Accessories', img: 'https://images.unsplash.com/photo-1544816155-12df96467464?q=80&w=150' }
+                    ];
+                    setCategories(initialCats.map(c => ({ ...c, name: language === 'ar' ? c.name_ar : c.name_en })));
+                } else {
+                    setProducts(querySnapshot.docs.map(doc => {
+                        const p = doc.data();
+                        return { 
+                            id: doc.id, 
+                            ...p, 
+                            name: language === 'ar' ? p.name_ar : p.name_en, 
+                            category: language === 'ar' ? p.category_ar : p.category_en,
+                            description: language === 'ar' ? p.description_ar : p.description_en
+                        };
+                    }));
+                    
+                    const cats = [
+                        { id: 'clothing', name_ar: 'ملابس', name_en: 'Clothing', img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=150' },
+                        { id: 'shoes', name_ar: 'أحذية', name_en: 'Shoes', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=150' },
+                        { id: 'gloves', name_ar: 'قفازات', name_en: 'Gloves', img: 'https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=150' },
+                        { id: 'belts', name_ar: 'أحزمة', name_en: 'Belts', img: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=150' },
+                        { id: 'tools', name_ar: 'أدوات', name_en: 'Tools', img: 'https://images.unsplash.com/photo-1517438476312-10d79c077509?q=80&w=150' },
+                        { id: 'accessories', name_ar: 'إكسسوارات', name_en: 'Accessories', img: 'https://images.unsplash.com/photo-1544816155-12df96467464?q=80&w=150' }
+                    ];
+                    setCategories(cats.map(c => ({ ...c, name: language === 'ar' ? c.name_ar : c.name_en })));
+                }
+            } catch (e) { console.error("Error products:", e); } finally { setLoadingProducts(false); }
+        };
+
+        const fetchTasks = async () => {
+            try {
+                const q = query(collection(db, "tasks"));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const initialTasks = [
+                        { title_ar: 'تمارين الكارديو الصباحية', title_en: 'Morning Cardio Session', time_ar: '08:00 ص', time_en: '08:00 AM', icon: '🏃‍♂️', type: 'cardio' },
+                        { title_ar: 'تدريب القوة - الأرجل', title_en: 'Strength Training - Legs', time_ar: '05:00 م', time_en: '05:00 PM', icon: '💪', type: 'strength' }
+                    ];
+                    for (const t of initialTasks) await addDoc(collection(db, "tasks"), t);
+                    setTasks(initialTasks.map((t, i) => ({ ...t, id: `seed-${i}`, title: language === 'ar' ? t.title_ar : t.title_en, time: language === 'ar' ? t.time_ar : t.time_en })));
+                } else {
+                    setTasks(querySnapshot.docs.map(doc => {
+                        const t = doc.data();
+                        return { id: doc.id, ...t, title: language === 'ar' ? t.title_ar : t.title_en, time: language === 'ar' ? t.time_ar : t.time_en };
+                    }));
+                }
+            } catch (e) { console.error("Error tasks:", e); } finally { setLoadingTasks(false); }
+        };
+
+        const fetchGoals = async () => {
+            try {
+                const q = query(collection(db, "goals"), limit(1));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    const initialGoal = { percentage: 85, text_ar: 'أداء مذهل!', text_en: 'Amazing performance!', sub_ar: 'أكملت 12 حصة من أصل 14.', sub_en: '12 out of 14 sessions done.' };
+                    await addDoc(collection(db, "goals"), initialGoal);
+                    setGoals({ ...initialGoal, text: language === 'ar' ? initialGoal.text_ar : initialGoal.text_en, sub: language === 'ar' ? initialGoal.sub_ar : initialGoal.sub_en });
+                } else {
+                    const g = querySnapshot.docs[0].data();
+                    setGoals({ id: querySnapshot.docs[0].id, ...g, text: language === 'ar' ? g.text_ar : g.text_en, sub: language === 'ar' ? g.sub_ar : g.sub_en });
+                }
+            } catch (e) { console.error("Error goals:", e); } finally { setLoadingGoals(false); }
+        };
+
         fetchGyms();
         fetchPackages();
+        fetchTrainers();
+        fetchSports();
+        fetchOffers();
+        fetchProducts();
+        fetchTasks();
+        fetchGoals();
     }, [language]);
+
+    // CART LOGIC
+    const [cart, setCart] = useState([]);
+
+    useEffect(() => {
+        const savedCart = localStorage.getItem('captina_cart');
+        if (savedCart) {
+            try {
+                setCart(JSON.parse(savedCart));
+            } catch (e) { console.error("Error loading cart:", e); }
+        }
+    }, []);
+
+    const saveCart = (newCart) => {
+        setCart(newCart);
+        localStorage.setItem('captina_cart', JSON.stringify(newCart));
+    };
+
+    const addToCart = (product, selection) => {
+        const cartId = `${product.id}-${selection.size || 'default'}-${selection.color?.code || 'default'}`;
+        const existingItemIndex = cart.findIndex(item => item.cartId === cartId);
+
+        if (existingItemIndex > -1) {
+            const newCart = [...cart];
+            newCart[existingItemIndex].quantity += selection.quantity || 1;
+            saveCart(newCart);
+        } else {
+            const newItem = {
+                cartId,
+                productId: product.id,
+                name: product.name,
+                image: product.image,
+                price: product.price,
+                size: selection.size,
+                color: selection.color,
+                quantity: selection.quantity || 1
+            };
+            saveCart([...cart, newItem]);
+        }
+    };
+
+    const removeFromCart = (cartId) => {
+        saveCart(cart.filter(item => item.cartId !== cartId));
+    };
+
+    const updateCartQuantity = (cartId, delta) => {
+        const newCart = cart.map(item => {
+            if (item.cartId === cartId) {
+                const newQty = Math.max(1, item.quantity + delta);
+                return { ...item, quantity: newQty };
+            }
+            return item;
+        }).filter(item => item.quantity > 0);
+        saveCart(newCart);
+    };
+
+    const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
     const changeLanguage = (newLang) => {
         setLanguage(newLang);
@@ -1506,6 +2295,14 @@ export function AppProvider({ children }) {
         if (!key) return '';
         if (key === 'gymsData') return gyms;
         if (key === 'packagesData') return packages;
+        if (key === 'pageTrainersData') return trainers;
+        if (key === 'pageSportsData') return sports;
+        if (key === 'offersData' || key === 'allOffersData') return offers;
+        if (key === 'productsData') return products;
+        if (key === 'categoriesData') return categories;
+        if (key === 'tasksData') return tasks;
+        if (key === 'goalsData') return goals;
+
         const keys = key.split('.');
         let value = translations[language];
         
@@ -1530,8 +2327,36 @@ export function AppProvider({ children }) {
             t,
             gyms,
             packages,
+            trainers,
+            sports,
+            offers,
+            products,
+            categories,
+            tasks,
+            goals,
             loadingGyms,
-            loadingPackages
+            loadingPackages,
+            loadingTrainers,
+            loadingSports,
+            loadingOffers,
+            loadingProducts,
+            loadingTasks,
+            loadingGoals,
+            alert,
+            setAlert,
+            cart,
+            addToCart,
+            removeFromCart,
+            updateCartQuantity,
+            cartTotal,
+            cartCount,
+            user,
+            userData,
+            favorites,
+            toggleFavorite,
+            loadingAuth,
+            isCartOpen,
+            setIsCartOpen
         }}>
             {children}
         </AppContext.Provider>
