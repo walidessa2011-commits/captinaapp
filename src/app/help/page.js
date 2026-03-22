@@ -82,18 +82,18 @@ export default function HelpCenter() {
             <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:40px_40px] opacity-30 -z-0"></div>
 
             {/* Header / Breadcrumbs - Refined Design */}
-            <header className="relative z-20 pt-8 px-6">
-                <div className="max-w-4xl mx-auto flex flex-col items-center">
+            <header className="relative z-20 pt-6 px-6">
+                <div className="max-w-2xl mx-auto flex flex-col items-center">
                     {/* Breadcrumbs */}
                     <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-3 mb-6 text-[11px] font-black uppercase tracking-[0.2em] opacity-60 dark:opacity-50 text-slate-500 dark:text-slate-400"
+                        className="flex items-center gap-2 mb-3 text-[9px] font-black uppercase tracking-[0.15em] opacity-60 dark:opacity-50 text-slate-500 dark:text-slate-400"
                     >
                         <Link href="/" className="hover:text-primary transition-colors">{t('helpPage.breadcrumbs.home')}</Link>
-                        {language === 'ar' ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        {language === 'ar' ? <ChevronLeft className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
                         <Link href="/settings" className="hover:text-primary transition-colors">{t('helpPage.breadcrumbs.settings')}</Link>
-                        {language === 'ar' ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        {language === 'ar' ? <ChevronLeft className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
                         <span className="text-primary font-black">{t('helpPage.breadcrumbs.help')}</span>
                     </motion.div>
 
@@ -102,81 +102,82 @@ export default function HelpCenter() {
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="inline-flex items-center gap-4 py-2 px-6 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-8 shadow-sm"
+                            className="inline-flex items-center gap-3 py-1.5 px-4 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-6 shadow-sm"
                         >
-                            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                            <h1 className="text-sm md:text-base font-black text-primary tracking-widest uppercase italic">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                            <h1 className="text-xs md:text-sm font-black text-primary tracking-widest uppercase italic">
                                 {t('helpPage.title')}
                             </h1>
-                            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                         </motion.div>
                     </div>
                 </div>
             </header>
 
-            <main className="container mx-auto px-6 max-w-4xl relative z-10">
+            <main className="container mx-auto px-6 max-w-2xl relative z-10">
                 {/* Premium Hero Search Section */}
-                <div className="text-center mb-20">
+                <div className="text-center mb-12">
                     <motion.div
-                        initial={{ scale: 0, opacity: 0, rotate: -45 }}
-                        animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className="w-32 h-32 bg-primary shadow-[0_20px_50px_rgba(var(--primary-rgb),0.3)] rounded-[3rem] flex items-center justify-center mx-auto mb-10 animate-float"
+                        initial={{ opacity: 0, scale: 0.9, rotate: -15 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                        className="relative mb-3"
                     >
-                        <LifeBuoy className="w-14 h-14 text-white" />
+                        <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full"></div>
+                        <div className="relative bg-white dark:bg-white/5 p-3 rounded-2xl border border-white dark:border-white/10 shadow-premium">
+                            <HelpCircle className="w-6 h-6 text-primary" />
+                        </div>
                     </motion.div>
-
-                    <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white mb-6 tracking-tighter leading-[1.1]">
-                        {t('helpPage.heroHeader')}
-                    </h2>
-                    <p className="text-lg text-slate-600 dark:text-slate-400 mb-10 max-w-2xl mx-auto font-medium leading-relaxed">
-                        {t('helpPage.heroSub')}
+                    <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white text-center leading-tight tracking-tight mb-2">
+                        {t('helpPage.header.title')}
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-center text-xs max-w-lg mb-6 leading-relaxed">
+                        {t('helpPage.header.subtitle')}
                     </p>
 
-                    <div className="relative max-w-2xl mx-auto group">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-500 rounded-[2.5rem] blur opacity-25 group-focus-within:opacity-50 transition duration-500"></div>
-                        <div className="relative">
-                            <Search className="absolute left-7 top-1/2 -translate-y-1/2 w-7 h-7 text-slate-400 group-focus-within:text-primary transition-all duration-300 group-focus-within:scale-110" />
+                    <div className="relative w-full max-w-xl group">
+                        <div className="absolute inset-0 bg-primary/20 blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity rounded-2xl"></div>
+                        <div className="relative flex items-center bg-white dark:bg-slate-900/80 border border-gray-200 dark:border-white/10 p-1.5 rounded-2xl shadow-premium focus-within:border-primary transition-all">
+                            <div className="w-10 h-10 flex items-center justify-center text-slate-400">
+                                <Search className="w-4 h-4" />
+                            </div>
                             <input
                                 type="text"
-                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] py-8 pl-16 pr-8 text-xl text-slate-900 dark:text-white shadow-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-slate-400"
-                                placeholder={t('helpPage.searchPlaceholder')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={t('helpPage.searchPlaceholder')}
+                                className="flex-1 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white text-xs font-medium"
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Premium Tabs */}
-                <div className="flex bg-white dark:bg-slate-900/40 backdrop-blur-2xl p-2 rounded-[2.5rem] mb-16 border border-slate-200 dark:border-slate-800 max-w-lg mx-auto shadow-xl">
+            <nav className="relative z-20 mt-8 mb-8">
+                <div className="max-w-xl mx-auto flex items-center justify-center p-1 bg-white/50 dark:bg-white/5 backdrop-blur-md rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm">
                     <button
                         onClick={() => setActiveTab('faqs')}
-                        className={`flex-1 py-5 rounded-[2.2rem] text-sm font-black uppercase tracking-wider transition-all duration-500 relative overflow-hidden ${activeTab === 'faqs' ? 'text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${
+                            activeTab === 'faqs' 
+                            ? 'bg-primary text-white shadow-lg shadow-primary/25 translate-y-[-1px]' 
+                            : 'text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                        }`}
                     >
-                        {activeTab === 'faqs' && (
-                            <motion.div
-                                layoutId="activeTabBg"
-                                className="absolute inset-0 bg-primary shadow-lg shadow-primary/30"
-                                transition={{ type: "spring", duration: 0.6 }}
-                            />
-                        )}
-                        <span className="relative z-10">{t('helpPage.tabs.faqs')}</span>
+                        <Book className="w-3.5 h-3.5" />
+                        {t('helpPage.tabs.faqs')}
                     </button>
                     <button
                         onClick={() => setActiveTab('contact')}
-                        className={`flex-1 py-5 rounded-[2.2rem] text-sm font-black uppercase tracking-wider transition-all duration-500 relative overflow-hidden ${activeTab === 'contact' ? 'text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${
+                            activeTab === 'contact' 
+                            ? 'bg-primary text-white shadow-lg shadow-primary/25 translate-y-[-1px]' 
+                            : 'text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-white/5'
+                        }`}
                     >
-                        {activeTab === 'contact' && (
-                            <motion.div
-                                layoutId="activeTabBg"
-                                className="absolute inset-0 bg-primary shadow-lg shadow-primary/30"
-                                transition={{ type: "spring", duration: 0.6 }}
-                            />
-                        )}
-                        <span className="relative z-10">{t('helpPage.tabs.contact')}</span>
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        {t('helpPage.tabs.contact')}
                     </button>
                 </div>
+            </nav>
 
                 <AnimatePresence mode="wait">
                     {activeTab === 'faqs' ? (
@@ -193,17 +194,17 @@ export default function HelpCenter() {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
-                                    className="bg-white dark:bg-slate-900/30 backdrop-blur-md rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden group hover:border-primary/50 transition-all shadow-lg hover:shadow-2xl"
+                                    className="bg-white dark:bg-slate-900/30 backdrop-blur-md rounded-[1.8rem] border border-slate-200 dark:border-slate-800 overflow-hidden group hover:border-primary/40 transition-all shadow-md hover:shadow-xl"
                                 >
                                     <button
                                         onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                                        className="w-full px-10 py-8 flex items-center justify-between text-start"
+                                        className="w-full px-7 py-6 flex items-center justify-between text-start"
                                     >
-                                        <span className={`text-xl font-bold tracking-tight transition-colors ${openFaq === index ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
+                                        <span className={`text-base font-bold tracking-tight transition-colors ${openFaq === index ? 'text-primary' : 'text-slate-900 dark:text-white'}`}>
                                             {faq.q}
                                         </span>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 ${openFaq === index ? 'bg-primary text-white rotate-180' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                                            <ChevronDown className="w-6 h-6" />
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${openFaq === index ? 'bg-primary text-white rotate-180' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                            <ChevronDown className="w-4 h-4" />
                                         </div>
                                     </button>
                                     <AnimatePresence>
@@ -212,9 +213,9 @@ export default function HelpCenter() {
                                                 initial={{ height: 0, opacity: 0 }}
                                                 animate={{ height: 'auto', opacity: 1 }}
                                                 exit={{ height: 0, opacity: 0 }}
-                                                className="px-10 pb-10"
+                                                className="px-7 pb-7"
                                             >
-                                                <div className="pt-6 border-t border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 leading-relaxed text-lg font-medium">
+                                                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 leading-relaxed text-sm font-medium">
                                                     {faq.a}
                                                 </div>
                                             </motion.div>
@@ -236,55 +237,55 @@ export default function HelpCenter() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
-                            className="space-y-10 pb-20"
+                            className="space-y-8 pb-16"
                         >
                             {/* Contact Options Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <motion.div
                                     whileHover={{ y: -5 }}
-                                    className="bg-white dark:bg-slate-900/40 backdrop-blur-md p-10 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-xl group transition-all"
+                                    className="bg-white dark:bg-slate-900/40 backdrop-blur-md p-7 rounded-[2.2rem] border border-slate-200 dark:border-slate-800 shadow-lg group transition-all"
                                 >
-                                    <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-primary transition-colors">
-                                        <ShieldCheck className="w-8 h-8 text-primary group-hover:text-white" />
+                                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-primary transition-colors">
+                                        <ShieldCheck className="w-6 h-6 text-primary group-hover:text-white" />
                                     </div>
-                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3 uppercase tracking-tight">{t('helpPage.contactItems.premium')}</h3>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-lg">{t('helpPage.contactItems.premiumDesc')}</p>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">{t('helpPage.contactItems.premium')}</h3>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">{t('helpPage.contactItems.premiumDesc')}</p>
                                 </motion.div>
 
                                 <motion.div
                                     whileHover={{ y: -5 }}
-                                    className="bg-white dark:bg-slate-900/40 backdrop-blur-md p-10 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-xl group transition-all"
+                                    className="bg-white dark:bg-slate-900/40 backdrop-blur-md p-7 rounded-[2.2rem] border border-slate-200 dark:border-slate-800 shadow-lg group transition-all"
                                 >
-                                    <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-blue-500 transition-colors">
-                                        <Phone className="w-8 h-8 text-blue-500 group-hover:text-white" />
+                                    <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-500 transition-colors">
+                                        <Phone className="w-6 h-6 text-blue-500 group-hover:text-white" />
                                     </div>
-                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3 uppercase tracking-tight">{t('helpPage.contactItems.hotline')}</h3>
-                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-lg">{t('helpPage.contactItems.hotlineDesc')}</p>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">{t('helpPage.contactItems.hotline')}</h3>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">{t('helpPage.contactItems.hotlineDesc')}</p>
                                 </motion.div>
                             </div>
 
                             {/* Direct Contact Form */}
-                            <div className="bg-white dark:bg-slate-900/60 backdrop-blur-3xl p-12 rounded-[3.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] rounded-full translate-x-32 -translate-y-32"></div>
-                                <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-10 tracking-tighter uppercase italic">{t('helpPage.form.title')}</h3>
+                            <div className="bg-white dark:bg-slate-900/60 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 blur-[80px] rounded-full translate-x-24 -translate-y-24"></div>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-8 tracking-tighter uppercase italic">{t('helpPage.form.title')}</h3>
 
                                 {success ? (
                                     <motion.div
                                         initial={{ opacity: 0, scale: 0.9 }}
                                         animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-green-500/10 dark:bg-green-500/20 border border-green-500/30 text-green-600 dark:text-green-400 p-12 rounded-[2.5rem] text-center"
+                                        className="bg-green-500/10 dark:bg-green-500/20 border border-green-500/30 text-green-600 dark:text-green-400 p-8 rounded-[1.8rem] text-center"
                                     >
-                                        <CheckCircle2 className="w-20 h-20 mx-auto mb-6" />
-                                        <p className="text-2xl font-black mb-2">{language === 'ar' ? 'تم الإرسال بنجاح!' : 'Sent Successfully!'}</p>
-                                        <p className="font-medium opacity-80">{t('helpPage.form.success')}</p>
+                                        <CheckCircle2 className="w-14 h-14 mx-auto mb-4" />
+                                        <p className="text-xl font-black mb-1">{language === 'ar' ? 'تم الإرسال بنجاح!' : 'Sent Successfully!'}</p>
+                                        <p className="font-medium opacity-80 text-sm">{t('helpPage.form.success')}</p>
                                     </motion.div>
                                 ) : (
-                                    <form onSubmit={handleSubmit} className="space-y-8">
+                                    <form onSubmit={handleSubmit} className="space-y-6">
                                         <div>
-                                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">{t('helpPage.form.subject')}</label>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{t('helpPage.form.subject')}</label>
                                             <input
                                                 type="text"
-                                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl py-6 px-8 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-medium text-lg"
+                                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl py-4 px-6 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-medium text-base"
                                                 placeholder={t('helpPage.form.subjectPlaceholder')}
                                                 required
                                                 value={formData.subject}
@@ -292,10 +293,10 @@ export default function HelpCenter() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">{t('helpPage.form.message')}</label>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">{t('helpPage.form.message')}</label>
                                             <textarea
-                                                rows="5"
-                                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl py-6 px-8 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-medium text-lg resize-none"
+                                                rows="4"
+                                                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl py-4 px-6 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-400 font-medium text-base resize-none"
                                                 placeholder={t('helpPage.form.messagePlaceholder')}
                                                 required
                                                 value={formData.message}
@@ -307,13 +308,13 @@ export default function HelpCenter() {
                                             whileTap={{ scale: 0.99 }}
                                             type="submit"
                                             disabled={loading}
-                                            className="w-full bg-primary hover:bg-primary-dark text-white font-black uppercase py-7 rounded-[2.5rem] shadow-[0_20px_40px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_25px_50px_rgba(var(--primary-rgb),0.4)] transition-all flex items-center justify-center gap-4 disabled:opacity-50 text-xl"
+                                            className="w-full bg-primary hover:bg-primary-dark text-white font-black uppercase py-5 rounded-[1.8rem] shadow-[0_15px_30px_rgba(var(--primary-rgb),0.2)] hover:shadow-[0_20px_40px_rgba(var(--primary-rgb),0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 text-base"
                                         >
                                             {loading ? (
-                                                <div className="w-7 h-7 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
                                             ) : (
                                                 <>
-                                                    <Send className="w-7 h-7" />
+                                                    <Send className="w-5 h-5" />
                                                     <span>{t('helpPage.form.submit')}</span>
                                                 </>
                                             )}

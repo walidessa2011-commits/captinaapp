@@ -5,18 +5,28 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { 
     Search, ChevronLeft, ChevronRight, 
-    Activity, Target
+    Activity, Target, Users
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import Link from 'next/link';
 import TrainerCard from '@/components/TrainerCard';
+import { useRouter } from 'next/navigation';
 
 export default function Trainers() {
     const { t, language, darkMode } = useApp();
+    const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [activeCategory, setActiveCategory] = useState("all");
     const [trainers, setTrainers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const getText = (field) => {
+        if (!field) return '';
+        if (typeof field === 'object') {
+            return field[language] || field['ar'] || field['en'] || '';
+        }
+        return field;
+    };
 
     useEffect(() => {
         const fetchTrainers = async () => {
@@ -39,22 +49,39 @@ export default function Trainers() {
         { id: 'all', name: language === 'ar' ? 'الكل' : 'All', icon: <Activity className="w-4 h-4" /> },
         ...sports.map(s => ({ 
             id: s.id, 
-            name: s.name, 
+            name: getText(s.name), 
             icon: <Target className="w-4 h-4" /> 
         }))
     ];
 
     const filteredTrainers = trainers.filter(trainer => {
-        const name = trainer.name || "";
+        const getName = (n) => {
+            if (!n) return "";
+            if (typeof n === 'string') return n;
+            return n[language] || n.ar || n.en || "";
+        };
+
+        const getSpecialty = (s) => {
+            if (!s) return "";
+            if (typeof s === 'string') return s;
+            return s[language] || s.ar || s.en || "";
+        };
+
+        const name = getName(trainer.name);
         const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
         
         const selectedSport = activeCategory === "all" ? null : sportsList.find(s => s.id === activeCategory);
         const selectedSportName = selectedSport?.name || "";
         
         // Check specialty string
-        const specialties = (trainer.specialty || "").split('-').map(s => s.trim().toLowerCase());
+        const specialtyString = getSpecialty(trainer.specialty);
+        const specialties = specialtyString.split('-').map(s => s.trim().toLowerCase());
+        
         // Check expertise array
-        const expertise = (trainer.expertise || []).map(e => e.toLowerCase());
+        const expertise = (trainer.expertise || []).map(e => {
+            if (typeof e === 'string') return e.toLowerCase();
+            return (e[language] || e.ar || e.en || "").toLowerCase();
+        });
         
         const matchesSport = activeCategory === "all" || 
                            specialties.some(s => s.includes(selectedSportName.toLowerCase())) ||
@@ -68,38 +95,37 @@ export default function Trainers() {
             {/* Background Decorations */}
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
-            
-            {/* Compact Immersive Header */}
-            <div className="relative h-28 md:h-32 w-full overflow-hidden flex items-center px-6">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-primary/20"></div>
-                
-                <div className="max-w-7xl mx-auto w-full flex items-center justify-between relative z-20">
-                    <div className="flex items-center gap-4">
-                        <Link 
-                            href="/"
-                            className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-all shadow-xl"
+            {/* Minimal Spacer */}
+            <div className="h-2 md:h-4"></div>
+
+            <div className="max-w-7xl mx-auto px-6 relative z-10">
+                {/* Top Action Bar - Title & Back */}
+                <div className="mb-2 p-1 rounded-[2rem] bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between shadow-premium transition-all gap-2 sm:gap-0">
+                    <div className="flex items-center gap-1">
+                        <button 
+                            onClick={() => router.back()}
+                            className="w-10 h-10 flex items-center justify-center text-slate-900 dark:text-white hover:text-primary transition-colors active:scale-95"
                         >
                             {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                        </Link>
+                        </button>
                         
-                        <motion.h1 
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="text-xl md:text-3xl font-black text-white tracking-tighter uppercase italic drop-shadow-2xl"
-                        >
-                            {language === 'ar' ? 'نخبة المدربين' : 'Elite Trainers'}
-                        </motion.h1>
+                        <div className="flex items-center gap-3 px-2 py-2 text-slate-900 dark:text-white">
+                            <Users className="w-4 h-4 text-primary" />
+                            <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] whitespace-nowrap">
+                                {language === 'ar' ? 'المدربين' : 'Trainers'}
+                            </span>
+                        </div>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-4">
-                        <div className="relative group">
-                            <Search className={`absolute ${language === 'en' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/50 group-focus-within:text-white transition-colors`} />
+                    <div className="flex items-center px-3 sm:px-4 pb-2 sm:pb-0 w-full sm:w-auto">
+                        <div className="relative group w-full sm:w-auto">
+                            <Search className={`absolute ${language === 'en' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-primary transition-colors`} />
                             <input 
                                 type="text"
                                 placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-white/5 border border-white/10 rounded-xl py-2 h-9 px-9 text-[10px] font-black text-white outline-none focus:border-white/30 transition-all placeholder:opacity-40 w-40 lg:w-60"
+                                className="bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-full py-2 h-9 px-9 text-[10px] font-black outline-none focus:border-primary transition-all placeholder:opacity-40 w-full sm:w-40 lg:w-60 text-slate-900 dark:text-white"
                             />
                         </div>
                     </div>
@@ -107,7 +133,7 @@ export default function Trainers() {
             </div>
 
             {/* Specialty Tabs */}
-            <div className="relative z-20 px-6 mt-4">
+            <div className="relative z-20 px-6 mt-2">
                 <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto no-scrollbar py-2 w-full">
                     {sportsList.map((sport) => (
                         <button
@@ -126,13 +152,13 @@ export default function Trainers() {
                 </div>
             </div>
 
-            <main className="max-w-7xl mx-auto px-6 mt-6 relative z-10">
+            <main className="max-w-7xl mx-auto px-6 mt-4 relative z-10">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                         <AnimatePresence mode="popLayout">
                             {filteredTrainers.map((trainer, idx) => (
                                 <TrainerCard key={trainer.id} trainer={trainer} idx={idx} />

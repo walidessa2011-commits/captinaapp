@@ -33,54 +33,79 @@ export default function MyBookings() {
     }, [user]);
 
     const isAdmin = userData?.role === 'admin' || userData?.role === 'supervisor' || user?.email === 'admin@captina.sa';
+    
+    const formatAddress = (addr) => {
+        if (!addr) return null;
+        if (typeof addr === 'string') return addr;
+        if (typeof addr === 'object') {
+            const { street, district, building, city } = addr;
+            return [district, street, building, city].filter(Boolean).join(', ');
+        }
+        return '';
+    };
 
     const fetchBookings = useCallback(async () => {
         if (user) {
             try {
-                const q = query(
+                // Fetch old bookings
+                const qBookings = query(
                     collection(db, "bookings"),
                     where("userId", "==", user.uid),
                     orderBy("createdAt", "desc")
                 );
-                const querySnapshot = await getDocs(q);
-                const data = querySnapshot.docs.map(doc => {
-                    const d = doc.data();
-                    let statusLabel = d.status;
+                const querySnapshotBookings = await getDocs(qBookings);
+                const bookingsData = querySnapshotBookings.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    type: 'booking'
+                }));
+
+                // Fetch new subscriptions
+                const qSubs = query(
+                    collection(db, "subscriptions"),
+                    where("userId", "==", user.uid),
+                    orderBy("createdAt", "desc")
+                );
+                const querySnapshotSubs = await getDocs(qSubs);
+                const subsData = querySnapshotSubs.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    type: 'subscription'
+                }));
+
+                // Combine and format
+                const combined = [...bookingsData, ...subsData].sort((a, b) => {
+                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+                    return dateB - dateA;
+                });
+
+                const data = combined.map(item => {
+                    let statusLabel = item.status;
                     if (language === 'ar') {
-                        if (statusLabel === 'Confirmed' || statusLabel === 'مؤكد') statusLabel = "مؤكد";
-                        else if (statusLabel === 'Pending' || statusLabel === 'قيد الانتظار') statusLabel = "قيد الانتظار";
-                        else if (statusLabel === 'Cancelled' || statusLabel === 'ملغي') statusLabel = "ملغي";
+                        if (statusLabel === 'Confirmed' || statusLabel === 'مؤكد' || statusLabel === 'confirmed') statusLabel = "مؤكد";
+                        else if (statusLabel === 'Pending' || statusLabel === 'قيد الانتظار' || statusLabel === 'pending') statusLabel = "قيد الانتظار";
+                        else if (statusLabel === 'Cancelled' || statusLabel === 'ملغي' || statusLabel === 'cancelled') statusLabel = "ملغي";
+                    } else {
+                        if (statusLabel === 'مؤكد' || statusLabel === 'confirmed') statusLabel = "Confirmed";
+                        else if (statusLabel === 'قيد الانتظار' || statusLabel === 'pending') statusLabel = "Pending";
+                        else if (statusLabel === 'ملغي' || statusLabel === 'cancelled') statusLabel = "Cancelled";
                     }
+
                     return {
-                        id: doc.id,
-                        ...d,
-                        service: d.serviceName || (language === 'ar' ? "جلسة تدريبية" : "Training Session"),
-                        trainer: d.trainerName || (language === 'ar' ? "كابتن الرياضي" : "Coach"),
-                        date: d.date || (language === 'ar' ? "غير محدد" : "Not set"),
-                        time: d.time || "---",
-                        location: d.location || (language === 'ar' ? "نادي كابتينا" : "Captina Club"),
+                        id: item.id,
+                        ...item,
+                        service: item.type === 'subscription' ? item.planLabel : (item.serviceName || (language === 'ar' ? "جلسة تدريبية" : "Training Session")),
+                        trainer: item.trainerName || (language === 'ar' ? "كابتن الرياضي" : "Coach"),
+                        date: item.startDate || item.date || (language === 'ar' ? "غير محدد" : "Not set"),
+                        time: item.time || "---",
+                        location: formatAddress(item.location || item.address) || (language === 'ar' ? "نادي كابتينا" : "Captina Club"),
                         status: statusLabel
                     };
                 });
                 setBookings(data);
             } catch (error) {
-                console.error("Error fetching bookings:", error);
-                if (bookings.length === 0) {
-                    setBookings([
-                        { 
-                            id: "dummy-1", 
-                            service: language === 'ar' ? "تدريب شخصي - ملاكمة" : "Personal Training - Boxing", 
-                            trainer: language === 'ar' ? "كابتن أحمد" : "Coach Ahmed", 
-                            date: language === 'ar' ? "25 مارس 2026" : "March 25, 2026", 
-                            time: "06:00 PM", 
-                            location: language === 'ar' ? "الصالة الرئيسية - فرع الملقا" : "Main Hall - Al Malqa Branch",
-                            status: language === 'ar' ? "مؤكد" : "Confirmed",
-                            userId: user?.uid,
-                            clientName: user?.displayName || "Test User",
-                            notes: "This is a dummy booking for demonstration."
-                        }
-                    ]);
-                }
+                console.error("Error fetching bookings/subscriptions:", error);
             } finally {
                 setLoading(false);
             }
@@ -97,14 +122,17 @@ export default function MyBookings() {
 
     const handleApprove = async (bookingId) => {
         try {
-            if (typeof bookingId === 'string' && !bookingId.startsWith('dummy')) {
-                const bookingRef = doc(db, "bookings", bookingId);
-                await updateDoc(bookingRef, {
-                    status: language === 'ar' ? "مؤكد" : "Confirmed",
-                    approvedAt: serverTimestamp(),
-                    approvedBy: user.uid
-                });
-            }
+            const item = bookings.find(b => b.id === bookingId);
+            if (!item) return;
+
+            const collectionName = item.type === 'subscription' ? "subscriptions" : "bookings";
+            const docRef = doc(db, collectionName, bookingId);
+            
+            await updateDoc(docRef, {
+                status: item.type === 'subscription' ? "confirmed" : (language === 'ar' ? "مؤكد" : "Confirmed"),
+                approvedAt: serverTimestamp(),
+                approvedBy: user.uid
+            });
             
             setBookings(prev => prev.map(b => 
                 b.id === bookingId 
@@ -112,10 +140,10 @@ export default function MyBookings() {
                 : b
             ));
         } catch (error) {
-            console.error("Error approving booking:", error);
+            console.error("Error approving:", error);
             setAlert({
                 title: language === 'ar' ? 'خطأ' : 'Error',
-                message: language === 'ar' ? "حدث خطأ أثناء قبول الحجز" : "Error approving booking",
+                message: language === 'ar' ? "حدث خطأ أثناء القبول" : "Error approving",
                 type: 'error'
             });
         }
@@ -136,26 +164,26 @@ export default function MyBookings() {
         if (!bookingId) return;
 
         try {
-            const booking = bookings.find(b => b.id === bookingId);
-            if (!booking) return;
+            const item = bookings.find(b => b.id === bookingId);
+            if (!item) return;
 
-            // If it's real firebase data
-            if (typeof bookingId === 'string' && !bookingId.startsWith('dummy')) {
-                const bookingRef = doc(db, "bookings", bookingId);
-                await updateDoc(bookingRef, {
-                    status: language === 'ar' ? "ملغي" : "Cancelled",
-                    cancelledAt: serverTimestamp()
-                });
+            const collectionName = item.type === 'subscription' ? "subscriptions" : "bookings";
+            const docRef = doc(db, collectionName, bookingId);
 
-                // Record in cancelled collection for tracking
-                await setDoc(doc(collection(db, "cancelled_sessions")), {
-                    bookingId,
-                    userId: user.uid,
-                    cancelledAt: serverTimestamp(),
-                    reason: "User cancelled",
-                    originalDetails: booking
-                });
-            }
+            await updateDoc(docRef, {
+                status: item.type === 'subscription' ? "cancelled" : (language === 'ar' ? "ملغي" : "Cancelled"),
+                cancelledAt: serverTimestamp()
+            });
+
+            // Record in cancelled collection for tracking
+            await setDoc(doc(collection(db, "cancelled_actions")), {
+                itemId: bookingId,
+                type: item.type,
+                userId: user.uid,
+                cancelledAt: serverTimestamp(),
+                reason: "User cancelled",
+                originalDetails: item
+            });
 
             // Update local state
             setBookings(prev => prev.map(b => 
@@ -164,10 +192,10 @@ export default function MyBookings() {
                 : b
             ));
         } catch (error) {
-            console.error("Error cancelling booking:", error);
+            console.error("Error cancelling:", error);
             setAlert({
                 title: language === 'ar' ? 'خطأ' : 'Error',
-                message: language === 'ar' ? "حدث خطأ أثناء إلغاء الحجز" : "Error cancelling booking",
+                message: language === 'ar' ? "حدث خطأ أثناء الإلغاء" : "Error cancelling",
                 type: 'error'
             });
         }

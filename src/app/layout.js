@@ -4,7 +4,7 @@ import "./globals.css";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
 import Link from 'next/link';
-import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2, LogOut, Lock, Settings, Shield } from 'lucide-react';
+import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2, LogOut, Lock, Settings, Shield, PlaySquare } from 'lucide-react';
 import { AppProvider, useApp } from "@/context/AppContext";
 import { usePathname, useRouter } from 'next/navigation';
 import { auth, db } from "@/lib/firebase";
@@ -15,13 +15,16 @@ import GlobalModal from "@/components/GlobalModal";
 import CartDrawer from "@/components/CartDrawer";
 
 function LayoutContent({ children }) {
-    const { t, language, darkMode, setAlert, user, userData, loadingAuth } = useApp();
+    const { t, language, darkMode, setAlert, user, userData, loadingAuth, cartCount, setIsCartOpen } = useApp();
     const pathname = usePathname();
     const isAdminPage = pathname.startsWith('/admin');
+    const isAdminLoginPage = pathname === '/admin/login';
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/intro' || pathname === '/forgot-password' || pathname.includes('/forgot-password');
     const [unreadCount, setUnreadCount] = useState(0);
     const [greeting, setGreeting] = useState('');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [shouldAnimateCart, setShouldAnimateCart] = useState(false);
+    const lastCartCount = useRef(cartCount);
     const router = useRouter();
     const menuRef = useRef(null);
     const profileRef = useRef(null);
@@ -54,11 +57,22 @@ function LayoutContent({ children }) {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const hasSeenIntro = localStorage.getItem('hasSeenIntro');
-            if (!hasSeenIntro && pathname !== '/intro') {
+            if (!hasSeenIntro && pathname !== '/intro' && !isAuthPage) {
                 router.push('/intro');
             }
         }
-    }, [pathname, router]);
+    }, [pathname, router, isAuthPage]);
+
+    // Route Guard
+    useEffect(() => {
+        if (!loadingAuth) {
+            if (!user && !isAuthPage && !isAdminPage) {
+                router.push('/login');
+            } else if (user && isAdminPage && !isAdminLoginPage && userData && userData.role !== 'admin') {
+                router.push('/');
+            }
+        }
+    }, [user, loadingAuth, isAuthPage, isAdminPage, userData, router]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -82,6 +96,15 @@ function LayoutContent({ children }) {
         setGreeting(getGreeting());
     }, [language]);
 
+
+    useEffect(() => {
+        if (cartCount > lastCartCount.current) {
+            setShouldAnimateCart(true);
+            const timer = setTimeout(() => setShouldAnimateCart(false), 1000);
+            return () => clearTimeout(timer);
+        }
+        lastCartCount.current = cartCount;
+    }, [cartCount]);
 
     useEffect(() => {
         if (!user) {
@@ -128,13 +151,13 @@ function LayoutContent({ children }) {
             <body className="antialiased flex flex-col min-h-screen bg-background dark:bg-background transition-colors duration-300">
                 {(!isAuthPage && !isAdminPage && user) && (
                     <header className="sticky top-0 z-50 w-full bg-background/80 dark:bg-background/80 backdrop-blur-xl transition-all duration-300">
-                        <div className="container mx-auto px-6 h-16 md:h-24 flex items-center justify-between">
+                        <div className="w-full px-4 md:px-10 h-14 md:h-20 flex items-center justify-between">
                             {/* Right Side - Dropdown & Greeting */}
                             <div ref={menuRef} className="flex items-center gap-4 relative">
                                 {/* Toggle Button for Dropdown */}
                                 <button 
                                     onClick={() => setIsMenuOpen(!isMenuOpen)}
-                                    className="p-3 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-premium hover:shadow-active transition-all group relative z-[60] lg:hidden"
+                                    className="p-2.5 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-premium hover:shadow-active transition-all group relative z-[60] lg:hidden"
                                 >
                                     {isMenuOpen ? (
                                         <X className="w-5 h-5 text-primary" />
@@ -157,23 +180,23 @@ function LayoutContent({ children }) {
                                             />
                                             {/* Menu Content */}
                                             <motion.div 
-                                                initial={{ opacity: 0, scale: 0.95, y: -20, x: language === 'ar' ? 20 : -20 }}
+                                                initial={{ opacity: 0, scale: 0.95, y: -10, x: language === 'ar' ? 10 : -10 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95, y: -20, x: language === 'ar' ? 20 : -20 }}
-                                                className={`absolute top-20 ${language === 'ar' ? 'right-4' : 'left-4'} w-64 bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-gray-100 dark:border-white/10 p-4 z-[55] space-y-2 overflow-hidden`}
+                                                exit={{ opacity: 0, scale: 0.95, y: -10, x: language === 'ar' ? 10 : -10 }}
+                                                className={`absolute top-[calc(100%+8px)] ${language === 'ar' ? 'right-0' : 'left-0'} w-56 bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-xl border border-gray-100 dark:border-white/10 p-2 z-[55] space-y-1 overflow-hidden`}
                                             >
                                                 {[
                                                     { name: t('home'), href: '/', icon: Home },
                                                     { name: t('packages'), href: '/packages', icon: CreditCard },
                                                     { name: t('trainers'), href: '/trainers', icon: TrainersIcon },
                                                     { name: t('store'), href: '/store', icon: Store },
-                                                    { name: t('booking.title'), href: '/booking', icon: MousePointer2 },
+                                                    { name: t('library'), href: '/library', icon: PlaySquare },
                                                 ].map((link, idx) => (
                                                     <Link
                                                         key={link.href}
                                                         href={link.href}
                                                         onClick={() => setIsMenuOpen(false)}
-                                                        className={`flex items-center gap-3 p-4 rounded-2xl transition-all ${
+                                                        className={`flex items-center gap-3 py-2.5 px-3 rounded-xl transition-all ${
                                                             link.href === '/' 
                                                             ? pathname === '/' 
                                                             : pathname.startsWith(link.href) 
@@ -181,19 +204,19 @@ function LayoutContent({ children }) {
                                                             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
                                                         }`}
                                                     >
-                                                        <link.icon className="w-5 h-5" />
-                                                        <span className="font-bold">{link.name}</span>
+                                                        <link.icon className="w-4 h-4" />
+                                                        <span className="font-bold text-sm">{link.name}</span>
                                                     </Link>
                                                 ))}
                                                 
-                                                <div className="pt-2 mt-2 border-t border-gray-50 dark:border-white/5 space-y-2">
-                                                    <Link href="/profile" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all">
-                                                        <User className="w-5 h-5" />
-                                                        <span className="font-bold">{t('profile')}</span>
+                                                <div className="pt-1 mt-1 border-t border-gray-50 dark:border-white/5 space-y-1">
+                                                    <Link href="/profile" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 py-2.5 px-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold">
+                                                        <User className="w-4 h-4" />
+                                                        <span>{t('profile')}</span>
                                                     </Link>
                                                     {userData?.role === 'admin' && (
-                                                        <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl text-primary bg-primary/5 hover:bg-primary/10 transition-all font-black border border-primary/10">
-                                                            <Shield className="w-5 h-5" />
+                                                        <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 py-2.5 px-3 rounded-xl text-primary bg-primary/5 hover:bg-primary/10 transition-all font-black text-sm border border-primary/10">
+                                                            <Shield className="w-4 h-4" />
                                                             <span>{language === 'ar' ? 'لوحة تحكم الإدارة' : 'Admin Panel'}</span>
                                                         </Link>
                                                     )}
@@ -208,9 +231,9 @@ function LayoutContent({ children }) {
                                         {greeting}
                                     </p>
                                     <h2 className="font-black text-gray-900 dark:text-white leading-tight capitalize flex items-center gap-1">
-                                        <span className="text-base md:text-xl">{language === 'ar' ? 'مرحباً' : 'Welcome'}</span>
+                                        <span className="text-sm md:text-lg">{language === 'ar' ? 'مرحباً' : 'Welcome'}</span>
                                         <span className="text-gray-300 dark:text-gray-700">/</span>
-                                        <span className="text-xs md:text-base opacity-90">{displayName}</span>
+                                        <span className="text-[10px] md:text-sm opacity-90">{displayName}</span>
                                     </h2>
                                 </div>
                             </div>
@@ -222,17 +245,111 @@ function LayoutContent({ children }) {
 
                             {/* Left Side - Notifications & Profile Dropdown */}
                             <div className="flex items-center gap-4">
-                                <Link href="/notifications" className="relative p-3 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm hover:shadow-md transition-all group">
+                                <motion.div
+                                    animate={shouldAnimateCart ? { 
+                                        scale: [1, 1.25, 1],
+                                    } : {}}
+                                    transition={{ duration: 0.5, ease: "backOut" }}
+                                >
+                                    {/* Premium Glowing Effect Wrapper */}
+                                    <div className="relative rounded-2xl group">
+                                        <AnimatePresence mode="wait">
+                                            {shouldAnimateCart && (
+                                                <>
+                                                    {/* Expansion Wave */}
+                                                    <motion.div 
+                                                        initial={{ scale: 0.8, opacity: 0 }}
+                                                        animate={{ scale: [1, 2, 2.5], opacity: [0, 0.5, 0] }}
+                                                        transition={{ duration: 0.8, ease: "easeOut" }}
+                                                        className="absolute inset-0 rounded-2xl bg-primary/40 blur-xl pointer-events-none z-0"
+                                                    />
+                                                    {/* Persistent Core Glow */}
+                                                    <motion.div 
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                                        transition={{ duration: 2, repeat: Infinity }}
+                                                        className="absolute -inset-2 rounded-[2rem] bg-primary/20 blur-2xl pointer-events-none z-0"
+                                                    />
+                                                </>
+                                            )}
+                                        </AnimatePresence>
+
+                                        <Link 
+                                            href="/cart"
+                                            className={`relative p-2.5 bg-white dark:bg-white/10 rounded-2xl border ${shouldAnimateCart ? 'border-primary ring-2 ring-primary/20 shadow-2xl shadow-primary/40' : 'border-gray-100 dark:border-white/10 shadow-sm'} hover:shadow-lg transition-all z-10 flex items-center justify-center overflow-visible group/cart`}
+                                        >
+                                            {/* Container for Shine Streak */}
+                                            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                                                {shouldAnimateCart && (
+                                                    <motion.div 
+                                                        initial={{ x: "-150%", rotate: 25 }}
+                                                        animate={{ x: "150%" }}
+                                                        transition={{ duration: 0.7, ease: "easeInOut" }}
+                                                        className="absolute inset-x-[-50%] inset-y-[-100%] bg-gradient-to-r from-transparent via-white/40 to-transparent z-10"
+                                                    />
+                                                )}
+                                            </div>
+                                            
+                                            <ShoppingBag className={`w-5 h-5 transition-all duration-500 ${shouldAnimateCart ? 'text-primary scale-110' : 'text-gray-700 dark:text-gray-200 group-hover/cart:text-primary group-hover/cart:-translate-y-0.5'}`} />
+                                            
+                                            {cartCount > 0 && (
+                                                <div className="absolute -top-3 -right-3 z-30 pointer-events-none">
+                                                    <motion.div 
+                                                        initial={{ scale: 0, rotate: -45 }}
+                                                        animate={{ scale: 1, rotate: 0 }}
+                                                        key={cartCount}
+                                                        className="relative min-w-[22px] h-[22px] md:min-w-[26px] md:h-[26px] flex items-center justify-center p-1"
+                                                    >
+                                                        {/* High-End Glossy Badge */}
+                                                        <span className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-rose-600 rounded-full shadow-[0_4px_15px_rgba(var(--primary-rgb),0.6)] border-[2.5px] border-white dark:border-[#0a0f1a]"></span>
+                                                        
+                                                        {/* Gloss Overlay */}
+                                                        <span className="absolute inset-[2px] bg-gradient-to-tr from-transparent via-white/20 to-transparent rounded-full opacity-50"></span>
+                                                        
+                                                        <span className="relative text-[10px] md:text-[12px] font-[1000] text-white leading-none tracking-tighter drop-shadow-md">
+                                                            {cartCount}
+                                                        </span>
+
+                                                        {/* Aura Pulse on update */}
+                                                        {shouldAnimateCart && (
+                                                            <motion.span 
+                                                                initial={{ scale: 1, opacity: 1 }}
+                                                                animate={{ scale: 3, opacity: 0 }}
+                                                                transition={{ duration: 0.8 }}
+                                                                className="absolute inset-0 bg-primary rounded-full blur-sm"
+                                                            />
+                                                        )}
+                                                    </motion.div>
+                                                </div>
+                                            )}
+                                        </Link>
+                                    </div>
+                                </motion.div>
+                                
+                                <Link href="/notifications" className="relative p-2.5 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm hover:shadow-md transition-all group">
                                     <Bell className="w-5 h-5 text-gray-700 dark:text-gray-300 group-hover:text-primary" />
                                     {unreadCount > 0 && (
-                                        <span className="absolute top-3 right-3 w-2 h-2 bg-primary border border-white dark:border-slate-900 rounded-full"></span>
+                                        <div className="absolute -top-3 -right-3 z-30 pointer-events-none">
+                                            <motion.div 
+                                                initial={{ scale: 0, rotate: 45 }}
+                                                animate={{ scale: 1, rotate: 0 }}
+                                                key={unreadCount}
+                                                className="relative min-w-[22px] h-[22px] md:min-w-[26px] md:h-[26px] flex items-center justify-center p-1"
+                                            >
+                                                {/* High-End Glossy Badge for Notifications */}
+                                                <span className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-orange-500 rounded-full shadow-[0_4px_15px_rgba(var(--primary-rgb),0.6)] border-[2.5px] border-white dark:border-[#0a0f1a]"></span>
+                                                <span className="relative text-[10px] md:text-[12px] font-[1000] text-white leading-none tracking-tighter drop-shadow-md">
+                                                    {unreadCount}
+                                                </span>
+                                            </motion.div>
+                                        </div>
                                     )}
                                 </Link>
                                 
                                 <div ref={profileRef} className="relative">
                                     <button 
                                         onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                        className={`w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden border-2 shadow-premium transition-all flex items-center justify-center bg-white dark:bg-white/5 relative group ${isProfileOpen ? 'border-primary ring-4 ring-primary/20' : 'border-white dark:border-white/5 hover:border-primary/50'}`}
+                                        className={`w-10 h-10 md:w-14 md:h-14 rounded-full overflow-hidden border-2 shadow-premium transition-all flex items-center justify-center bg-white dark:bg-white/5 relative group ${isProfileOpen ? 'border-primary ring-4 ring-primary/20' : 'border-white dark:border-white/5 hover:border-primary/50'}`}
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                         {userData?.photoURL || user?.photoURL ? (
@@ -251,63 +368,65 @@ function LayoutContent({ children }) {
                                                 initial={{ opacity: 0, scale: 0.95, y: 10, x: language === 'ar' ? -10 : 10 }}
                                                 animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
                                                 exit={{ opacity: 0, scale: 0.95, y: 10, x: language === 'ar' ? -10 : 10 }}
-                                                className={`absolute top-[calc(100%+12px)] ${language === 'ar' ? 'left-0' : 'right-0'} w-64 bg-white dark:bg-[#1a2235] rounded-[2rem] shadow-2xl border border-gray-100 dark:border-white/10 p-3 z-[60] overflow-hidden`}
+                                                className={`absolute top-[calc(100%+8px)] ${language === 'ar' ? 'left-0' : 'right-0'} w-56 bg-white dark:bg-[#1a2235] rounded-[1.5rem] shadow-xl border border-gray-100 dark:border-white/10 p-2 z-[60] overflow-hidden`}
                                             >
                                                 {/* Header Info */}
-                                                <div className="p-4 mb-2 bg-slate-50 dark:bg-white/5 rounded-[1.5rem] flex items-center gap-3 border border-gray-100 dark:border-white/5">
-                                                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/20 bg-primary/5 shadow-inner flex items-center justify-center">
+                                                <div className="p-3 mb-1.5 bg-slate-50 dark:bg-white/5 rounded-2xl flex items-center gap-2.5 border border-gray-100 dark:border-white/5">
+                                                    <div className="w-9 h-9 rounded-full overflow-hidden border border-primary/20 bg-primary/5 shadow-inner flex shrink-0 items-center justify-center">
                                                         {userData?.photoURL || user?.photoURL ? (
                                                             <img src={userData?.photoURL || user?.photoURL} alt="Dropdown Profile" className="w-full h-full aspect-square object-cover" />
                                                         ) : (
-                                                            <User className="w-6 h-6 text-primary" />
+                                                            <User className="w-4 h-4 text-primary" />
                                                         )}
                                                     </div>
                                                     <div className="flex flex-col text-start overflow-hidden">
                                                         <span className="text-sm font-black text-slate-900 dark:text-white truncate tracking-tight">{displayName}</span>
-                                                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate opacity-70">{user?.email}</span>
+                                                        <span className="text-[9px] font-bold text-gray-500 dark:text-gray-400 truncate opacity-70">{user?.email}</span>
                                                     </div>
                                                 </div>
 
-                                                <div className="space-y-1">
+                                                <div className="space-y-0.5">
                                                     <Link 
                                                         href="/profile" 
                                                         onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold"
+                                                        className="flex items-center gap-3 py-2 px-3 rounded-xl text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5 dark:hover:bg-primary/10 transition-all text-xs font-bold group"
                                                     >
-                                                        <User className="w-4 h-4 text-primary" />
+                                                        <User className="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" />
                                                         <span>{language === 'ar' ? 'الصفحة الشخصية' : 'Personal Profile'}</span>
                                                     </Link>
                                                     <Link 
                                                         href="/settings" 
                                                         onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold"
+                                                        className="flex items-center gap-3 py-2 px-3 rounded-xl text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5 dark:hover:bg-primary/10 transition-all text-xs font-bold group"
                                                     >
-                                                        <Settings className="w-4 h-4 text-emerald-500" />
+                                                        <Settings className="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" />
                                                         <span>{language === 'ar' ? 'الاعدادات' : 'Settings'}</span>
                                                     </Link>
                                                     <Link 
                                                         href="/settings/password" 
                                                         onClick={() => setIsProfileOpen(false)}
-                                                        className="flex items-center gap-3 p-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold"
+                                                        className="flex items-center gap-3 py-2 px-3 rounded-xl text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-primary/5 dark:hover:bg-primary/10 transition-all text-xs font-bold group"
                                                     >
-                                                        <Lock className="w-4 h-4 text-blue-500" />
+                                                        <Lock className="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" />
                                                         <span>{language === 'ar' ? 'تغيير كلمة المرور' : 'Change Password'}</span>
                                                     </Link>
                                                     
                                                     {userData?.role === 'admin' && (
-                                                        <Link 
-                                                            href="/admin/dashboard" 
-                                                            onClick={() => setIsProfileOpen(false)}
-                                                            className="flex items-center gap-3 p-3 rounded-xl text-primary bg-primary/5 hover:bg-primary/10 transition-all text-sm font-black border border-primary/10"
-                                                        >
-                                                            <Shield className="w-4 h-4" />
-                                                            <span>{language === 'ar' ? 'لوحة تحكم الإدارة' : 'Admin Panel'}</span>
-                                                        </Link>
+                                                        <div className="pt-1 mt-1 border-t border-gray-100 dark:border-white/5">
+                                                            <Link 
+                                                                href="/admin/dashboard" 
+                                                                onClick={() => setIsProfileOpen(false)}
+                                                                className="flex items-center gap-3 py-2 px-3 rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all text-xs font-black"
+                                                            >
+                                                                <Shield className="w-4 h-4" />
+                                                                <span>{language === 'ar' ? 'لوحة تحكم الإدارة' : 'Admin Panel'}</span>
+                                                            </Link>
+                                                        </div>
                                                     )}
                                                     <div className="pt-1 mt-1 border-t border-gray-100 dark:border-white/5">
                                                         <button 
                                                             onClick={handleLogout}
-                                                            className="w-full flex items-center gap-3 p-3 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all text-sm font-bold"
+                                                            className="w-full flex items-center gap-3 py-2 px-3 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all text-xs font-bold"
                                                         >
                                                             <LogOut className="w-4 h-4" />
                                                             <span>{language === 'ar' ? 'تسجيل الخروج' : 'Log Out'}</span>
@@ -324,7 +443,16 @@ function LayoutContent({ children }) {
                 )}
 
                 <main className="flex-grow pb-28 lg:pb-0 dark:text-white">
-                    {children}
+                    {loadingAuth ? (
+                        <div className={`min-h-[80vh] flex flex-col items-center justify-center transition-colors duration-500 ${darkMode ? 'bg-[#0A0E17]' : 'bg-slate-50'}`}>
+                            <div className="relative">
+                                <div className="w-20 h-20 rounded-3xl overflow-hidden border-2 border-primary/20 animate-pulse">
+                                    <img src="/logo_captina.jpg" alt="Loading" className="w-full h-full object-cover" />
+                                </div>
+                                <div className="absolute -inset-4 border-2 border-primary/10 rounded-[2rem] animate-ping opacity-20"></div>
+                            </div>
+                        </div>
+                    ) : (isAuthPage || isAdminPage || user) ? children : null}
                 </main>
 
                 {(!isAuthPage && !isAdminPage && user) && (

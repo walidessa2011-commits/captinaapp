@@ -22,8 +22,8 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 export default function AdminLoginPage() {
     const { language, t } = useApp();
     const router = useRouter();
-    const [email, setEmail] = useState('admin@captina.sa');
-    const [password, setPassword] = useState('CaptinaAdmin2026!');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -66,16 +66,20 @@ export default function AdminLoginPage() {
     };
 
     const handleSetupAdmin = async () => {
+        if (!email || !password) {
+            setError(language === 'ar' ? 'يرجى إدخال البريد الإلكتروني وكلمة المرور للإعداد.' : 'Please enter email and password for setup.');
+            return;
+        }
         setIsLoading(true);
         setError('');
         try {
             // This will attempt to create the admin user if it doesn't exist
-            const userCredential = await createUserWithEmailAndPassword(auth, 'admin@captina.sa', 'CaptinaAdmin2026!');
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
             await setDoc(doc(db, "users", user.uid), {
                 fullName: "System Admin",
-                email: "admin@captina.sa",
+                email: email,
                 role: "admin",
                 createdAt: serverTimestamp(),
                 photoURL: "https://images.unsplash.com/photo-1599563672721-3e4b76a084e7?q=80&w=100"
@@ -154,7 +158,7 @@ export default function AdminLoginPage() {
                                     type="email" 
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="admin@captina.sa"
+                                    placeholder={language === 'ar' ? 'البريد الإلكتروني للمسؤول' : 'admin@example.com'}
                                     required
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white font-bold placeholder-gray-600 focus:border-primary focus:bg-white/10 transition-all outline-none"
                                 />
@@ -224,8 +228,8 @@ export default function AdminLoginPage() {
                                     >
                                         <p className="text-[10px] text-gray-400 mb-3 leading-relaxed">
                                             {language === 'ar' 
-                                                ? 'سيؤدي هذا إلى إنشاء حساب المسؤول بالتفاصيل الموضحة (admin@captina.sa) تلقائياً.' 
-                                                : 'This will automatically provision the root admin account with the displayed credentials.'}
+                                                ? 'أدخل البريد الإلكتروني وكلمة المرور المطلوبة أعلاه ثم اضغط على زر الإنشاء.' 
+                                                : 'Enter the desired email and password above then click the create button.'}
                                         </p>
                                         <button 
                                             type="button"

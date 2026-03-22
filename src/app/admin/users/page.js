@@ -18,12 +18,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
 
+import Pagination from '../components/Pagination';
+
 export default function AdminUsers() {
     const { language, setAlert } = useApp();
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState('all');
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    // Helper: get display text from bilingual or plain string
+    const getText = (val) => {
+        if (typeof val === 'object' && val !== null) {
+            return val[language] || val['ar'] || val['en'] || '';
+        }
+        return val || '';
+    };
 
     const fetchUsers = async () => {
         setIsLoading(true);
@@ -69,11 +83,23 @@ export default function AdminUsers() {
     };
 
     const filteredUsers = users.filter(user => {
-        const matchesSearch = (user.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+        const nameText = getText(user.fullName);
+        const matchesSearch = nameText.toLowerCase().includes(searchTerm.toLowerCase()) || 
                               (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesRole = filterRole === 'all' || user.role === filterRole || (!user.role && filterRole === 'user');
         return matchesSearch && matchesRole;
     });
+
+    // Reset to page 1 when search or filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterRole]);
+
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+    const paginatedUsers = filteredUsers.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
 
     return (
         <div className="space-y-6">
@@ -134,85 +160,103 @@ export default function AdminUsers() {
                                     <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-end">{language === 'ar' ? 'إجراءات' : 'Actions'}</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-white/10">
-                                {filteredUsers.length > 0 ? filteredUsers.map((user) => (
-                                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-2xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/5 flex items-center justify-center shadow-sm">
-                                                    {user.photoURL ? (
-                                                        <img 
-                                                            src={user.photoURL} 
-                                                            alt="Avatar" 
-                                                            referrerPolicy="no-referrer"
-                                                            className="w-full h-full aspect-square object-cover" 
-                                                        />
-                                                    ) : (
-                                                        <Users className="w-6 h-6 text-gray-400" />
-                                                    )}
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/10 relative">
+                                <AnimatePresence mode="popLayout">
+                                    {paginatedUsers.length > 0 ? paginatedUsers.map((user) => (
+                                        <motion.tr 
+                                            key={user.id}
+                                            layout
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
+                                        >
+                                            <td className="px-6 py-4 text-start">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/5 flex items-center justify-center shadow-sm shrink-0">
+                                                        {user.photoURL ? (
+                                                            <img 
+                                                                src={user.photoURL} 
+                                                                alt="Avatar" 
+                                                                referrerPolicy="no-referrer"
+                                                                className="w-full h-full aspect-square object-cover" 
+                                                            />
+                                                        ) : (
+                                                            <Users className="w-6 h-6 text-gray-400" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-sm font-black text-slate-900 dark:text-white capitalize truncate">{getText(user.fullName) || (language === 'ar' ? 'مستخدم بدون اسم' : 'Unnamed User')}</span>
+                                                        <span className="text-[11px] font-bold text-gray-500 truncate">{user.email}</span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-black text-slate-900 dark:text-white capitalize">{user.fullName || (language === 'ar' ? 'مستخدم بدون اسم' : 'Unnamed User')}</span>
-                                                    <span className="text-[11px] font-bold text-gray-500">{user.email}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-start min-w-[120px]">
+                                                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
+                                                    {user.createdAt && typeof user.createdAt.toDate === 'function' ? user.createdAt.toDate().toLocaleDateString() : (user.createdAt instanceof Date ? user.createdAt.toLocaleDateString() : (user.createdAt || 'N/A'))}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-start">
+                                                {user.role === 'admin' ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 rounded-full text-xs font-black uppercase tracking-wider">
+                                                        <ShieldAlert className="w-3.5 h-3.5" />
+                                                        {language === 'ar' ? 'مسؤول' : 'Admin'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-full text-xs font-black uppercase tracking-wider">
+                                                        <Check className="w-3.5 h-3.5" />
+                                                        {language === 'ar' ? 'مستخدم' : 'User'}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-end">
+                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {/* Edit User Profile */}
+                                                    <Link 
+                                                        href={`/admin/users/${user.id}`}
+                                                        title={language === 'ar' ? 'تعديل بيانات المستخدم' : 'Edit User Data'}
+                                                        className="flex items-center justify-center p-2 bg-gray-100 dark:bg-white/10 text-gray-500 hover:bg-blue-500/10 hover:text-blue-500 rounded-xl transition-colors"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </Link>
+                                                    {/* Role Toggle */}
+                                                    <button 
+                                                        onClick={() => handleRoleUpdate(user.id, user.role === 'admin' ? 'user' : 'admin')}
+                                                        title={language === 'ar' ? 'تغيير الصلاحية' : 'Change Role'}
+                                                        className="p-2 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors"
+                                                    >
+                                                        <Shield className="w-4 h-4" />
+                                                    </button>
+                                                    {/* Delete */}
+                                                    <button 
+                                                        onClick={() => handleDelete(user.id)}
+                                                        title={language === 'ar' ? 'حذف المستخدم' : 'Delete User'}
+                                                        className="p-2 bg-gray-100 dark:bg-white/10 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
-                                                {user.createdAt ? user.createdAt.toDate().toLocaleDateString() : 'N/A'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {user.role === 'admin' ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 rounded-full text-xs font-black uppercase tracking-wider">
-                                                    <ShieldAlert className="w-3.5 h-3.5" />
-                                                    {language === 'ar' ? 'مسؤول' : 'Admin'}
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-full text-xs font-black uppercase tracking-wider">
-                                                    <Check className="w-3.5 h-3.5" />
-                                                    {language === 'ar' ? 'مستخدم' : 'User'}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-end">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {/* Edit User Profile */}
-                                                <Link 
-                                                    href={`/admin/users/${user.id}`}
-                                                    title={language === 'ar' ? 'تعديل بيانات المستخدم' : 'Edit User Data'}
-                                                    className="flex items-center justify-center p-2 bg-gray-100 dark:bg-white/10 text-gray-500 hover:bg-blue-500/10 hover:text-blue-500 rounded-xl transition-colors"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </Link>
-                                                {/* Role Toggle */}
-                                                <button 
-                                                    onClick={() => handleRoleUpdate(user.id, user.role === 'admin' ? 'user' : 'admin')}
-                                                    title={language === 'ar' ? 'تغيير الصلاحية' : 'Change Role'}
-                                                    className="p-2 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-primary/10 hover:text-primary rounded-xl transition-colors"
-                                                >
-                                                    <Shield className="w-4 h-4" />
-                                                </button>
-                                                {/* Delete */}
-                                                <button 
-                                                    onClick={() => handleDelete(user.id)}
-                                                    title={language === 'ar' ? 'حذف المستخدم' : 'Delete User'}
-                                                    className="p-2 bg-gray-100 dark:bg-white/10 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan="4" className="px-6 py-12 text-center text-gray-500 font-bold">
-                                            {language === 'ar' ? 'لم يتم العثور على مستخدمين يطابقون بحثك.' : 'No users found matching your search.'}
-                                        </td>
-                                    </tr>
-                                )}
+                                            </td>
+                                        </motion.tr>
+                                    )) : (
+                                        <motion.tr 
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="w-full"
+                                        >
+                                            <td colSpan="4" className="px-6 py-12 text-center text-gray-500 font-bold">
+                                                {language === 'ar' ? 'لم يتم العثور على مستخدمين يطابقون بحثك.' : 'No users found matching your search.'}
+                                            </td>
+                                        </motion.tr>
+                                    )}
+                                </AnimatePresence>
                             </tbody>
                         </table>
+                        <Pagination 
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                        />
                     </div>
                 )}
             </div>

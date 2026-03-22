@@ -15,8 +15,8 @@ import {
     Sparkles,
     Check
 } from 'lucide-react';
-import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
+import { useRouter } from 'next/navigation';
 import { db, auth } from "@/lib/firebase";
 import { 
     collection, 
@@ -33,6 +33,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 
 export default function NotificationsPage() {
     const { language, darkMode, t } = useApp();
+    const router = useRouter();
     const [user] = useAuthState(auth);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -116,80 +117,48 @@ export default function NotificationsPage() {
             <div className={`absolute top-0 right-0 w-[800px] h-[800px] rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse transition-opacity duration-1000 ${darkMode ? 'bg-[#E51B24]/10 opacity-100' : 'bg-[#E51B24]/5 opacity-60'}`}></div>
             <div className={`absolute bottom-0 left-0 w-96 h-96 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2 transition-colors duration-1000 ${darkMode ? 'bg-primary/5' : 'bg-primary/5'}`}></div>
 
-            {/* Header / Breadcrumbs */}
-            <header className="relative z-20 pt-16 pb-6 px-6 container mx-auto">
+            <header className="relative z-20 pt-8 pb-6 px-4 container mx-auto">
                 <div className="max-w-4xl mx-auto">
-                    {/* Breadcrumbs - Fixed alignment */}
-                    <motion.div 
-                        initial={{ opacity: 0, x: language === 'ar' ? 20 : -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`flex items-center gap-2 mb-6 text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-white/40' : 'text-gray-400'}`}
-                    >
-                        <Link href="/" className="hover:text-primary transition-colors">{language === 'ar' ? 'الرئيسية' : 'Home'}</Link>
-                        <span className="opacity-40">{language === 'ar' ? ' \u00BB ' : ' \u00AB '}</span>
-                        <span className="text-primary font-black">{language === 'ar' ? 'الإشعارات' : 'Notifications'}</span>
-                    </motion.div>
+                    <div className={`flex items-center justify-between p-2 rounded-2xl border shadow-sm ${darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-100'} overflow-x-auto no-scrollbar`}>
+                        <div className="flex items-center gap-2 min-w-max">
+                            <button 
+                                onClick={() => router.back()}
+                                className={`p-2 rounded-xl transition-all ${darkMode ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-gray-50 text-gray-900 hover:bg-gray-100'}`}
+                            >
+                                <ChevronLeft className={`w-5 h-5 ${language === 'ar' ? 'rotate-180' : ''}`} />
+                            </button>
 
-                    {/* Title and Action */}
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 w-full">
-                        <div className="space-y-4 pt-4">
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-3"
-                            >
-                                <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(229,27,36,0.5)] animate-pulse"></div>
-                                <h1 className={`text-xl md:text-3xl font-black tracking-tighter italic uppercase transition-colors ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                    {language === 'ar' 
-                                        ? 'الإشعارات ( تفاعل لحظي - إشعارات كابتينا )' 
-                                        : 'Updates ( Real-time - Captina Info )'}
-                                </h1>
-                            </motion.div>
-                            <motion.p 
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: 0.1 }}
-                                className={`text-[11px] font-bold transition-colors ${darkMode ? 'text-white/40' : 'text-gray-500'}`}
-                            >
-                                {language === 'ar' ? 'ابق على اطلاع دائم بكل جديد حول حجوزاتك وعروضنا' : 'Stay up to date with your bookings and our latest offers'}
-                            </motion.p>
+                            <div className={`flex items-center gap-1 p-1 rounded-xl ${darkMode ? 'bg-black/20' : 'bg-gray-50'}`}>
+                                <button 
+                                    onClick={() => setFilter('all')}
+                                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap tracking-wider ${filter === 'all' ? 'bg-[#E51B24] text-white shadow-md' : darkMode ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    {language === 'ar' ? 'عرض الكل' : 'All'}
+                                </button>
+                                <button 
+                                    onClick={() => setFilter('unread')}
+                                    className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2 whitespace-nowrap tracking-wider ${filter === 'unread' ? 'bg-[#E51B24] text-white shadow-md' : darkMode ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    {language === 'ar' ? 'غير مقروء' : 'Unread'}
+                                    {notifications.filter(n => !n.read).length > 0 && (
+                                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black ${filter === 'unread' ? 'bg-white text-primary' : 'bg-rose-500 text-white'}`}>
+                                            {notifications.filter(n => !n.read).length}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
-                        <motion.button 
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                        <button 
                             onClick={markAllAsRead}
-                            className={`flex items-center gap-2 text-[10px] font-black uppercase px-6 py-3.5 rounded-2xl transition-all border whitespace-nowrap tracking-wider shadow-sm ${
+                            className={`flex items-center gap-2 text-[10px] font-black uppercase px-4 py-2.5 rounded-xl transition-all min-w-max mr-2 ${language === 'ar' ? 'mr-0 ml-2' : 'ml-0 mr-2'} ${
                                 darkMode 
-                                ? 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20' 
-                                : 'bg-white border-black/5 text-gray-900 hover:bg-gray-50 hover:border-black/10'
+                                ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' 
+                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                             }`}
                         >
-                            <Check className="w-4 h-4 text-emerald-500" />
-                            {language === 'ar' ? 'تحديد الكل كمقروء' : 'Mark All as Read'}
-                        </motion.button>
-                    </div>
-
-                    {/* Compact Filters */}
-                    <div className={`inline-flex gap-1.5 p-1.5 rounded-2xl border transition-all shadow-sm mb-8 ${darkMode ? 'bg-[#1a2235]/60 border-white/5' : 'bg-white border-black/5'}`}>
-                        <button 
-                            onClick={() => setFilter('all')}
-                            className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${filter === 'all' ? 'bg-[#E51B24] text-white shadow-lg shadow-[#E51B24]/20' : darkMode ? 'text-white/40 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
-                        >
-                            {language === 'ar' ? 'عرض الكل' : 'All'}
-                        </button>
-                        <button 
-                            onClick={() => setFilter('unread')}
-                            className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 tracking-widest ${filter === 'unread' ? 'bg-[#E51B24] text-white shadow-lg shadow-[#E51B24]/20' : darkMode ? 'text-white/40 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}
-                        >
-                            {language === 'ar' ? 'غير مقروء' : 'Unread'}
-                            {notifications.filter(n => !n.read).length > 0 && (
-                                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition-colors ${filter === 'unread' ? 'bg-white text-primary' : 'bg-primary text-white'}`}>
-                                    {notifications.filter(n => !n.read).length}
-                                </span>
-                            )}
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>{language === 'ar' ? 'تحديد الكل مقروء' : 'Mark as Read'}</span>
                         </button>
                     </div>
                 </div>

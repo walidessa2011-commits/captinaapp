@@ -16,8 +16,11 @@ import {
     X,
     ChevronLeft,
     ChevronRight,
-    Settings,
-    Shield
+    Shield,
+    PlaySquare,
+    Dumbbell,
+    BarChart3,
+    MessageCircle
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,12 +29,17 @@ import { auth } from "@/lib/firebase";
 const menuItems = [
     { title: 'Dashboard', title_ar: 'لوحة التحكم', href: '/admin/dashboard', icon: LayoutDashboard },
     { title: 'Users', title_ar: 'المستخدمين', href: '/admin/users', icon: Users },
+    { title: 'Videos', title_ar: 'الفيديوهات', href: '/admin/videos', icon: PlaySquare },
     { title: 'Trainers', title_ar: 'المدربين', href: '/admin/trainers', icon: UserCheck },
     { title: 'Gyms', title_ar: 'النوادي الرياضية', href: '/admin/gyms', icon: Building2 },
     { title: 'Products', title_ar: 'المنتجات', href: '/admin/products', icon: ShoppingBag },
     { title: 'Offers', title_ar: 'العروض', href: '/admin/offers', icon: Tag },
+    { title: 'Packages', title_ar: 'الباقات', href: '/admin/packages', icon: Dumbbell },
+    { title: 'Sports', title_ar: 'الرياضات', href: '/admin/sports', icon: Dumbbell },
     { title: 'Bookings', title_ar: 'الحجوزات', href: '/admin/bookings', icon: CalendarCheck },
     { title: 'Orders', title_ar: 'الطلبات', href: '/admin/orders', icon: CreditCard },
+    { title: 'Reports', title_ar: 'التقارير', href: '/admin/reports', icon: BarChart3 },
+    { title: 'Support', title_ar: 'الدعم الفني', href: '/admin/support', icon: MessageCircle },
 ];
 
 export default function AdminSidebar({ isOpen, setIsOpen }) {
@@ -63,9 +71,10 @@ export default function AdminSidebar({ isOpen, setIsOpen }) {
                 initial={false}
                 animate={{ 
                     x: isOpen ? 0 : (language === 'ar' ? '100%' : '-100%'),
-                    width: '280px'
+                    width: isOpen ? '280px' : '0px',
+                    opacity: isOpen ? 1 : 0
                 }}
-                className={`fixed top-0 bottom-0 ${language === 'ar' ? 'right-0' : 'left-0'} z-50 bg-white dark:bg-[#0f172a] border-x border-gray-100 dark:border-white/5 shadow-2xl lg:translate-x-0 lg:static transition-all duration-300`}
+                className={`fixed top-0 bottom-0 ${language === 'ar' ? 'right-0' : 'left-0'} z-50 bg-white dark:bg-[#0f172a] border-x border-gray-100 dark:border-white/5 shadow-2xl lg:sticky transition-all duration-300 overflow-hidden`}
             >
                 {/* Header */}
                 <div className="p-6 flex items-center justify-between border-b border-gray-50 dark:border-white/5">

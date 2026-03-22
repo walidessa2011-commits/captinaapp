@@ -13,7 +13,7 @@ export default function AdminLayout({ children }) {
     const { language, darkMode, userData } = useApp();
     const router = useRouter();
     const pathname = usePathname();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isAuthenticating, setIsAuthenticating] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
 

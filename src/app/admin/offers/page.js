@@ -10,47 +10,64 @@ import {
     XCircle,
     Plus,
     Percent,
-    Clock
+    Clock,
+    Languages
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import ImageUpload from "../components/ImageUpload";
 import { Loader2, Calendar } from 'lucide-react';
+import Pagination from '../components/Pagination';
 
 export default function AdminOffers() {
-    const { language, setAlert } = useApp();
-    const [offers, setOffers] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { language, setAlert, offers, loadingOffers: isLoading } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [editingOffer, setEditingOffer] = useState(null);
+    const [formLang, setFormLang] = useState('ar');
     const [formData, setFormData] = useState({
-        title: '',
-        description: '',
+        title: { ar: '', en: '' },
+        subtitle: { ar: '', en: '' },
+        badge: { ar: '', en: '' },
+        description: { ar: '', en: '' },
         discountAmount: '0',
+        targetMonths: '0', // 0 = all/any, 1 = monthly, 3 = 3 months, etc.
         validUntil: '',
         image: '',
         status: 'active'
     });
 
-    const fetchOffers = async () => {
-        setIsLoading(true);
-        try {
-            const offersSnap = await getDocs(collection(db, "offers"));
-            setOffers(offersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } catch (error) {
-            console.error("Error fetching offers:", error);
-        } finally {
-            setIsLoading(false);
+    // Helper: get display text from bilingual or plain string
+    const getText = (obj, field) => {
+        if (!obj) return '';
+        if (obj[field] && typeof obj[field] === 'object') {
+            return obj[field][language] || obj[field]['ar'] || obj[field]['en'] || '';
         }
+        return obj[`${field}_ar`] || obj[`${field}_en`] || obj[field] || '';
+    };
+
+    // Helper: normalize to bilingual object
+    const normalizeText = (obj, field) => {
+        if (!obj) return { ar: '', en: '' };
+        // If field exists as an object: {ar, en}
+        if (obj[field] && typeof obj[field] === 'object') {
+            return { ar: obj[field].ar || '', en: obj[field].en || '' };
+        }
+        // If they are flat fields: field_ar, field_en
+        return { 
+            ar: obj[`${field}_ar`] || obj[field] || '', 
+            en: obj[`${field}_en`] || obj[field] || '' 
+        };
     };
 
     useEffect(() => {
-        fetchOffers();
+        // No local fetch needed, using global offers from AppContext
     }, []);
 
     const handleDelete = (offerId, offerTitle) => {
@@ -61,7 +78,6 @@ export default function AdminOffers() {
             onConfirm: async () => {
                 try {
                     await deleteDoc(doc(db, "offers", offerId));
-                    setOffers(offers.filter(o => o.id !== offerId));
                 } catch (error) {
                     console.error("Error deleting offer:", error);
                     alert("Error deleting offer");
@@ -70,13 +86,33 @@ export default function AdminOffers() {
         });
     };
 
+    const handleToggleStatus = async (offerId, currentStatus) => {
+        try {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            await updateDoc(doc(db, "offers", offerId), {
+                status: newStatus,
+                updatedAt: serverTimestamp()
+            });
+        } catch (error) {
+            console.error("Error toggling offer status:", error);
+            setAlert({
+                title: language === 'ar' ? 'خطأ' : 'Error',
+                message: language === 'ar' ? 'فشل في تغيير حالة العرض' : 'Failed to toggle offer status',
+                type: 'error'
+            });
+        }
+    };
+
     const handleOpenModal = (offer = null) => {
         if (offer) {
             setEditingOffer(offer);
             setFormData({
-                title: offer.title || '',
-                description: offer.description || '',
+                title: normalizeText(offer, 'title'),
+                subtitle: normalizeText(offer, 'subtitle') || normalizeText(offer, 'sub'),
+                badge: normalizeText(offer, 'badge'),
+                description: normalizeText(offer, 'description') || normalizeText(offer, 'desc'),
                 discountAmount: String(offer.discountAmount || 0),
+                targetMonths: String(offer.targetMonths || 0),
                 validUntil: offer.validUntil || '',
                 image: offer.image || '',
                 status: offer.status || 'active'
@@ -84,26 +120,46 @@ export default function AdminOffers() {
         } else {
             setEditingOffer(null);
             setFormData({
-                title: '',
-                description: '',
+                title: { ar: '', en: '' },
+                subtitle: { ar: '', en: '' },
+                badge: { ar: '', en: '' },
+                description: { ar: '', en: '' },
                 discountAmount: '0',
+                targetMonths: '0',
                 validUntil: '',
                 image: '',
                 status: 'active'
             });
         }
+        setFormLang('ar');
         setIsModalOpen(true);
     };
 
     const handleSave = async (e) => {
         e.preventDefault();
-        if (!formData.title.trim()) return;
+        if (!formData.title.ar.trim() && !formData.title.en.trim()) return;
 
         setIsSaving(true);
         try {
             const offerData = {
-                ...formData,
+                title_ar: formData.title.ar,
+                title_en: formData.title.en,
+                subtitle_ar: formData.subtitle.ar,
+                subtitle_en: formData.subtitle.en,
+                badge_ar: formData.badge.ar,
+                badge_en: formData.badge.en,
+                description_ar: formData.description.ar,
+                description_en: formData.description.en,
+                // Include older field names for compatibility if needed, but AppContext is updated
+                sub_ar: formData.subtitle.ar,
+                sub_en: formData.subtitle.en,
+                desc_ar: formData.description.ar,
+                desc_en: formData.description.en,
                 discountAmount: Number(formData.discountAmount) || 0,
+                targetMonths: Number(formData.targetMonths) || 0,
+                validUntil: formData.validUntil,
+                image: formData.image,
+                status: formData.status,
                 updatedAt: serverTimestamp()
             };
 
@@ -124,7 +180,7 @@ export default function AdminOffers() {
                 });
             }
             setIsModalOpen(false);
-            fetchOffers();
+            // No need to call local fetchOffers() anymore because AppContext onSnapshot handles it globally.
         } catch (error) {
             console.error("Error saving offer:", error);
             setAlert({
@@ -138,8 +194,38 @@ export default function AdminOffers() {
     };
 
     const filteredOffers = offers.filter(offer => 
-        (offer.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-        (offer.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+        getText(offer, 'title').toLowerCase().includes(searchTerm.toLowerCase()) || 
+        getText(offer, 'description').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.ceil(filteredOffers.length / itemsPerPage);
+    const paginatedOffers = filteredOffers.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Language Toggle Component
+    const LangToggle = () => (
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+            <button 
+                type="button"
+                onClick={() => setFormLang('ar')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${formLang === 'ar' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'text-gray-400 hover:text-rose-500'}`}
+            >
+                عربي
+            </button>
+            <button 
+                type="button"
+                onClick={() => setFormLang('en')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${formLang === 'en' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'text-gray-400 hover:text-rose-500'}`}
+            >
+                EN
+            </button>
+        </div>
     );
 
     return (
@@ -155,7 +241,6 @@ export default function AdminOffers() {
                         {language === 'ar' ? 'إنشاء الحملات الترويجية، ومراقبة صلاحية العروض والخصومات.' : 'Create promotional campaigns and monitor offer validity and discounts.'}
                     </p>
                 </div>
-                {/* Optional logic for adding offers */}
                 <button 
                     onClick={() => handleOpenModal()}
                     className="flex items-center gap-2 px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-2xl transition-colors shadow-lg shadow-rose-500/30 whitespace-nowrap"
@@ -185,9 +270,10 @@ export default function AdminOffers() {
                     <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    <AnimatePresence>
-                        {filteredOffers.length > 0 ? filteredOffers.map((offer, idx) => (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <AnimatePresence>
+                            {paginatedOffers.length > 0 ? paginatedOffers.map((offer, idx) => (
                             <motion.div 
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
@@ -213,8 +299,8 @@ export default function AdminOffers() {
                                         </span>
                                     </div>
 
-                                    <h3 className="font-black text-xl text-slate-900 dark:text-white line-clamp-1 mb-1">{offer.title || 'Untitled Offer'}</h3>
-                                    <p className="text-xs font-bold text-gray-500 line-clamp-2 h-8 mb-4">{offer.description || 'No description provided.'}</p>
+                                    <h3 className="font-black text-xl text-slate-900 dark:text-white line-clamp-1 mb-1">{getText(offer, 'title') || 'Untitled Offer'}</h3>
+                                    <p className="text-xs font-bold text-gray-500 line-clamp-2 h-8 mb-4">{getText(offer, 'description') || 'No description provided.'}</p>
 
                                     <div className="flex flex-col gap-2 mb-4">
                                         <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 px-3 py-2 rounded-xl text-xs font-bold">
@@ -246,7 +332,7 @@ export default function AdminOffers() {
                                         </button>
 
                                         <button 
-                                            onClick={() => handleDelete(offer.id, offer.title)}
+                                            onClick={() => handleDelete(offer.id, getText(offer, 'title'))}
                                             title={language === 'ar' ? 'حذف العرض' : 'Delete Offer'}
                                             className="p-2 border border-rose-200 text-rose-500 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10 rounded-xl transition-colors"
                                         >
@@ -265,6 +351,14 @@ export default function AdminOffers() {
                         )}
                     </AnimatePresence>
                 </div>
+                {totalPages > 1 && (
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                    />
+                )}
+            </div>
             )}
             {/* Modal */}
             <AnimatePresence>
@@ -283,17 +377,28 @@ export default function AdminOffers() {
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
                             className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden relative z-10 border border-gray-100 dark:border-white/10"
                         >
-                            <div className="p-8">
-                                <div className="flex items-center justify-between mb-8">
+                            <div className="p-8 max-h-[90vh] overflow-y-auto">
+                                <div className="flex items-center justify-between mb-6">
                                     <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
                                         {editingOffer ? (language === 'ar' ? 'تعديل العرض' : 'Edit Offer') : (language === 'ar' ? 'إنشاء عرض جديد' : 'New Offer')}
                                     </h2>
-                                    <button 
-                                        onClick={() => setIsModalOpen(false)}
-                                        className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
-                                    >
-                                        <XCircle className="w-6 h-6 text-gray-400" />
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <LangToggle />
+                                        <button 
+                                            onClick={() => setIsModalOpen(false)}
+                                            className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                                        >
+                                            <XCircle className="w-6 h-6 text-gray-400" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Current language indicator */}
+                                <div className="flex items-center gap-2 mb-6 px-3 py-2 bg-rose-50 dark:bg-rose-500/10 rounded-xl border border-rose-100 dark:border-rose-500/20">
+                                    <Languages className="w-4 h-4 text-rose-500" />
+                                    <span className="text-xs font-black text-rose-600 dark:text-rose-400">
+                                        {formLang === 'ar' ? 'أنت تكتب الآن باللغة العربية' : 'You are now typing in English'}
+                                    </span>
                                 </div>
 
                                 <form onSubmit={handleSave} className="space-y-6">
@@ -309,28 +414,58 @@ export default function AdminOffers() {
                                     <div className="space-y-4">
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
-                                                {language === 'ar' ? 'عنوان العرض' : 'Offer Title'}
+                                                {formLang === 'ar' ? 'العنوان الرئيسي (عربي)' : 'Main Title (English)'}
                                             </label>
                                             <input 
                                                 type="text"
-                                                required
-                                                value={formData.title}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                                                required={formLang === 'ar'}
+                                                value={formData.title[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, title: { ...prev.title, [formLang]: e.target.value } }))}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
                                                 className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-rose-500 transition-all"
-                                                placeholder={language === 'ar' ? 'مثال: خصم الصيف 50%' : 'e.g. Summer Sale 50%'}
+                                                placeholder={formLang === 'ar' ? 'مثال: خصم الصيف 50%' : 'e.g. Summer Sale 50%'}
                                             />
                                         </div>
 
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
-                                                {language === 'ar' ? 'وصف العرض' : 'Offer Description'}
+                                                {formLang === 'ar' ? 'العنوان الفرعي (عربي)' : 'Subtitle (English)'}
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={formData.subtitle[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, subtitle: { ...prev.subtitle, [formLang]: e.target.value } }))}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
+                                                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-rose-500 transition-all"
+                                                placeholder={formLang === 'ar' ? 'مثال: لفترة محدودة جداً' : 'e.g. Limited time only'}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
+                                                {formLang === 'ar' ? 'شارة العرض (عربي)' : 'Offer Badge (English)'}
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                value={formData.badge[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, badge: { ...prev.badge, [formLang]: e.target.value } }))}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
+                                                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-rose-500 transition-all"
+                                                placeholder={formLang === 'ar' ? 'مثال: عرض حصري' : 'e.g. Exclusive'}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
+                                                {formLang === 'ar' ? 'وصف العرض (عربي)' : 'Offer Description (English)'}
                                             </label>
                                             <textarea 
-                                                value={formData.description}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                value={formData.description[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, description: { ...prev.description, [formLang]: e.target.value } }))}
                                                 rows={3}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
                                                 className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-rose-500 transition-all resize-none"
-                                                placeholder={language === 'ar' ? 'تفاصيل العرض...' : 'Offer details...'}
+                                                placeholder={formLang === 'ar' ? 'تفاصيل العرض...' : 'Offer details...'}
                                             />
                                         </div>
 
@@ -364,6 +499,26 @@ export default function AdminOffers() {
                                                         dir="ltr"
                                                     />
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
+                                                {language === 'ar' ? 'الباقة المستهدفة' : 'Target Package'}
+                                            </label>
+                                            <div className="relative">
+                                                <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                <select 
+                                                    value={formData.targetMonths}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, targetMonths: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 pl-11 pr-4 text-sm font-bold dark:text-white outline-none focus:border-rose-500 transition-all appearance-none cursor-pointer"
+                                                >
+                                                    <option value="0">{language === 'ar' ? 'كل الباقات' : 'All Packages'}</option>
+                                                    <option value="1">{language === 'ar' ? 'الباقة الشهرية' : 'Monthly Package'}</option>
+                                                    <option value="3">{language === 'ar' ? '3 أشهر' : '3 Months'}</option>
+                                                    <option value="6">{language === 'ar' ? '6 أشهر' : '6 Months'}</option>
+                                                    <option value="12">{language === 'ar' ? 'عروض سنوية' : 'Annual Offers'}</option>
+                                                </select>
                                             </div>
                                         </div>
                                     </div>

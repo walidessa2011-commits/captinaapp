@@ -1,11 +1,119 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    
+    // --- HELPERS ---
+    
+    function signedIn() {
+      return request.auth != null;
     }
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    
+    function isAdmin() {
+      return signedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(data) {
+      return signedIn() && (
+        (data.userId != null && data.userId == request.auth.uid) || 
+        (data.uid != null && data.uid == request.auth.uid)
+      );
+    }
+
+    // --- PUBLIC COLLECTIONS (Global Read) ---
+    
+    match /app_content/{id} { allow read: if true; }
+    match /tasks/{id} { allow read: if true; }
+    match /goals/{id} { allow read: if true; }
+    match /sports/{id} { allow read: if true; }
+    match /trainers/{id} { allow read: if true; }
+    match /products/{id} { allow read: if true; }
+    match /gyms/{id} { allow read: if true; }
+    match /offers/{id} { allow read: if true; }
+    match /videos/{id} { allow read: if true; }
+    match /categories/{id} { allow read: if true; }
+    match /packages/{id} { allow read: if true; }
+    match /library/{id} { allow read: if true; }
+    match /settings/{id} { allow read: if true; }
+
+    // --- USER COLLECTIONS ---
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn();
+      allow update: if signedIn() && (
+        (request.auth.uid == uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- User Specific Data ---
+    // Rule: Users can manage their own data, Admins full access
+    
+    match /addresses/{id} {
+      allow read, update, delete: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if signedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
+    }
+
+    match /orders/{id} {
+      allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if signedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /bookings/{id} {
+      allow read, update, delete: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if signedIn() && 
+        (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid) &&
+        (
+          !request.resource.data.isTrial || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.has_used_trial != true
+        );
+    }
+
+    match /subscriptions/{id} {
+      allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if signedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /notifications/{id} {
+      allow read, update, delete: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if isAdmin(); // Only admins/system should create notifications
+    }
+
+    match /help/{id} {
+      allow read, create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    match /training_schedules/{id} {
+      allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /user_programs/{id} {
+      allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    match /freeze_requests/{id} {
+      allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if signedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /contact_inquiries/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- ADMIN SYSTEM FALLBACK ---
+    
+    match /{document=**} {
+      allow read, write: if isAdmin();
     }
   }
 }

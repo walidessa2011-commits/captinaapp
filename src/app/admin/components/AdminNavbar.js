@@ -25,10 +25,11 @@ export default function AdminNavbar({ setIsSidebarOpen }) {
             {/* Left Section */}
             <div className="flex items-center gap-6">
                 <button 
-                    onClick={() => setIsSidebarOpen(true)}
-                    className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl hover:bg-primary/10 hover:text-primary transition-all lg:hidden"
+                    onClick={() => setIsSidebarOpen(prev => !prev)}
+                    className="p-3 bg-gray-50 dark:bg-white/5 rounded-2xl hover:bg-primary/10 hover:text-primary transition-all flex items-center justify-center border border-gray-100 dark:border-white/10 shadow-sm group active:scale-95"
+                    title={language === 'ar' ? 'القائمة' : 'Menu'}
                 >
-                    <Menu className="w-5 h-5" />
+                    <Menu className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />
                 </button>
 
                 <div className="hidden lg:flex items-center gap-3 bg-gray-50 dark:bg-white/5 px-4 py-2.5 rounded-2xl border border-transparent focus-within:border-primary/20 focus-within:bg-white dark:focus-within:bg-[#1a2235] transition-all w-80 group">

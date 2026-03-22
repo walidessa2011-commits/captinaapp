@@ -8,34 +8,57 @@ import { ChevronRight, ChevronLeft, ArrowRight, Sparkles, Target, Users, ShieldC
 import Splash from "@/components/Splash";
 
 export default function IntroPage() {
-    const { language, darkMode } = useApp();
+    const { language, darkMode, appContent } = useApp();
     const router = useRouter();
     const [currentSlide, setCurrentSlide] = useState(0);
     const [showSplash, setShowSplash] = useState(true);
 
-    const slides = [
+    const introData = appContent?.onboarding?.slides || [
         {
-            title: language === 'ar' ? 'رحلتك الرياضية تبدأ هنا' : 'Your Fitness Journey Starts Here',
-            desc: language === 'ar' ? 'استكشف عالم الرياضة مع مدربين معتمدين وتدريبات مخصصة تناسب أهدافك.' : 'Explore the world of sports with certified trainers and customized workouts that fit your goals.',
+            title_ar: 'رحلتك الرياضية تبدأ هنا',
+            title_en: 'Your Fitness Journey Starts Here',
+            desc_ar: 'استكشف عالم الرياضة مع مدربين معتمدين وتدريبات مخصصة تناسب أهدافك.',
+            desc_en: 'Explore the world of sports with certified trainers and customized workouts that fit your goals.',
             image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000',
-            icon: <Sparkles className="w-6 h-6" />,
+            icon: 'Sparkles',
             accent: '#E51B24'
         },
         {
-            title: language === 'ar' ? 'مدربون محترفون ونخبة' : 'Elite Professional Trainers',
-            desc: language === 'ar' ? 'تدرب مع الأفضل في مجالات الملاكمة، فنون القتال، واللياقة البدنية أينما كنت.' : 'Train with the best in boxing, martial arts, and fitness wherever you are.',
+            title_ar: 'مدربون محترفون ونخبة',
+            title_en: 'Elite Professional Trainers',
+            desc_ar: 'تدرب مع الأفضل في مجالات الملاكمة، فنون القتال، واللياقة البدنية أينما كنت.',
+            desc_en: 'Train with the best in boxing, martial arts, and fitness wherever you are.',
             image: 'https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=1000',
-            icon: <Target className="w-6 h-6" />,
+            icon: 'Target',
             accent: '#E51B24'
         },
         {
-            title: language === 'ar' ? 'مجتمع متكامل وآمن' : 'Integrated & Safe Community',
-            desc: language === 'ar' ? 'انضم إلى مجتمع كابتينا، تابع تقدمك، واحجز حصصك بسهولة تامة.' : 'Join the Captina community, track your progress, and book your classes with total ease.',
+            title_ar: 'مجتمع متكامل وآمن',
+            title_en: 'Integrated & Safe Community',
+            desc_ar: 'انضم إلى مجتمع كابتينا، تابع تقدمك، واحجز حصصك بسهولة تامة.',
+            desc_en: 'Join the Captina community, track your progress, and book your classes with total ease.',
             image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000',
-            icon: <ShieldCheck className="w-6 h-6" />,
+            icon: 'ShieldCheck',
             accent: '#E51B24'
         }
     ];
+
+    const getIcon = (name) => {
+        switch(name) {
+            case 'Sparkles': return <Sparkles className="w-6 h-6" />;
+            case 'Target': return <Target className="w-6 h-6" />;
+            case 'ShieldCheck': return <ShieldCheck className="w-6 h-6" />;
+            default: return <Sparkles className="w-6 h-6" />;
+        }
+    };
+
+    const slides = introData.map(s => ({
+        title: language === 'ar' ? s.title_ar : s.title_en,
+        desc: language === 'ar' ? s.desc_ar : s.desc_en,
+        image: s.image,
+        icon: getIcon(s.icon),
+        accent: s.accent
+    }));
 
     const nextSlide = () => {
         if (currentSlide >= slides.length - 1) {
@@ -87,9 +110,9 @@ export default function IntroPage() {
                     className={`flex items-center gap-2.5 backdrop-blur-lg p-1 rounded-xl border border-white/10 transition-colors ${darkMode ? 'bg-black/30' : 'bg-white/40'}`}
                 >
                     <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/10">
-                        <img src="/logo_captina.jpg" alt="Logo" className="w-full h-full object-cover" />
+                        <img src={appContent?.branding?.logo || "/logo_captina.jpg"} alt="Logo" className="w-full h-full object-cover" />
                     </div>
-                    <span className="font-black text-xs tracking-wider uppercase text-[#E51B24] pr-2">Captina</span>
+                    <span className="font-black text-xs tracking-wider uppercase text-[#E51B24] pr-2">{appContent?.branding?.name || "Captina"}</span>
                 </motion.div>
                 
                 <motion.button 

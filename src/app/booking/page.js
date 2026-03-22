@@ -11,19 +11,33 @@ import {
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from "@/context/AppContext";
 import { db, auth } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { 
+    RecaptchaVerifier, 
+    signInWithPhoneNumber, 
+    linkWithPhoneNumber 
+} from "firebase/auth";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, updateDoc } from "firebase/firestore";
 import Link from 'next/link';
 import HorizontalDatePicker from '@/components/HorizontalDatePicker';
 
 function BookingContent() {
-    const { t, language, darkMode } = useApp();
+    const { t, language, darkMode, setAlert } = useApp();
     const searchParams = useSearchParams();
     const router = useRouter();
     
     // Initial data from URL
     const isTrial = searchParams.get('trial') === 'true';
     const initialPkg = searchParams.get('package');
+    const initialOffer = searchParams.get('offer');
     const initialSport = searchParams.get('sport') || t('karateContent.title');
+
+    const getText = (field) => {
+        if (!field) return '';
+        if (typeof field === 'object') {
+            return field[language] || field['ar'] || field['en'] || '';
+        }
+        return field;
+    };
 
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,10 +55,103 @@ function BookingContent() {
         trainer: null,
         date: '',
         time: '',
-        notes: ''
+        notes: '',
+        offerId: initialOffer,
+        packageId: initialPkg
     });
 
+    const [userAddresses, setUserAddresses] = useState([]);
+    const [selectedAddressId, setSelectedAddressId] = useState('new');
+    const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
+
     const [dbTrainers, setDbTrainers] = useState([]);
+    const [trainerSchedules, setTrainerSchedules] = useState([]);
+    const [userProfile, setUserProfile] = useState(null);
+    const [otpSent, setOtpSent] = useState(false);
+    const [verificationCode, setVerificationCode] = useState('');
+    const [confirmationResult, setConfirmationResult] = useState(null);
+    const [verifyingPhone, setVerifyingPhone] = useState(false);
+    const [tempPhone, setTempPhone] = useState('');
+
+    // Fetch User Profile and Trial Status
+    useEffect(() => {
+        if (!auth.currentUser) return;
+        
+        const fetchUserProfile = async () => {
+            try {
+                const userDoc = await getDocs(query(collection(db, "users"), where("uid", "==", auth.currentUser.uid)));
+                if (!userDoc.empty) {
+                    const data = userDoc.docs[0].data();
+                    setUserProfile(data);
+                    
+                    // If trying to book a trial but already used it
+                    if (isTrial && data.has_used_trial) {
+                        setAlert({
+                            type: 'error',
+                            message: language === 'ar' 
+                                ? 'لقد استفدت من الحصة التجريبية مسبقاً، تفضل بالاطلاع على باقاتنا' 
+                                : 'You have already used your trial session. Please check our subscription packages.'
+                        });
+                        router.push('/packages');
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching user profile:", err);
+            }
+        };
+        fetchUserProfile();
+    }, [auth.currentUser, isTrial]);
+
+    // Fetch trainer's schedule for the selected date and implement travel buffer
+    useEffect(() => {
+        if (!bookingData.trainer || !bookingData.date) return;
+
+        const fetchSchedule = async () => {
+            try {
+                const q = query(
+                    collection(db, "bookings"),
+                    where("trainer.id", "==", bookingData.trainer.id),
+                    where("date", "==", bookingData.date),
+                    where("status", "in", ["confirmed", "pending"])
+                );
+                const snap = await getDocs(q);
+                const bookings = snap.docs.map(doc => doc.data());
+                setTrainerSchedules(bookings);
+            } catch (err) {
+                console.error("Error fetching trainer schedule:", err);
+            }
+        };
+        fetchSchedule();
+    }, [bookingData.trainer, bookingData.date]);
+
+    // Helper functions for time calculation
+    const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const [time, period] = timeStr.split(' ');
+        let [hours, minutes] = time.split(':').map(Number);
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        return hours * 60 + minutes;
+    };
+
+    const isSlotAvailable = (slotTime) => {
+        if (!trainerSchedules || trainerSchedules.length === 0) return true;
+        
+        const slotMinutes = timeToMinutes(slotTime);
+        const buffer = 45; // 45 minutes travel window
+        const sessionDuration = 60; // 60 minutes session
+
+        return !trainerSchedules.some(booking => {
+            const bookingStart = timeToMinutes(booking.time);
+            const bookingEnd = bookingStart + sessionDuration;
+            
+            // A slot is taken if its session window (start to end + buffer) overlaps with an existing booking's window
+            const existingWindowStart = bookingStart - buffer;
+            const existingWindowEnd = bookingEnd + buffer;
+
+            return slotMinutes >= existingWindowStart && slotMinutes < existingWindowEnd;
+        });
+    };
 
     useEffect(() => {
         const fetchTrainers = async () => {
@@ -56,8 +163,42 @@ function BookingContent() {
                 console.error("Error fetching trainers:", err);
             }
         };
+
+        const fetchAddresses = async () => {
+            if (!auth.currentUser) {
+                setIsLoadingAddresses(false);
+                return;
+            }
+            try {
+                setIsLoadingAddresses(true);
+                const q = query(collection(db, "addresses"), where("userId", "==", auth.currentUser.uid));
+                const snap = await getDocs(q);
+                const addrs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setUserAddresses(addrs);
+                if (addrs.length > 0) {
+                    const defaultAddr = addrs.find(a => a.isDefault) || addrs[0];
+                    setSelectedAddressId(defaultAddr.id);
+                    setBookingData(prev => ({
+                        ...prev,
+                        address: {
+                            city: defaultAddr.city || '',
+                            district: defaultAddr.district || '',
+                            street: defaultAddr.street || '',
+                            building: defaultAddr.building || '',
+                            fullAddress: defaultAddr.fullAddress || ''
+                        }
+                    }));
+                }
+            } catch (err) {
+                console.error("Error fetching addresses:", err);
+            } finally {
+                setIsLoadingAddresses(false);
+            }
+        };
+
         fetchTrainers();
-    }, []);
+        fetchAddresses();
+    }, [auth.currentUser]);
 
     const steps = [
         { id: 1, label: t('booking.selectSport') },
@@ -67,9 +208,20 @@ function BookingContent() {
     ];
 
     // Pricing logic
-    const basePrice = isTrial ? 0 : 100;
-    const homeFee = bookingData.locationType === 'home' ? 50 : 0;
-    const totalPrice = basePrice + homeFee;
+    let basePrice = 100; // Default session price
+    
+    if (isTrial || initialOffer === 'offer-trial-free' || initialPkg === 'trial') {
+        basePrice = 0;
+    } else if (initialOffer === 'offer-annual-50') {
+        basePrice = 1500; // 50% of 3000 (Example annual price)
+    } else if (initialPkg === 'monthly') {
+        basePrice = 599;
+    } else if (initialPkg === 'vip') {
+        basePrice = 1499;
+    }
+
+    const homeFee = (bookingData.locationType === 'home' && !isTrial) ? 50 : 0;
+    const totalPrice = isTrial ? 0 : (basePrice + homeFee);
 
     const nextStep = () => setStep(s => Math.min(s + 1, 4));
     const prevStep = () => setStep(s => Math.max(s - 1, 1));
@@ -78,32 +230,165 @@ function BookingContent() {
 
     const sportsOptions = t('booking.sportsList') || [];
 
+    const setupRecaptcha = () => {
+        if (window.recaptchaVerifier) return;
+        try {
+            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-booking-container', {
+                'size': 'invisible',
+                'callback': (response) => {
+                    console.log("Recaptcha verified for booking");
+                }
+            });
+        } catch (error) {
+            console.error("Recaptcha setup error:", error);
+        }
+    };
+
+    const handleSendOTP = async () => {
+        const phone = tempPhone || userProfile?.phone;
+        if (!phone) {
+            setAlert({
+                type: 'error',
+                message: language === 'ar' ? 'يرجى إدخال رقم الجوال' : 'Please enter your phone number'
+            });
+            return;
+        }
+
+        verifyingPhoneSet(true);
+        try {
+            setupRecaptcha();
+            const fullPhone = phone.startsWith('+') ? phone : `+966${phone.replace(/^0/, '')}`;
+            
+            const confirmation = await signInWithPhoneNumber(auth, fullPhone, window.recaptchaVerifier);
+            setConfirmationResult(confirmation);
+            setOtpSent(true);
+            setAlert({
+                type: 'success',
+                message: language === 'ar' ? 'تم إرسال رمز التحقق' : 'Verification code sent'
+            });
+        } catch (error) {
+            console.error("OTP Send error:", error);
+            setAlert({
+                type: 'error',
+                message: error.message
+            });
+        } finally {
+            verifyingPhoneSet(false);
+        }
+    };
+
+    const verifyingPhoneSet = (val) => setVerifyingPhone(val);
+
+    const handleVerifyOTP = async () => {
+        if (!verificationCode || !confirmationResult) return;
+        verifyingPhoneSet(true);
+        try {
+            const result = await confirmationResult.confirm(verificationCode);
+            const phone = result.user.phoneNumber;
+            
+            const userRef = doc(db, "users", auth.currentUser.uid);
+            await updateDoc(userRef, {
+                phone: phone,
+                phone_verified: true
+            });
+
+            setUserProfile(prev => ({ ...prev, phone: phone, phone_verified: true }));
+            setOtpSent(false);
+            setConfirmationResult(null);
+            setAlert({
+                type: 'success',
+                message: language === 'ar' ? 'تم توثيق الجوال بنجاح' : 'Phone verified successfully'
+            });
+            
+            await saveBooking();
+        } catch (error) {
+            console.error("OTP Verify error:", error);
+            setAlert({
+                type: 'error',
+                message: language === 'ar' ? 'رمز غير صحيح' : 'Invalid code'
+            });
+        } finally {
+            verifyingPhoneSet(false);
+        }
+    };
+
+    const saveBooking = async () => {
+        setIsSubmitting(true);
+        try {
+            const bookingRef = await addDoc(collection(db, "bookings"), {
+                ...bookingData,
+                userId: auth.currentUser.uid,
+                userEmail: auth.currentUser.email,
+                id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+                createdAt: serverTimestamp(),
+                status: 'pending',
+                isTrial: isTrial,
+                booking_type: isTrial ? 'trial' : 'paid',
+                totalPrice: totalPrice,
+                currency: t('currency')
+            });
+
+            if (isTrial) {
+                const userRef = doc(db, "users", auth.currentUser.uid);
+                await updateDoc(userRef, {
+                    has_used_trial: true
+                });
+            }
+
+            setIsSuccess(true);
+        } catch (error) {
+            console.error("Error booking:", error);
+            setAlert({
+                type: 'error',
+                message: language === 'ar' ? 'حدث خطأ أثناء الحجز' : 'Error during booking'
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleConfirm = async () => {
         if (!auth.currentUser) {
             router.push('/login');
             return;
         }
 
-        setIsSubmitting(true);
-        try {
-            await addDoc(collection(db, "bookings"), {
-                ...bookingData,
-                userId: auth.currentUser.uid,
-                status: 'pending',
-                totalPrice: totalPrice,
-                currency: t('currency'),
-                createdAt: serverTimestamp(),
-                isTrial: isTrial
-            });
-            setIsSuccess(true);
-        } catch (error) {
-            console.error("Error adding booking: ", error);
-        } finally {
-            setIsSubmitting(false);
+        if (isTrial && !auth.currentUser.phoneNumber && !userProfile?.phone_verified) {
+            setOtpSent(false);
+            setTempPhone(userProfile?.phone || '');
+            // This will trigger the modal in the UI
+            return; 
         }
+
+        await saveBooking();
     };
 
     const trainers = dbTrainers.length > 0 ? dbTrainers : (t('pageTrainersData') || []);
+
+    const filteredTrainers = trainers.filter(trainer => {
+        if (!bookingData.sport) return true;
+        
+        const specialtyAr = trainer.specialty?.ar || '';
+        const specialtyEn = trainer.specialty?.en || '';
+        const titleAr = trainer.title?.ar || '';
+        const titleEn = trainer.title?.en || '';
+        
+        const sport = bookingData.sport.toLowerCase();
+        
+        return specialtyAr.includes(bookingData.sport) || 
+               specialtyEn.toLowerCase().includes(sport) ||
+               titleAr.includes(bookingData.sport) ||
+               titleEn.toLowerCase().includes(sport);
+    });
+
+    // Auto-select trainer if only one match for trial
+    useEffect(() => {
+        if (isTrial && bookingData.sport && filteredTrainers.length === 1) {
+            if (!bookingData.trainer || bookingData.trainer.id !== filteredTrainers[0].id) {
+                setBookingData(prev => ({ ...prev, trainer: filteredTrainers[0] }));
+            }
+        }
+    }, [bookingData.sport, filteredTrainers, isTrial]);
 
     const textClass = darkMode ? "text-white" : "text-slate-900";
 
@@ -307,37 +592,135 @@ function BookingContent() {
                                                     {t('booking.addressDetails')}
                                                 </h4>
                                             </div>
+
+                                            {/* Saved Addresses Selection */}
+                                            {isLoadingAddresses ? (
+                                                <div className="space-y-3 animate-pulse">
+                                                    <div className="h-10 w-32 bg-gray-100 dark:bg-white/5 rounded-lg" />
+                                                    <div className="h-20 w-full bg-gray-100 dark:bg-white/5 rounded-2xl" />
+                                                    <div className="h-20 w-full bg-gray-100 dark:bg-white/5 rounded-2xl" />
+                                                </div>
+                                            ) : userAddresses.length > 0 && (
+                                                <div className="space-y-4">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 tracking-widest">{language === 'ar' ? 'اختر عنواناً محفوظاً' : 'Choose a saved address'}</label>
+                                                    <div className="grid grid-cols-1 gap-2">
+                                                        {userAddresses.map((addr) => (
+                                                            <button
+                                                                key={addr.id}
+                                                                onClick={() => {
+                                                                    setSelectedAddressId(addr.id);
+                                                                    setBookingData({
+                                                                        ...bookingData,
+                                                                        address: {
+                                                                            city: addr.city || '',
+                                                                            district: addr.district || '',
+                                                                            street: addr.street || '',
+                                                                            building: addr.building || '',
+                                                                            fullAddress: addr.fullAddress || ''
+                                                                        }
+                                                                    });
+                                                                }}
+                                                                className={`p-4 rounded-3xl border-2 text-start transition-all flex items-center justify-between group ${selectedAddressId === addr.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-gray-50 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10 overflow-hidden'}`}
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedAddressId === addr.id ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
+                                                                        {addr.type === 'work' ? <Building className="w-5 h-5" /> : <Home className="w-5 h-5" />}
+                                                                    </div>
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="text-sm font-black text-gray-900 dark:text-white">{addr.label}</p>
+                                                                            {addr.isPrimary && (
+                                                                                <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-black uppercase">{language === 'ar' ? 'أساسي' : 'Primary'}</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-[10px] font-bold text-gray-400 truncate max-w-[200px]">{addr.fullAddress}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedAddressId === addr.id ? 'border-primary bg-primary text-white scale-100' : 'border-gray-200 dark:border-white/10 scale-90 opacity-0 group-hover:opacity-100'}`}>
+                                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                        <button
+                                                            onClick={() => setSelectedAddressId('new')}
+                                                            className={`p-4 rounded-3xl border-2 border-dashed text-start transition-all flex items-center gap-3 ${selectedAddressId === 'new' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-primary/50'}`}
+                                                        >
+                                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${selectedAddressId === 'new' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-white/10 group-hover:bg-primary/10 group-hover:text-primary'}`}>
+                                                                <Plus className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="text-start">
+                                                                <span className="text-sm font-black block">{language === 'ar' ? 'عنوان جديد' : 'New Address'}</span>
+                                                                <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">{language === 'ar' ? 'أضف موقعاً غير مسجل' : 'Add location manually'}</span>
+                                                            </div>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                             
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1.5 text-start">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.city')}</label>
-                                                    <select className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all">
-                                                        <option>{language === 'ar' ? 'الرياض' : 'Riyadh'}</option>
-                                                        <option>{language === 'ar' ? 'جدة' : 'Jeddah'}</option>
-                                                        <option>{language === 'ar' ? 'الدمام' : 'Dammam'}</option>
-                                                    </select>
-                                                </div>
-                                                <div className="space-y-1.5 text-start">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.district')}</label>
-                                                    <select className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all">
-                                                        <option>{language === 'ar' ? 'العليا' : 'Olaya'}</option>
-                                                        <option>{language === 'ar' ? 'الملقا' : 'Al-Malqa'}</option>
-                                                        <option>{language === 'ar' ? 'النرجس' : 'An-Narjis'}</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-1.5 text-start">
-                                                <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.addressDetails')}</label>
-                                                <input 
-                                                    type="text" 
-                                                    placeholder={t('booking.addressExample')} 
-                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all"
-                                                />
-                                            </div>
-                                            <button className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-black transition-all">
-                                                <Crosshair className="w-5 h-5" />
-                                                {t('booking.useCurrentLocation')}
-                                            </button>
+                                            {(selectedAddressId === 'new' || userAddresses.length === 0) && (
+                                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1.5 text-start">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.city')}</label>
+                                                            <select 
+                                                                value={bookingData.address.city}
+                                                                onChange={(e) => setBookingData({...bookingData, address: {...bookingData.address, city: e.target.value}})}
+                                                                className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-white/10 focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all appearance-none"
+                                                            >
+                                                                <option value="">{t('booking.city')}</option>
+                                                                <option value="Riyadh">{language === 'ar' ? 'الرياض' : 'Riyadh'}</option>
+                                                                <option value="Jeddah">{language === 'ar' ? 'جدة' : 'Jeddah'}</option>
+                                                                <option value="Dammam">{language === 'ar' ? 'الدمام' : 'Dammam'}</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="space-y-1.5 text-start">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.district')}</label>
+                                                            <input 
+                                                                type="text"
+                                                                placeholder={t('booking.district')}
+                                                                value={bookingData.address.district}
+                                                                onChange={(e) => setBookingData({...bookingData, address: {...bookingData.address, district: e.target.value}})}
+                                                                className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-white/10 focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* New Location Picker Field */}
+                                                    <div className="space-y-1.5 text-start">
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase px-2">{language === 'ar' ? 'موقع المنشأة (اللوكيشن)' : 'Location (Map)'}</label>
+                                                        <button 
+                                                            className="w-full bg-primary/5 border-2 border-primary/20 hover:border-primary transition-all rounded-2xl px-6 py-4 flex items-center justify-between group"
+                                                            type="button"
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                                                    <MapIcon className="w-5 h-5" />
+                                                                </div>
+                                                                <div className="text-start">
+                                                                    <p className="text-sm font-black text-gray-900 dark:text-white">{language === 'ar' ? 'تحديد الموقع على الخريطة' : 'Pick location on map'}</p>
+                                                                    <p className="text-[10px] font-bold text-primary italic uppercase tracking-widest">{language === 'ar' ? 'دقة عالية للحجز' : 'High precision for booking'}</p>
+                                                                </div>
+                                                            </div>
+                                                            <ChevronRight className="w-5 h-5 text-primary" />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-1.5 text-start">
+                                                        <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.addressDetails')}</label>
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder={t('booking.addressExample')} 
+                                                            value={bookingData.address.fullAddress}
+                                                            onChange={(e) => setBookingData({...bookingData, address: {...bookingData.address, fullAddress: e.target.value}})}
+                                                            className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-white/10 focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all"
+                                                        />
+                                                    </div>
+                                                    <button className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-black transition-all">
+                                                        <Crosshair className="w-5 h-5" />
+                                                        {t('booking.useCurrentLocation')}
+                                                    </button>
+                                                </motion.div>
+                                            )}
                                         </div>
 
                                         {/* Map Placeholder */}
@@ -423,21 +806,21 @@ function BookingContent() {
                                         {t('booking.selectYourTrainer')}
                                     </h2>
                                     <div className="flex md:grid md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto md:overflow-visible pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-                                        {trainers.map((trainer) => (
+                                        {filteredTrainers.map((trainer) => (
                                             <button 
                                                 key={trainer.id}
                                                 onClick={() => setBookingData({...bookingData, trainer})}
                                                 className={`flex-shrink-0 w-32 md:w-full bg-white dark:bg-slate-800 rounded-[28px] p-3 border-2 transition-all flex flex-col items-center gap-2 ${bookingData.trainer?.id === trainer.id ? 'border-primary shadow-lg shadow-primary/5' : 'border-transparent shadow-sm'}`}
                                             >
                                                 <div className="relative">
-                                                    <img src={trainer.image || trainer.profileImage || 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200'} referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={typeof trainer.name === 'string' ? trainer.name : trainer.name?.[language]} />
+                                                    <img src={trainer.image || trainer.profileImage || 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200'} referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={getText(trainer.name)} />
                                                     {bookingData.trainer?.id === trainer.id && (
                                                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
                                                             <CheckCircle2 className="w-2.5 h-2.5 text-white" />
                                                         </div>
                                                     )}
                                                 </div>
-                                                <h4 className="text-[10px] font-black text-gray-900 dark:text-white text-center line-clamp-1">{typeof trainer.name === 'string' ? trainer.name : trainer.name?.[language]}</h4>
+                                                <h4 className="text-[10px] font-black text-gray-900 dark:text-white text-center line-clamp-1">{getText(trainer.name)}</h4>
                                                 <div className="flex items-center gap-1">
                                                     <CheckCircle2 className="w-2 h-2 text-amber-500 fill-amber-500" />
                                                     <span className="text-[8px] font-black text-gray-500">{trainer.rating}</span>
@@ -491,19 +874,25 @@ function BookingContent() {
                                                         '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
                                                         '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', 
                                                         '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM'
-                                                    ].map((time) => (
-                                                        <button 
-                                                            key={time}
-                                                            onClick={() => setBookingData({...bookingData, time})}
-                                                            className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 ${
-                                                                bookingData.time === time 
-                                                                ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20 scale-[1.05] z-10' 
-                                                                : 'border-transparent bg-gray-50 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
-                                                            }`}
-                                                        >
-                                                            {time}
-                                                        </button>
-                                                    ))}
+                                                    ].map((time) => {
+                                                        const available = isSlotAvailable(time);
+                                                        return (
+                                                            <button 
+                                                                key={time}
+                                                                disabled={!available}
+                                                                onClick={() => setBookingData({...bookingData, time})}
+                                                                className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 ${
+                                                                    !available 
+                                                                    ? 'opacity-30 cursor-not-allowed bg-gray-200 dark:bg-white/5 border-transparent'
+                                                                    : bookingData.time === time 
+                                                                    ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20 scale-[1.05] z-10' 
+                                                                    : 'border-transparent bg-gray-50 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                                                                }`}
+                                                            >
+                                                                {time}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>
@@ -535,9 +924,18 @@ function BookingContent() {
                                             {[
                                                 { label: t('booking.service'), value: bookingData.sport, icon: Dumbbell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
                                                 { label: t('booking.selectLocation'), value: bookingData.locationType === 'home' ? (`${t('booking.atHome')} (+50)`) : (bookingData.selectedGym?.name || '-'), icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                                                { label: t('booking.selectTrainer'), value: bookingData.trainer ? (typeof bookingData.trainer.name === 'string' ? bookingData.trainer.name : bookingData.trainer.name?.[language]) : '-', icon: User, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                                                { label: t('booking.selectTrainer'), value: bookingData.trainer ? getText(bookingData.trainer.name) : '-', icon: User, color: 'text-amber-500', bg: 'bg-amber-500/10' },
                                                 { label: t('booking.selectDateTime'), value: `${bookingData.date} • ${bookingData.time}`, icon: Calendar, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                                            ].map((item, i) => (
+                                                isTrial ? {
+                                                    label: language === 'ar' ? 'نوع الجلسة' : 'Session Type',
+                                                    value: language === 'ar' ? 'حصة تجريبية مجانية (جلسة واحدة)' : 'Free Trial Session (1 Session)',
+                                                    icon: Sparkles, color: 'text-primary', bg: 'bg-primary/10'
+                                                } : (bookingData.offerId || bookingData.packageId) && { 
+                                                    label: bookingData.offerId ? (language === 'ar' ? 'العرض المختار' : 'Selected Offer') : (language === 'ar' ? 'الباقة المختارة' : 'Selected Package'), 
+                                                    value: bookingData.offerId || bookingData.packageId, 
+                                                    icon: Sparkles, color: 'text-primary', bg: 'bg-primary/10' 
+                                                }
+                                            ].filter(Boolean).map((item, i) => (
                                                 <div key={i} className="flex items-center gap-4 text-start group">
                                                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 ${item.bg}`}>
                                                         <item.icon className={`w-5 h-5 ${item.color}`} />
@@ -580,8 +978,10 @@ function BookingContent() {
                                             <div className="pt-8 border-t border-white/10 flex justify-between items-end">
                                                 <span className="text-sm font-black uppercase tracking-widest">{t('booking.totalPrice')}</span>
                                                 <div className="text-end">
-                                                    <span className="text-5xl font-black text-primary leading-none">{totalPrice}</span>
-                                                    <span className="text-xs font-black ml-2 text-slate-400 uppercase">{t('currency')}</span>
+                                                    <span className="text-5xl font-black text-primary leading-none">
+                                                        {isTrial ? (language === 'ar' ? 'مجاني' : 'FREE') : totalPrice}
+                                                    </span>
+                                                    {!isTrial && <span className="text-xs font-black ml-2 text-slate-400 uppercase">{t('currency')}</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -637,35 +1037,147 @@ function BookingContent() {
                 </div>
             )}
 
+            {/* OTP Verification Modal for Trial */}
+            <AnimatePresence>
+                {isTrial && !auth.currentUser.phoneNumber && !userProfile?.phone_verified && tempPhone !== null && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            className="bg-white dark:bg-slate-800 rounded-[32px] p-8 max-w-sm w-full shadow-2xl space-y-6"
+                        >
+                            <div className="text-center space-y-2">
+                                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                                    <Phone className="w-8 h-8 text-primary" />
+                                </div>
+                                <h3 className="text-xl font-black text-gray-900 dark:text-white">
+                                    {language === 'ar' ? 'توثيق الجوال' : 'Phone Verification'}
+                                </h3>
+                                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 leading-relaxed">
+                                    {language === 'ar' ? 'لضمان أفضل خدمة، يرجى توثيق رقم جوالك السعودي قبل حجز الحصة التجريبية' : 'To ensure the best service, please verify your Saudi mobile number before booking your trial session.'}
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                {!otpSent ? (
+                                    <div className="space-y-2">
+                                        <div className="relative">
+                                            <div className={`absolute ${language === 'en' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 flex items-center gap-2 border-r pr-3 ${darkMode ? 'border-white/10' : 'border-black/5'}`}>
+                                                <img src="https://flagcdn.com/w20/sa.png" width="18" alt="SA" />
+                                                <span className={`font-black text-xs ${darkMode ? 'text-white' : 'text-gray-900'}`}>+966</span>
+                                            </div>
+                                            <input
+                                                type="tel"
+                                                value={tempPhone}
+                                                onChange={(e) => setTempPhone(e.target.value.replace(/\D/g, ''))}
+                                                className={`w-full border-2 rounded-2xl py-4 ${language === 'en' ? 'pl-24 pr-5' : 'pr-24 pl-5'} focus:border-primary outline-none transition-all font-black text-sm ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-transparent text-gray-900'}`}
+                                                placeholder="5xxxxxxx"
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={handleSendOTP}
+                                            disabled={verifyingPhone || !tempPhone}
+                                            className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-xs uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            {verifyingPhone ? (language === 'ar' ? 'جاري الإرسال...' : 'Sending...') : (language === 'ar' ? 'إرسال الرمز' : 'Send Code')}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <input
+                                            type="text"
+                                            maxLength={6}
+                                            value={verificationCode}
+                                            onChange={(e) => setVerificationCode(e.target.value)}
+                                            className={`w-full border-2 rounded-2xl py-4 px-5 text-center tracking-[0.8em] focus:border-primary outline-none transition-all font-black text-xl ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-transparent text-gray-900'}`}
+                                            placeholder="000000"
+                                        />
+                                        <button 
+                                            onClick={handleVerifyOTP}
+                                            disabled={verifyingPhone || verificationCode.length < 6}
+                                            className="w-full bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all text-xs uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            {verifyingPhone ? (language === 'ar' ? 'جاري التحقق...' : 'Verifying...') : (language === 'ar' ? 'تأكيد الحجز' : 'Verify & Confirm')}
+                                        </button>
+                                        <button 
+                                            onClick={() => setOtpSent(false)}
+                                            className="w-full text-[10px] font-black text-gray-400 hover:text-primary transition-colors uppercase tracking-widest"
+                                        >
+                                            {language === 'ar' ? 'تغيير الرقم' : 'Change Number'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <button 
+                                onClick={() => setTempPhone(null)}
+                                className="w-full text-[10px] font-black text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest"
+                            >
+                                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                            </button>
+                            
+                            <div id="recaptcha-booking-container"></div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Success Overlay */}
             <AnimatePresence>
                 {isSuccess && (
                     <motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-6"
+                        className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[120] flex items-center justify-center p-6"
                     >
                         <motion.div 
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
-                            className="bg-white dark:bg-slate-800 rounded-[40px] p-10 max-w-sm w-full text-center space-y-6 shadow-2xl"
+                            className="bg-white dark:bg-slate-800 rounded-[40px] p-8 md:p-12 max-w-md w-full text-center space-y-8 shadow-2xl relative overflow-hidden"
                         >
+                            {/* Decorative Background for Trial Success */}
+                            {isTrial && <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-blue-500 to-primary"></div>}
+                            
                             <div className="w-24 h-24 bg-emerald-500 rounded-[32px] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/20">
                                 <CheckCircle2 className="w-12 h-12 text-white" />
                             </div>
-                            <div className="space-y-2">
-                                <h2 className="text-2xl font-black text-gray-900 dark:text-white">
-                                    {t('booking.sentToAdmin')}
-                                </h2>
+                            
+                            <div className="space-y-3">
+                                <hgroup>
+                                    <h2 className="text-2xl font-black text-gray-900 dark:text-white leading-tight">
+                                        {t('booking.sentToAdmin')}
+                                    </h2>
+                                    {isTrial && (
+                                        <div className="mt-4 p-4 bg-primary/5 rounded-2xl border border-primary/20">
+                                            <p className="text-xs font-black text-primary uppercase tracking-widest mb-1">
+                                                {language === 'ar' ? 'هدية كابتينا لك!' : "Captina's Gift to You!"}
+                                            </p>
+                                            <p className="text-[11px] font-bold text-gray-600 dark:text-gray-300 leading-relaxed">
+                                                {language === 'ar' 
+                                                    ? 'استمتع بحصتك التجريبية! احصل على خصم 20% عند اشتراكك في أي باقة تدريبية بعد انتهاء الحصة مباشرة' 
+                                                    : 'Enjoy your trial session! Get 20% OFF when you subscribe to any training package immediately after your session.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                </hgroup>
                                 <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
                                     {t('booking.waitingForConfirmation')}
                                 </p>
                             </div>
+
                             <Link 
                                 href="/profile/bookings"
-                                className="block w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-black/10 dark:shadow-white/5"
+                                className="block w-full bg-primary text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-[1.02] transition-all shadow-xl shadow-primary/20 group"
                             >
-                                {language === 'ar' ? 'الذهاب لحجوزاتي' : 'Go to My Bookings'}
+                                <span className="flex items-center justify-center gap-2">
+                                    {language === 'ar' ? 'متابعة حجوزاتي' : 'Follow My Bookings'}
+                                    <ArrowRight className={`w-4 h-4 ${language === 'ar' ? 'rotate-180' : ''} group-hover:translate-x-1 transition-transform`} />
+                                </span>
                             </Link>
                         </motion.div>
                     </motion.div>

@@ -13,5 +13,24 @@
         "supportEmail": "walidessa2020@gmail.com"
       }
     }
+  },
+  "hosting": {
+    "public": "out",
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "/sports/**", "destination": "/sports/1.html" },
+      { "source": "/trainers/**", "destination": "/trainers/1.html" },
+      { "source": "/gyms/**", "destination": "/gyms/1.html" },
+      { "source": "/offers/**", "destination": "/offers/1.html" },
+      { "source": "/store/**", "destination": "/store/1.html" },
+      { "source": "/library/**", "destination": "/library/educational.html" },
+      { "source": "**", "destination": "/404.html" }
+    ]
   }
 }

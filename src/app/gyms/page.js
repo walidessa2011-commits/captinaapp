@@ -45,7 +45,7 @@ export default function Gyms() {
                     </div>
                 </div>
                 {/* Gyms Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {gyms.map((gym, idx) => (
                         <motion.div 
                             key={gym.id}
@@ -58,7 +58,7 @@ export default function Gyms() {
                             <Link href={`/gyms/${gym.id}`}>
                                 <div className="relative bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium transition-all duration-500 hover:shadow-active hover:-translate-y-2 flex flex-col h-full active:scale-[0.98]">
                                     {/* Card Image Section */}
-                                    <div className="relative w-full h-48 overflow-hidden shrink-0">
+                                    <div className="relative w-full h-40 overflow-hidden shrink-0">
                                         <img 
                                             src={gym.image} 
                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
@@ -127,7 +127,7 @@ export default function Gyms() {
                     viewport={{ once: true }}
                     className="mt-20 p-12 rounded-[3rem] bg-white/80 dark:bg-[#1a2235]/40 border border-gray-100 dark:border-white/10 relative overflow-hidden backdrop-blur-3xl shadow-premium"
                 >
-                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-8">
+                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-6">
                         {[
                             { label: language === 'ar' ? 'أحدث الأجهزة' : 'Elite Gear', icon: Building, color: 'text-blue-500' },
                             { label: language === 'ar' ? 'مساحات واسعة' : 'Wide Areas', icon: Star, color: 'text-amber-500' },

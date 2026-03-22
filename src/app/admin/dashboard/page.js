@@ -195,7 +195,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <div className="text-[10px] font-bold text-gray-400 flex items-center gap-1 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-lg">
                                     <Clock className="w-3 h-3" />
-                                    <span>{user.createdAt ? user.createdAt.toDate().toLocaleDateString() : 'N/A'}</span>
+                                    <span className="text-[11px] font-bold text-gray-500">{user.createdAt && typeof user.createdAt.toDate === 'function' ? user.createdAt.toDate().toLocaleDateString() : (user.createdAt instanceof Date ? user.createdAt.toLocaleDateString() : (user.createdAt || 'N/A'))}</span>
                                 </div>
                             </div>
                         )) : (

@@ -12,6 +12,14 @@ export default function SportTrainers({ sportName, sportId }) {
     const [trainers, setTrainers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Helper: get display text from bilingual or plain string
+    const getText = (val) => {
+        if (typeof val === 'object' && val !== null) {
+            return val[language] || val['ar'] || val['en'] || '';
+        }
+        return val || '';
+    };
+
     useEffect(() => {
         const fetchTrainers = async () => {
             try {
@@ -26,8 +34,9 @@ export default function SportTrainers({ sportName, sportId }) {
 
                 // Filter by sportName (English or Arabic) or sportId
                 const filtered = allTrainers.filter(trainer => {
-                    const expertise = (trainer.expertise || []).map(e => e.toLowerCase());
-                    const specialty = (trainer.specialty || "").toLowerCase();
+                    // Expertise can be an array of strings or objects
+                    const expertise = (trainer.expertise || []).map(e => getText(e).toLowerCase());
+                    const specialty = getText(trainer.specialty).toLowerCase();
                     
                     const matchesSport = expertise.some(e => 
                         e.includes(sportId.toLowerCase()) || 

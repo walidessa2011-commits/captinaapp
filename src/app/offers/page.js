@@ -7,9 +7,8 @@ import { useApp } from "@/context/AppContext";
 import { useRouter } from 'next/navigation';
 
 export default function Offers() {
-    const { language, t, darkMode } = useApp();
+    const { language, t, darkMode, offers: allOffers, addToCart, setIsCartOpen } = useApp();
     const router = useRouter();
-    const allOffers = t('allOffersData') || [];
 
     return (
         <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-32 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -18,11 +17,11 @@ export default function Offers() {
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
             
             {/* Minimal Spacer */}
-            <div className="h-4 md:h-8"></div>
+            <div className="h-2 md:h-4"></div>
 
             <main className="max-w-7xl mx-auto px-6 relative z-10">
                 {/* Top Action Bar - Title & Back */}
-                <div className="mb-4 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
+                <div className="mb-2 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
                     <div className="flex items-center gap-1">
                         <button 
                             onClick={() => router.back()}
@@ -46,9 +45,9 @@ export default function Offers() {
                     </div>
                 </div>
  
-            <div className="container mx-auto px-6 mt-12 relative z-10 max-w-7xl">
-                {/* Offers Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="container mx-auto px-6 mt-6 relative z-10 max-w-7xl">
+                    {/* Offers Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {allOffers.map((offer, index) => (
                         <motion.div 
                             key={index}
@@ -56,7 +55,8 @@ export default function Offers() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: index * 0.1 }}
-                            className="group"
+                            className="group cursor-pointer"
+                            onClick={() => router.push(`/offers/${offer.id}`)}
                         >
                             <div className="relative bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium transition-all duration-500 hover:shadow-active hover:-translate-y-2 flex flex-col h-full active:scale-[0.98]">
                                 {/* Card Image Section */}
@@ -111,8 +111,29 @@ export default function Offers() {
 
                                     {/* CTA Button */}
                                     <div className="mt-8">
-                                        <button className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black py-4 rounded-2xl shadow-xl hover:bg-primary hover:text-white dark:hover:bg-primary transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2rem] group/btn">
-                                            {t('activateOffer') || 'Get Offer'}
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const pkg = { 
+                                                    id: offer.id, 
+                                                    name: offer.title, 
+                                                    price: offer.price || 0,
+                                                    image: offer.image
+                                                };
+                                                addToCart(pkg, { 
+                                                    type: 'subscription', 
+                                                    metadata: { 
+                                                        incomplete: true, 
+                                                        packageId: offer.id,
+                                                        offerId: offer.id,
+                                                        isTrial: offer.id === 'offer-trial-free' || offer.id === 'trial'
+                                                    } 
+                                                });
+                                                setIsCartOpen(true);
+                                            }}
+                                            className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black py-4 rounded-2xl shadow-xl hover:bg-primary hover:text-white dark:hover:bg-primary transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2rem] group/btn"
+                                        >
+                                            {language === 'ar' ? 'أضف إلى السلة' : 'Add to Cart'}
                                             <ArrowRight className={`w-4 h-4 transition-transform ${language === 'ar' ? 'rotate-180 group-hover/btn:-translate-x-1' : 'group-hover/btn:translate-x-1'}`} />
                                         </button>
                                     </div>
@@ -127,7 +148,7 @@ export default function Offers() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
-                    className="mt-20 p-1 rounded-[3rem] bg-gradient-to-br from-primary via-primary/50 to-blue-500 shadow-2xl relative overflow-hidden"
+                    className="mt-10 p-1 rounded-[3rem] bg-gradient-to-br from-primary via-primary/50 to-blue-500 shadow-2xl relative overflow-hidden"
                 >
                     <div className="bg-white dark:bg-[#0a101f] rounded-[2.8rem] p-8 md:p-12 relative overflow-hidden">
                         {/* Abstract background for coupon */}

@@ -1,16 +1,34 @@
 "use client";
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Star, Users, Crown, ArrowRight, UserCheck } from 'lucide-react';
+import { Star, Users, Crown, ArrowRight, UserCheck, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
+import { trainersData } from "@/lib/trainersData";
 
 export default function TrainerCard({ trainer, idx }) {
-    const { language, darkMode } = useApp();
+    const { language, darkMode, favoriteTrainers, toggleFavoriteTrainer } = useApp();
     
+    const isFavorite = favoriteTrainers.includes(trainer.id);
+
+    const handleToggleFavorite = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFavoriteTrainer(trainer.id);
+    };
+    
+    // Helper: get display text from bilingual or plain string
+    const getText = (val) => {
+        if (typeof val === 'object' && val !== null) {
+            return val[language] || val['ar'] || val['en'] || '';
+        }
+        return val || '';
+    };
+
     // Process specialties/expertise
-    const expertise = trainer.expertise || [];
-    const specialties = trainer.specialty ? trainer.specialty.split('-').map(s => s.trim()) : [];
+    const expertise = (trainer.expertise || []).map(e => getText(e));
+    const specialtyText = getText(trainer.specialty);
+    const specialties = specialtyText ? specialtyText.split('-').map(s => s.trim()) : [];
     const allSkills = [...new Set([...expertise, ...specialties])];
 
     return (
@@ -25,18 +43,41 @@ export default function TrainerCard({ trainer, idx }) {
                 <div className="relative bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium transition-all duration-500 hover:shadow-active hover:-translate-y-2 flex flex-col h-full active:scale-[0.98]">
                     {/* Profile Media */}
                     <div className="relative aspect-[4/5] overflow-hidden m-1.5 rounded-[2.2rem]">
-                        {trainer.image ? (
-                            <img 
-                                src={trainer.image}
-                                alt={trainer.name}
-                                referrerPolicy="no-referrer"
-                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gray-100 dark:bg-white/5 flex items-center justify-center transition-transform duration-1000 group-hover:scale-110">
-                                <UserCheck className="w-12 h-12 text-gray-300" />
-                            </div>
-                        )}
+                        {(() => {
+                            // Find static data by ID or by matching name (AR/EN)
+                            const getStaticData = () => {
+                                if (trainersData[trainer.id]) return trainersData[trainer.id];
+                                
+                                // Search by name (handling both string and object names)
+                                return Object.values(trainersData).find(t => {
+                                    const trainerName = typeof trainer.name === 'object' ? trainer.name : { ar: trainer.name, en: trainer.name };
+                                    
+                                    const normalize = (name) => name?.replace(/كابتن|captain/gi, '').trim() || "";
+                                    
+                                    const dbAr = normalize(trainerName.ar);
+                                    const dbEn = normalize(trainerName.en);
+                                    const staticAr = normalize(t.name.ar);
+                                    const staticEn = normalize(t.name.en);
+
+                                    return (
+                                        (dbAr && staticAr && (staticAr.includes(dbAr) || dbAr.includes(staticAr))) ||
+                                        (dbEn && staticEn && (staticEn.toLowerCase().includes(dbEn.toLowerCase()) || dbEn.toLowerCase().includes(staticEn.toLowerCase())))
+                                    );
+                                });
+                            };
+
+                            const staticData = getStaticData();
+                            const imgSrc = trainer.image || staticData?.profileImage;
+
+                            return (
+                                <img 
+                                    src={imgSrc || "/trainers/default_trainer.png"}
+                                    alt={getText(trainer.name)}
+                                    referrerPolicy="no-referrer"
+                                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                                />
+                            );
+                        })()}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
                     
                         {/* Top Icons */}
@@ -45,17 +86,27 @@ export default function TrainerCard({ trainer, idx }) {
                                 <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
                                 <span>{trainer.rating || "5.0"}</span>
                             </div>
-                            {(trainer.premium || trainer.verified) && (
-                                <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-[0_4px_15px_rgba(255,0,0,0.4)]">
-                                    <Crown className="w-4 h-4 text-white" />
-                                </div>
-                            )}
-                        </div>
 
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={handleToggleFavorite}
+                                    className={`w-8 h-8 rounded-xl backdrop-blur-md flex items-center justify-center border transition-all active:scale-90 ${isFavorite ? 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-500/30' : 'bg-white/20 border-white/30 text-white hover:bg-white/40'}`}
+                                >
+                                    <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+                                </button>
+                                
+                                {(trainer.premium || trainer.verified) && (
+                                    <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-[0_4px_15px_rgba(255,0,0,0.4)] border border-primary/50">
+                                        <Crown className="w-4 h-4 text-white" />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+ 
                         {/* Name & Specialty Over Image */}
                         <div className="absolute bottom-6 start-6 end-6">
                             <h3 className="text-lg font-black text-white tracking-tight leading-tight group-hover:text-primary transition-colors mb-1 truncate">
-                                {trainer.name}
+                                {getText(trainer.name)}
                             </h3>
                             <div className="flex items-center gap-2">
                                 <div className="h-1 w-4 bg-primary rounded-full"></div>

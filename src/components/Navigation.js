@@ -13,7 +13,7 @@ export default function Navigation() {
         { name: t('packages'), href: '/packages' },
         { name: t('trainers'), href: '/trainers' },
         { name: t('store'), href: '/store' },
-        { name: t('booking.title'), href: '/booking' },
+        { name: t('library'), href: '/library' },
         { name: t('contactUs'), href: '/contact' },
     ];
 

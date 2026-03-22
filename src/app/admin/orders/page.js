@@ -11,27 +11,37 @@ import {
     User,
     Package,
     Truck,
-    Eye
+    Eye,
+    X,
+    Phone,
+    Mail,
+    MapPin,
+    Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import Pagination from '../components/Pagination';
 
 export default function AdminOrders() {
     const { language, setAlert } = useApp();
     const [orders, setOrders] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // Changed from isLoading to loading
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+    const [selectedOrder, setSelectedOrder] = useState(null); // New state for selected order
+    const [showDetailsModal, setShowDetailsModal] = useState(false); // New state for modal visibility
 
     const fetchOrders = async () => {
-        setIsLoading(true);
+        setLoading(true); // Changed from setIsLoading to setLoading
         try {
             const ordersSnap = await getDocs(collection(db, "orders"));
             setOrders(ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         } catch (error) {
             console.error("Error fetching orders:", error);
         } finally {
-            setIsLoading(false);
+            setLoading(false); // Changed from setIsLoading to setLoading
         }
     };
 
@@ -56,10 +66,45 @@ export default function AdminOrders() {
         });
     };
 
-    const handleUpdateStatus = async (orderId, newStatus) => {
+    const handleUpdateStatus = async (orderId, newStatus, orderData) => {
         try {
-            await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-            setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+            const statusTextMap = {
+                processing: { ar: 'قيد المعالجة', en: 'Processing' },
+                shipping: { ar: 'قيد الشحن والتوصيل', en: 'Shipping & Delivery' },
+                delivered: { ar: 'تم التوصيل بنجاح', en: 'Delivered Successfully' },
+                cancelled: { ar: 'تم إلغاء الطلب', en: 'Order Cancelled' }
+            };
+
+            const statusText = language === 'ar' ? statusTextMap[newStatus].ar : statusTextMap[newStatus].en;
+
+            await updateDoc(doc(db, "orders", orderId), { 
+                status: newStatus,
+                statusText: statusText
+            });
+
+            // Create Notification for the user
+            if (orderData.userId) {
+                await addDoc(collection(db, "notifications"), {
+                    userId: orderData.userId,
+                    title: language === 'ar' ? 'تحديث حالة الطلب' : 'Order Status Update',
+                    message: language === 'ar' 
+                        ? `تم تحديث حالة طلبك #${orderId.slice(-6)} إلى: ${statusText}` 
+                        : `Your order #${orderId.slice(-6)} status has been updated to: ${statusText}`,
+                    type: 'alert',
+                    read: false,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus, statusText } : o));
+            
+            if (setAlert) {
+                setAlert({
+                    title: language === 'ar' ? 'تم التحديث' : 'Updated',
+                    message: language === 'ar' ? 'تم تحديث حالة الطلب وإرسال إشعار للعميل.' : 'Order status updated and notification sent to customer.',
+                    type: 'success'
+                });
+            }
         } catch (error) {
             console.error("Error updating order status:", error);
             alert("Error updating order status");
@@ -70,6 +115,16 @@ export default function AdminOrders() {
         (order.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
         (order.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.userEmail || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+    const paginatedOrders = filteredOrders.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
     );
 
     return (
@@ -102,7 +157,7 @@ export default function AdminOrders() {
             </div>
 
             {/* List */}
-            {isLoading ? (
+            {loading ? ( // Changed from isLoading to loading
                 <div className="flex items-center justify-center p-20">
                     <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
@@ -121,7 +176,7 @@ export default function AdminOrders() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/10">
                                 <AnimatePresence>
-                                    {filteredOrders.length > 0 ? filteredOrders.map((order) => (
+                                    {paginatedOrders.length > 0 ? paginatedOrders.map((order) => (
                                         <motion.tr 
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
@@ -138,7 +193,9 @@ export default function AdminOrders() {
                                                         <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider block max-w-[120px] truncate" title={order.id}>#{order.id.slice(-6)}</span>
                                                         <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mt-1">
                                                             <Clock className="w-3.5 h-3.5" />
-                                                            {order.createdAt ? order.createdAt.toDate().toLocaleDateString() : 'N/A'}
+                                                            {order.createdAt && typeof order.createdAt.toDate === 'function' ? 
+                                                                order.createdAt.toDate().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US') : 
+                                                                (order.createdAt instanceof Date ? order.createdAt.toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US') : (order.createdAt || 'N/A'))}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -176,7 +233,7 @@ export default function AdminOrders() {
                                                     {/* Status Dropdown/Selector simplified into sequence buttons or direct select */}
                                                     <select 
                                                         value={order.status || 'processing'}
-                                                        onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                                                        onChange={(e) => handleUpdateStatus(order.id, e.target.value, order)}
                                                         className="text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/10 rounded-xl px-2 py-1.5 outline-none focus:border-rose-500 transition-colors opacity-0 group-hover:opacity-100"
                                                     >
                                                         <option value="processing" className="dark:bg-[#0f172a]">{language === 'ar' ? 'قيد المعالجة' : 'Processing'}</option>
@@ -188,6 +245,7 @@ export default function AdminOrders() {
                                                     {/* View items details */}
                                                     <button 
                                                         title={language === 'ar' ? 'عرض تفاصيل الطلب' : 'View Details'}
+                                                        onClick={() => { setSelectedOrder(order); setShowDetailsModal(true); }} // Modified onClick
                                                         className="p-1.5 bg-gray-100 dark:bg-white/10 text-gray-500 hover:text-primary dark:text-gray-400 rounded-lg transition-colors opacity-0 group-hover:opacity-100 ml-2"
                                                     >
                                                         <Eye className="w-4 h-4" />
@@ -208,6 +266,124 @@ export default function AdminOrders() {
                     </div>
                 </div>
             )}
+            
+            {totalPages > 1 && (
+                <div className="flex justify-center mt-6">
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+            )}
+
+            {/* Order Details Modal */}
+            <AnimatePresence>
+                {showDetailsModal && selectedOrder && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowDetailsModal(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                            className="bg-white dark:bg-[#1e293b] w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl relative z-10 border border-gray-100 dark:border-white/10"
+                        >
+                            <div className="p-8">
+                                <div className="flex justify-between items-center mb-8">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+                                            {language === 'ar' ? 'تفاصيل الطلب' : 'Order Details'}
+                                        </h2>
+                                        <p className="text-emerald-500 font-bold text-sm tracking-widest mt-1">#{selectedOrder.id.slice(-8).toUpperCase()}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => setShowDetailsModal(false)}
+                                        className="p-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-500 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white/40 transition-all"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Customer Info */}
+                                    <div className="space-y-6">
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-white/30">
+                                            {language === 'ar' ? 'بيانات العميل' : 'Customer Info'}
+                                        </h3>
+                                        <div className="p-5 rounded-3xl border bg-gray-50 border-gray-100 dark:bg-white/5 dark:border-white/5">
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-3">
+                                                    <User className="w-4 h-4 text-rose-500" /> {/* Changed text-primary to text-rose-500 for consistency */}
+                                                    <span className="font-bold text-gray-900 dark:text-white">{selectedOrder.userName}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-sm">
+                                                    <Phone className="w-4 h-4 text-emerald-500" />
+                                                    <span className="text-gray-600 dark:text-white/60">{selectedOrder.userPhone || selectedOrder.phone}</span>
+                                                </div>
+                                                <div className="flex items-start gap-3 text-sm">
+                                                    <MapPin className="w-4 h-4 text-rose-500" /> 
+                                                    <span className="text-gray-600 dark:text-white/60">
+                                                        {selectedOrder.deliveryInfo?.city || selectedOrder.city}, {selectedOrder.deliveryInfo?.address || selectedOrder.address}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Order Items */}
+                                    <div className="space-y-6">
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-white/30">
+                                            {language === 'ar' ? 'المنتجات' : 'Products'}
+                                        </h3>
+                                        <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {selectedOrder.itemsNames?.map((item, i) => (
+                                                <div key={i} className="p-4 rounded-2xl border flex items-center gap-4 bg-gray-50 border-gray-100 dark:bg-white/5 dark:border-white/5">
+                                                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center"> {/* Changed bg-primary/10 to bg-rose-500/10 for consistency */}
+                                                        <Package className="w-5 h-5 text-rose-500" /> {/* Changed text-primary to text-rose-500 for consistency */}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold truncate max-w-[150px] text-gray-900 dark:text-white">{item}</p>
+                                                        {selectedOrder.items && selectedOrder.items[i] && (
+                                                            <p className="text-[10px] text-gray-500 uppercase font-black">
+                                                                {selectedOrder.items[i].quantity} x {selectedOrder.items[i].price} {language === 'ar' ? 'ر.س' : 'SAR'}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Order Summary */}
+                                <div className="mt-10 p-6 rounded-3xl bg-emerald-50 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20">
+                                    <div className="flex justify-between items-center">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-black uppercase tracking-widest text-emerald-600/60 dark:text-emerald-400/60">
+                                                {language === 'ar' ? 'الإجمالي الكلي' : 'Grand Total'}
+                                            </p>
+                                            <p className="text-3xl font-black text-gray-900 dark:text-white">
+                                                {selectedOrder.totalPrice} {language === 'ar' ? 'ريال' : 'SAR'}
+                                            </p>
+                                        </div>
+                                        <div className={`px-5 py-2 rounded-2xl border font-black text-xs uppercase tracking-tighter ${
+                                            selectedOrder.paymentMethod === 'credit_card' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                        }`}>
+                                            {selectedOrder.paymentMethod === 'credit_card' ? (language === 'ar' ? 'بطاقة ائتمان' : 'Credit Card') : (language === 'ar' ? 'دفع عند الاستلام' : 'COD')}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

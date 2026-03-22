@@ -36,11 +36,11 @@ export default function StorePage() {
     return (
         <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-32 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Minimal Spacer */}
-            <div className="h-4 md:h-8"></div>
+            <div className="h-2 md:h-4"></div>
 
             <main className="max-w-7xl mx-auto px-6 relative z-10">
                 {/* Top Action Bar - Title & Back */}
-                <div className="mb-4 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
+                <div className="mb-2 p-1 rounded-full bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-between shadow-premium transition-all">
                     <div className="flex items-center gap-1">
                         <button 
                             onClick={() => router.push('/')}
@@ -83,14 +83,13 @@ export default function StorePage() {
                     </div>
                 </div>
 
-                {/* Categories */}
-                <div className="mt-8">
-                    <div className="flex items-center gap-2 mb-6 text-start">
+                <div className="mt-4">
+                    <div className="flex items-center gap-2 mb-2 text-start">
                         <Sparkles className="w-5 h-5 text-primary" />
                         <h2 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">{language === 'ar' ? 'التصنيفات' : 'Categories'}</h2>
                     </div>
                     
-                    <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                    <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
                         <button 
                             onClick={() => setActiveCategory("all")}
                             className={`flex items-center gap-3 px-6 py-3 rounded-2xl whitespace-nowrap transition-all duration-300 border font-black text-[10px] uppercase tracking-widest active:scale-95 ${activeCategory === 'all' ? 'bg-primary text-white border-primary shadow-xl shadow-primary/20 scale-105' : 'bg-white dark:bg-white/5 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-white/5 hover:border-primary/30'}`}
@@ -113,7 +112,7 @@ export default function StorePage() {
                 </div>
 
                 {/* Products Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4">
                     <AnimatePresence mode="popLayout">
                         {filteredProducts.map((product, idx) => (
                             <motion.div 
@@ -140,7 +139,7 @@ export default function StorePage() {
                                     <div className="px-5 pb-5 pt-2 flex flex-col flex-1 text-start">
                                         <div className="mb-4">
                                             <span className="text-[8px] font-black text-primary uppercase tracking-widest block mb-1">{product.category}</span>
-                                            <h3 className="text-xs md:text-sm font-black text-slate-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-primary transition-colors">
+                                            <h3 className="text-[10px] md:text-xs font-black text-slate-900 dark:text-white tracking-tight line-clamp-1 group-hover:text-primary transition-colors">
                                                 {product.name}
                                             </h3>
                                         </div>

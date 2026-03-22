@@ -15,7 +15,8 @@ import {
     Hash,
     Palette,
     Maximize,
-    Heart
+    Heart,
+    Languages
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
@@ -23,29 +24,48 @@ import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, serverTimestamp
 import ImageUpload from "../components/ImageUpload";
 import { Loader2 } from 'lucide-react';
 
+import Pagination from '../components/Pagination';
+
 export default function AdminProducts() {
     const { language, setAlert } = useApp();
     const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [formLang, setFormLang] = useState('ar'); // Language toggle for form inputs
     const [formData, setFormData] = useState({
-        name: '',
-        category: '',
+        name: { ar: '', en: '' },
+        category: { ar: '', en: '' },
         price: '0',
         stock: '0',
         image: '',
-        description: '',
+        description: { ar: '', en: '' },
         status: 'active',
         productCode: '',
-        sizes: '',
-        colors: '',
+        sizes: [],
+        colors: [],
         favoritesCount: '0'
     });
+
+    // Helper: get display text from bilingual or plain string
+    const getText = (val) => {
+        if (typeof val === 'object' && val !== null) {
+            return val[language] || val['ar'] || val['en'] || '';
+        }
+        return val || '';
+    };
+
+    // Helper: normalize to bilingual object
+    const normalizeText = (val) => {
+        if (typeof val === 'object' && val !== null) return { ar: val.ar || '', en: val.en || '' };
+        return { ar: val || '', en: val || '' };
+    };
 
     const fetchProducts = async () => {
         setIsLoading(true);
@@ -102,40 +122,41 @@ export default function AdminProducts() {
         if (product) {
             setEditingProduct(product);
             setFormData({
-                name: product.name || '',
-                category: product.category || '',
+                name: normalizeText(product.name),
+                category: normalizeText(product.category),
                 price: String(product.price || 0),
                 stock: String(product.stock || 0),
                 image: product.image || '',
-                description: product.description || '',
+                description: normalizeText(product.description),
                 status: product.status || 'active',
                 productCode: product.productCode || '',
-                sizes: product.sizes || '',
-                colors: product.colors || '',
+                sizes: Array.isArray(product.sizes) ? product.sizes : (product.sizes ? product.sizes.split(',').map(s => s.trim()) : []),
+                colors: Array.isArray(product.colors) ? product.colors : [],
                 favoritesCount: String(product.favoritesCount || 0)
             });
         } else {
             setEditingProduct(null);
             setFormData({
-                name: '',
-                category: '',
+                name: { ar: '', en: '' },
+                category: { ar: '', en: '' },
                 price: '0',
                 stock: '0',
                 image: '',
-                description: '',
+                description: { ar: '', en: '' },
                 status: 'active',
                 productCode: '',
-                sizes: '',
-                colors: '',
+                sizes: [],
+                colors: [],
                 favoritesCount: '0'
             });
         }
+        setFormLang('ar');
         setIsModalOpen(true);
     };
 
     const handleSave = async (e) => {
         e.preventDefault();
-        if (!formData.name.trim()) return;
+        if (!formData.name.ar.trim() && !formData.name.en.trim()) return;
 
         setIsSaving(true);
         try {
@@ -178,8 +199,39 @@ export default function AdminProducts() {
     };
 
     const filteredProducts = products.filter(product => 
-        (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-        (product.category || '').toLowerCase().includes(searchTerm.toLowerCase())
+        getText(product.name).toLowerCase().includes(searchTerm.toLowerCase()) || 
+        getText(product.category).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+    const paginatedProducts = filteredProducts.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Language Toggle Component
+    const LangToggle = () => (
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+            <button 
+                type="button"
+                onClick={() => setFormLang('ar')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${formLang === 'ar' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'text-gray-400 hover:text-blue-500'}`}
+            >
+                عربي
+            </button>
+            <button 
+                type="button"
+                onClick={() => setFormLang('en')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${formLang === 'en' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'text-gray-400 hover:text-blue-500'}`}
+            >
+                EN
+            </button>
+        </div>
     );
 
     return (
@@ -195,7 +247,6 @@ export default function AdminProducts() {
                         {language === 'ar' ? 'إضافة منتجات المتجر، التعديل على المخزون والسعر، وتحديد الحالة.' : 'Add store products, modify inventory and prices, and manage active status.'}
                     </p>
                 </div>
-                {/* Optional logic for adding products */}
                 <button 
                     onClick={() => handleOpenModal()}
                     className="flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-black rounded-2xl transition-colors shadow-lg shadow-blue-500/30 whitespace-nowrap"
@@ -238,90 +289,94 @@ export default function AdminProducts() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/10">
-                                <AnimatePresence>
-                                    {filteredProducts.length > 0 ? filteredProducts.map((product) => (
-                                        <motion.tr 
+                                <AnimatePresence mode="popLayout">
+                                    {paginatedProducts.length > 0 ? paginatedProducts.map((product) => (
+                                         <motion.tr 
+                                             layout
+                                             initial={{ opacity: 0 }}
+                                             animate={{ opacity: 1 }}
+                                             exit={{ opacity: 0 }}
+                                             key={product.id} 
+                                             className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
+                                         >
+                                             <td className="px-6 py-4">
+                                                 <div className="flex items-center gap-4">
+                                                     <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/5 flex items-center justify-center shrink-0">
+                                                         {product.image ? (
+                                                             <img src={product.image} alt={getText(product.name)} className="w-full h-full object-cover" />
+                                                         ) : (
+                                                             <ImageIcon className="w-6 h-6 text-gray-400" />
+                                                         )}
+                                                     </div>
+                                                     <div className="flex flex-col">
+                                                         <span className="text-sm font-black text-slate-900 dark:text-white capitalize line-clamp-1">{getText(product.name) || 'Unnamed Product'}</span>
+                                                         <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-lg w-fit mt-1">
+                                                             <Tag className="w-3 h-3" />
+                                                             {getText(product.category) || 'General'}
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                             </td>
+                                             <td className="px-6 py-4">
+                                                 <span className="text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                                     {product.price || 0} {language === 'ar' ? 'ر.س' : 'SAR'}
+                                                 </span>
+                                             </td>
+                                             <td className="px-6 py-4">
+                                                 <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${product.stock > 10 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : product.stock > 0 ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'}`}>
+                                                     {product.stock || 0} {language === 'ar' ? 'وحدة' : 'Units'}
+                                                 </span>
+                                             </td>
+                                             <td className="px-6 py-4">
+                                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${product.status === 'active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400'}`}>
+                                                     {product.status === 'active' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                                                     {product.status === 'active' ? (language === 'ar' ? 'متاح' : 'Available') : (language === 'ar' ? 'مخفي' : 'Hidden')}
+                                                 </span>
+                                             </td>
+                                             <td className="px-6 py-4 text-end">
+                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                     <button 
+                                                         onClick={() => handleToggleStatus(product.id, product.status)}
+                                                         title={language === 'ar' ? 'تغيير العرض' : 'Toggle Visibility'}
+                                                         className="p-2 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-blue-500/10 hover:text-blue-500 rounded-xl transition-colors"
+                                                     >
+                                                         {product.status === 'active' ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                                                     </button>
+                                                     <button 
+                                                         onClick={() => handleOpenModal(product)}
+                                                         title={language === 'ar' ? 'تعديل المنتج' : 'Edit Product'}
+                                                         className="p-2 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-blue-500/10 hover:text-blue-500 rounded-xl transition-colors"
+                                                     >
+                                                         <Edit className="w-4 h-4" />
+                                                     </button>
+                                                     <button 
+                                                         onClick={() => handleDelete(product.id, getText(product.name))}
+                                                         title={language === 'ar' ? 'حذف المنتج' : 'Delete Product'}
+                                                         className="p-2 bg-gray-100 dark:bg-white/10 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors"
+                                                     >
+                                                         <Trash2 className="w-4 h-4" />
+                                                     </button>
+                                                 </div>
+                                             </td>
+                                         </motion.tr>
+                                     )) : (
+                                         <motion.tr 
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            key={product.id} 
-                                            className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
-                                        >
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/5 flex items-center justify-center shrink-0">
-                                                        {product.image ? (
-                                                            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <ImageIcon className="w-6 h-6 text-gray-400" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-sm font-black text-slate-900 dark:text-white capitalize line-clamp-1">{product.name || 'Unnamed Product'}</span>
-                                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-lg w-fit mt-1">
-                                                            <Tag className="w-3 h-3" />
-                                                            {product.category || 'General'}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-sm font-black text-slate-900 dark:text-white whitespace-nowrap">
-                                                    {product.price || 0} {language === 'ar' ? 'ر.س' : 'SAR'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${product.stock > 10 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : product.stock > 0 ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'}`}>
-                                                    {product.stock || 0} {language === 'ar' ? 'وحدة' : 'Units'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${product.status === 'active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400'}`}>
-                                                    {product.status === 'active' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                                                    {product.status === 'active' ? (language === 'ar' ? 'متاح' : 'Available') : (language === 'ar' ? 'مخفي' : 'Hidden')}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-end">
-                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {/* Toggle Display */}
-                                                    <button 
-                                                        onClick={() => handleToggleStatus(product.id, product.status)}
-                                                        title={language === 'ar' ? 'تغيير العرض' : 'Toggle Visibility'}
-                                                        className="p-2 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-blue-500/10 hover:text-blue-500 rounded-xl transition-colors"
-                                                    >
-                                                        {product.status === 'active' ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                                                    </button>
-                                                    
-                                                    {/* Edit */}
-                                                    <button 
-                                                        onClick={() => handleOpenModal(product)}
-                                                        title={language === 'ar' ? 'تعديل المنتج' : 'Edit Product'}
-                                                        className="p-2 bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-blue-500/10 hover:text-blue-500 rounded-xl transition-colors"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-
-                                                    {/* Delete */}
-                                                    <button 
-                                                        onClick={() => handleDelete(product.id, product.name)}
-                                                        title={language === 'ar' ? 'حذف المنتج' : 'Delete Product'}
-                                                        className="p-2 bg-gray-100 dark:bg-white/10 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </motion.tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan="5" className="px-6 py-12 text-center text-gray-500 font-bold">
-                                                {language === 'ar' ? 'لم يتم العثور على منتجات تطابق بحثك.' : 'No products found matching your search.'}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </AnimatePresence>
-                            </tbody>
+                                         >
+                                             <td colSpan="5" className="px-6 py-12 text-center text-gray-500 font-bold">
+                                                 {language === 'ar' ? 'لم يتم العثور على منتجات تطابق بحثك.' : 'No products found matching your search.'}
+                                             </td>
+                                         </motion.tr>
+                                     )}
+                                 </AnimatePresence>
+                             </tbody>
                         </table>
+                        <Pagination 
+                             currentPage={currentPage}
+                             totalPages={totalPages}
+                             onPageChange={setCurrentPage}
+                         />
                     </div>
                 </div>
             )}
@@ -343,16 +398,27 @@ export default function AdminProducts() {
                             className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden relative z-10 border border-gray-100 dark:border-white/10"
                         >
                             <div className="p-8 max-h-[90vh] overflow-y-auto">
-                                <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center justify-between mb-6">
                                     <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">
                                         {editingProduct ? (language === 'ar' ? 'تعديل المنتج' : 'Edit Product') : (language === 'ar' ? 'إضافة منتج جديد' : 'Add New Product')}
                                     </h2>
-                                    <button 
-                                        onClick={() => setIsModalOpen(false)}
-                                        className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
-                                    >
-                                        <XCircle className="w-6 h-6 text-gray-400" />
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <LangToggle />
+                                        <button 
+                                            onClick={() => setIsModalOpen(false)}
+                                            className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                                        >
+                                            <XCircle className="w-6 h-6 text-gray-400" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Current language indicator */}
+                                <div className="flex items-center gap-2 mb-6 px-3 py-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
+                                    <Languages className="w-4 h-4 text-blue-500" />
+                                    <span className="text-xs font-black text-blue-600 dark:text-blue-400">
+                                        {formLang === 'ar' ? 'أنت تكتب الآن باللغة العربية' : 'You are now typing in English'}
+                                    </span>
                                 </div>
 
                                 <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -367,14 +433,15 @@ export default function AdminProducts() {
                                         
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
-                                                {language === 'ar' ? 'وصف المنتج' : 'Product Description'}
+                                                {formLang === 'ar' ? 'وصف المنتج (عربي)' : 'Product Description (English)'}
                                             </label>
                                             <textarea 
-                                                value={formData.description}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                value={formData.description[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, description: { ...prev.description, [formLang]: e.target.value } }))}
                                                 rows={4}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
                                                 className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all resize-none"
-                                                placeholder={language === 'ar' ? 'اكتب تفاصيل المنتج هنا...' : 'Enter product details here...'}
+                                                placeholder={formLang === 'ar' ? 'اكتب تفاصيل المنتج هنا...' : 'Enter product details here...'}
                                             />
                                         </div>
                                     </div>
@@ -382,28 +449,30 @@ export default function AdminProducts() {
                                     <div className="space-y-4">
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
-                                                {language === 'ar' ? 'اسم المنتج' : 'Product Name'}
+                                                {formLang === 'ar' ? 'اسم المنتج (عربي)' : 'Product Name (English)'}
                                             </label>
                                             <input 
                                                 type="text"
-                                                required
-                                                value={formData.name}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                                                required={formLang === 'ar'}
+                                                value={formData.name[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, name: { ...prev.name, [formLang]: e.target.value } }))}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
                                                 className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all"
-                                                placeholder={language === 'ar' ? 'مثال: قفازات ملاكمة' : 'e.g. Boxing Gloves'}
+                                                placeholder={formLang === 'ar' ? 'مثال: قفازات ملاكمة' : 'e.g. Boxing Gloves'}
                                             />
                                         </div>
 
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
-                                                {language === 'ar' ? 'التصنيف' : 'Category'}
+                                                {formLang === 'ar' ? 'التصنيف (عربي)' : 'Category (English)'}
                                             </label>
                                             <input 
                                                 type="text"
-                                                value={formData.category}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                                                value={formData.category[formLang]}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, category: { ...prev.category, [formLang]: e.target.value } }))}
+                                                dir={formLang === 'ar' ? 'rtl' : 'ltr'}
                                                 className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all"
-                                                placeholder={language === 'ar' ? 'مثال: معدات رياضية' : 'e.g. Equipment'}
+                                                placeholder={formLang === 'ar' ? 'مثال: معدات رياضية' : 'e.g. Equipment'}
                                             />
                                         </div>
 
@@ -462,32 +531,124 @@ export default function AdminProducts() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 gap-4">
                                             <div className="space-y-2">
-                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1">
-                                                    <Maximize className="w-3 h-3" />
-                                                    {language === 'ar' ? 'المقاسات' : 'Sizes'}
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1 flex items-center justify-between">
+                                                    <div className="flex items-center gap-1">
+                                                        <Maximize className="w-3 h-3" />
+                                                        {language === 'ar' ? 'المقاسات المتاحة' : 'Available Sizes'}
+                                                    </div>
+                                                    <span className="text-[10px] lowercase text-gray-400 font-bold italic">
+                                                        {language === 'ar' ? '(اضغط Enter للإضافة)' : '(Press Enter to add)'}
+                                                    </span>
                                                 </label>
-                                                <input 
-                                                    type="text"
-                                                    value={formData.sizes}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, sizes: e.target.value }))}
-                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all"
-                                                    placeholder={language === 'ar' ? 'S, M, L' : 'S, M, L'}
-                                                />
+                                                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl focus-within:border-blue-500 transition-all min-h-[52px]">
+                                                    {formData.sizes.map((size, index) => (
+                                                        <span key={index} className="flex items-center gap-1 px-2 py-1 bg-blue-500 text-white text-[10px] font-black rounded-lg uppercase tracking-wider">
+                                                            {size}
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => setFormData(p => ({ ...p, sizes: p.sizes.filter((_, i) => i !== index) }))}
+                                                                className="hover:text-rose-200 transition-colors"
+                                                            >
+                                                                <XCircle className="w-3 h-3" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                    <input 
+                                                        type="text"
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                const val = e.target.value.trim();
+                                                                if (val && !formData.sizes.includes(val)) {
+                                                                    setFormData(p => ({ ...p, sizes: [...p.sizes, val] }));
+                                                                    e.target.value = '';
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="bg-transparent border-none outline-none flex-1 text-sm font-bold dark:text-white min-w-[60px]"
+                                                        placeholder={formData.sizes.length === 0 ? (language === 'ar' ? 'أضف مقاس...' : 'Add size...') : ''}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
+
+                                            <div className="space-y-4">
                                                 <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1">
                                                     <Palette className="w-3 h-3" />
-                                                    {language === 'ar' ? 'الألوان' : 'Colors'}
+                                                    {language === 'ar' ? 'الألوان المتاحة' : 'Available Colors'}
                                                 </label>
-                                                <input 
-                                                    type="text"
-                                                    value={formData.colors}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, colors: e.target.value }))}
-                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all"
-                                                    placeholder={language === 'ar' ? 'أحمر، أزرق' : 'Red, Blue'}
-                                                />
+                                                
+                                                <div className="flex flex-wrap gap-3">
+                                                    {formData.colors.map((color, index) => (
+                                                        <div key={index} className="flex flex-col items-center gap-1 group relative">
+                                                            <div className="w-10 h-10 rounded-xl border-2 border-white/10 shadow-lg p-1 group-hover:scale-105 transition-transform">
+                                                                <div className="w-full h-full rounded-lg" style={{ backgroundColor: color.code }} />
+                                                            </div>
+                                                            <span className="text-[8px] font-black text-gray-400 truncate w-12 text-center uppercase tracking-widest">
+                                                                {language === 'ar' ? color.name_ar : color.name_en}
+                                                            </span>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => setFormData(p => ({ ...p, colors: p.colors.filter((_, i) => i !== index) }))}
+                                                                className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <XCircle className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-3xl border border-gray-100 dark:border-white/10 space-y-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{language === 'ar' ? 'اللون' : 'Color'}</label>
+                                                            <input 
+                                                                type="color" 
+                                                                id="colorPicker"
+                                                                defaultValue="#3B82F6"
+                                                                className="w-10 h-10 rounded-xl bg-transparent border-none cursor-pointer outline-none block"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 space-y-2">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{language === 'ar' ? 'اسم اللون (عربي)' : 'Name (AR)'}</label>
+                                                            <input 
+                                                                type="text" 
+                                                                id="colorNameAr"
+                                                                className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all"
+                                                                placeholder={language === 'ar' ? 'مثال: أحمر' : 'Red'}
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 space-y-2">
+                                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{language === 'ar' ? 'الاسم (EN)' : 'Name (EN)'}</label>
+                                                            <input 
+                                                                type="text" 
+                                                                id="colorNameEn"
+                                                                className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-2 px-3 text-sm font-bold dark:text-white outline-none focus:border-blue-500 transition-all"
+                                                                placeholder="Red"
+                                                            />
+                                                        </div>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const code = document.getElementById('colorPicker').value;
+                                                                const name_ar = document.getElementById('colorNameAr').value.trim();
+                                                                const name_en = document.getElementById('colorNameEn').value.trim();
+                                                                if (name_ar || name_en) {
+                                                                    setFormData(p => ({ 
+                                                                        ...p, 
+                                                                        colors: [...p.colors, { code, name_ar: name_ar || name_en, name_en: name_en || name_ar }] 
+                                                                    }));
+                                                                    document.getElementById('colorNameAr').value = '';
+                                                                    document.getElementById('colorNameEn').value = '';
+                                                                }
+                                                            }}
+                                                            className="self-end mb-0.5 p-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20"
+                                                        >
+                                                            <Plus className="w-5 h-5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex gap-3 pt-6">
