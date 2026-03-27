@@ -8,25 +8,18 @@ import {
     Activity, Target, Users
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
+import { matchesSport } from "@/lib/utils";
 import Link from 'next/link';
 import TrainerCard from '@/components/TrainerCard';
 import { useRouter } from 'next/navigation';
 
 export default function Trainers() {
-    const { t, language, darkMode } = useApp();
+    const { t, language, darkMode, getText } = useApp();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [activeCategory, setActiveCategory] = useState("all");
     const [trainers, setTrainers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    const getText = (field) => {
-        if (!field) return '';
-        if (typeof field === 'object') {
-            return field[language] || field['ar'] || field['en'] || '';
-        }
-        return field;
-    };
 
     useEffect(() => {
         const fetchTrainers = async () => {
@@ -55,39 +48,15 @@ export default function Trainers() {
     ];
 
     const filteredTrainers = trainers.filter(trainer => {
-        const getName = (n) => {
-            if (!n) return "";
-            if (typeof n === 'string') return n;
-            return n[language] || n.ar || n.en || "";
-        };
-
-        const getSpecialty = (s) => {
-            if (!s) return "";
-            if (typeof s === 'string') return s;
-            return s[language] || s.ar || s.en || "";
-        };
-
-        const name = getName(trainer.name);
+        const name = getText(trainer.name);
         const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
         
-        const selectedSport = activeCategory === "all" ? null : sportsList.find(s => s.id === activeCategory);
-        const selectedSportName = selectedSport?.name || "";
+        if (activeCategory === "all") return matchesSearch;
+
+        const selectedSport = sports.find(s => s.id === activeCategory);
+        const matchesSportFilter = selectedSport ? matchesSport(trainer, selectedSport) : false;
         
-        // Check specialty string
-        const specialtyString = getSpecialty(trainer.specialty);
-        const specialties = specialtyString.split('-').map(s => s.trim().toLowerCase());
-        
-        // Check expertise array
-        const expertise = (trainer.expertise || []).map(e => {
-            if (typeof e === 'string') return e.toLowerCase();
-            return (e[language] || e.ar || e.en || "").toLowerCase();
-        });
-        
-        const matchesSport = activeCategory === "all" || 
-                           specialties.some(s => s.includes(selectedSportName.toLowerCase())) ||
-                           expertise.some(e => e.includes(selectedSportName.toLowerCase()));
-        
-        return matchesSearch && matchesSport;
+        return matchesSearch && matchesSportFilter;
     });
 
     return (

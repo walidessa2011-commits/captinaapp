@@ -19,7 +19,7 @@ import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import Link from 'next/link';
 
 export default function AdminDashboard() {
-    const { language } = useApp();
+    const { language, getText } = useApp();
     const [stats, setStats] = useState({
         users: 0,
         gyms: 0,
@@ -189,7 +189,7 @@ export default function AdminDashboard() {
                                         )}
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-slate-900 dark:text-white">{user.fullName || (language === 'ar' ? 'بدون اسم' : 'Unnamed')}</span>
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">{getText(user.fullName) || (language === 'ar' ? 'بدون اسم' : 'Unnamed')}</span>
                                         <span className="text-[10px] text-gray-500">{user.email}</span>
                                     </div>
                                 </div>
@@ -233,8 +233,8 @@ export default function AdminDashboard() {
                                         <Activity className="w-5 h-5 text-purple-500" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[150px]">{booking.trainerName || booking.gymName || 'Session'}</span>
-                                        <span className="text-[10px] text-gray-500">{booking.sportType || 'General'}</span>
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[150px]">{getText(booking.trainerName || booking.gymName) || 'Session'}</span>
+                                        <span className="text-[10px] text-gray-500">{getText(booking.sportType) || 'General'}</span>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">

@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 
 export default function AdminNavbar({ setIsSidebarOpen }) {
-    const { user, userData, language, setLanguage, darkMode, setDarkMode } = useApp();
+    const { user, userData, language, setLanguage, darkMode, setDarkMode, getLoc } = useApp();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     return (
@@ -86,7 +86,7 @@ export default function AdminNavbar({ setIsSidebarOpen }) {
                         </div>
                         <div className="hidden lg:flex flex-col text-start mr-1">
                             <span className="text-xs font-black text-slate-900 dark:text-white leading-none mb-0.5 tracking-tight truncate max-w-[120px]">
-                                {userData?.fullName || user?.displayName || 'Admin Console'}
+                                {getLoc(userData?.fullName) || user?.displayName || 'Admin Console'}
                             </span>
                             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest opacity-60">
                                 System Root

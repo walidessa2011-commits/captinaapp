@@ -1716,13 +1716,13 @@ export const translations = {
         gymsPageTitle: "Captina Certified Gyms",
         gymsPage: {
             gymsData: [
-            { id: 1, name: "Al-Monsiya Branch", type: 'Internal', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
-            { id: 2, name: "Al-Yasmin Branch", type: 'Internal', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
-            { id: 3, name: "Gold's Gym", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
-            { id: 4, name: "Fitness First", type: 'Partner', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
-            { id: 5, name: "Titan Academy", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800" },
-            { id: 6, name: "The Cage", type: 'Partner', rating: '4.7', image: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=800" }
-        ],
+                { id: 1, name: "Al-Monsiya Branch", type: 'Internal', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
+                { id: 2, name: "Al-Yasmin Branch", type: 'Internal', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
+                { id: 3, name: "Gold's Gym", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800" },
+                { id: 4, name: "Fitness First", type: 'Partner', rating: '4.8', image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=800" },
+                { id: 5, name: "Titan Academy", type: 'Partner', rating: '4.9', image: "https://images.unsplash.com/photo-1574673139641-87b1d3d609a7?q=80&w=800" },
+                { id: 6, name: "The Cage", type: 'Partner', rating: '4.7', image: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=800" }
+            ],
             subTitle: "Wide coverage across Riyadh",
             breadcrumbs: {
                 home: "Home",
@@ -1772,7 +1772,7 @@ export function AppProvider({ children }) {
     const [goals, setGoals] = useState([]);
     const [activeSubscription, setActiveSubscription] = useState(null);
     const [loadingSubscription, setLoadingSubscription] = useState(true);
-    
+
     const [user, loadingAuth] = useAuthState(auth);
     const [userData, setUserData] = useState(null);
     const [favorites, setFavorites] = useState([]);
@@ -1783,13 +1783,129 @@ export function AppProvider({ children }) {
     const [inquiries, setInquiries] = useState([]);
     const [loadingInquiries, setLoadingInquiries] = useState(true);
 
-    const getValue = (obj, field, lang) => {
-        if (!obj) return '';
-        if (obj[field] && typeof obj[field] === 'object' && !Array.isArray(obj[field])) {
-            return obj[field][lang] || obj[field]['ar'] || obj[field]['en'] || '';
+    const getValue = useCallback((obj, field, lang) => {
+        if (!obj || !field) return '';
+        const languageCode = lang || language || 'ar'; // Default to ar
+
+        // CASE 1: Field is actually an object itself { ar: '...', en: '...' }
+        const fieldVal = obj[field];
+        if (fieldVal && typeof fieldVal === 'object' && !Array.isArray(fieldVal)) {
+            const res = fieldVal[languageCode] || fieldVal['ar'] || fieldVal['en'] || Object.values(fieldVal)[0] || '';
+            return typeof res === 'string' ? res : String(res || '');
         }
-        return obj[`${field}_${lang}`] || obj[field] || '';
-    };
+
+        // CASE 2: Flat structure with field_ar, field_en
+        const field_ar = obj[`${field}_ar`];
+        const field_en = obj[`${field}_en`];
+
+        if (languageCode === 'ar' && field_ar) return String(field_ar);
+        if (languageCode === 'en' && field_en) return String(field_en);
+
+        // CASE 3: Fallback to string if available, ensuring no nested objects are returned
+        return typeof fieldVal === 'string' ? fieldVal : (fieldVal ? String(fieldVal) : '');
+    }, [language]);
+
+    // COOKIE HELPERS
+    const setCookie = useCallback((name, value, days = 7) => {
+        if (typeof document === 'undefined') return;
+        const expires = new Date(Date.now() + days * 864e5).toUTCString();
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+    }, []);
+
+    const deleteCookie = useCallback((name) => {
+        if (typeof document === 'undefined') return;
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    }, []);
+
+    const getLoc = useCallback((val) => {
+        if (!val) return '';
+        if (typeof val === 'object' && !Array.isArray(val)) {
+            // Priority: current language, then ar, then en, then first available key
+            const result = val[language] || val.ar || val.en || Object.values(val)[0] || '';
+            return typeof result === 'string' ? result : String(result || '');
+        } else if (Array.isArray(val)) {
+            return ''; // Prevent array rendering as child
+        }
+        return String(val || '');
+    }, [language]);
+
+    // Alias for getLoc to support components using getText
+    const getText = getLoc;
+
+    const getAr = useCallback((val) => {
+        if (!val) return '';
+        return typeof val === 'object' && !Array.isArray(val) ? (val.ar || val.en || '') : String(val || '');
+    }, []);
+
+    const getEn = useCallback((val) => {
+        if (!val) return '';
+        return typeof val === 'object' && !Array.isArray(val) ? (val.en || val.ar || '') : String(val || '');
+    }, []);
+
+    const getSubscriptionDetails = useCallback((sub) => {
+        if (!sub) return null;
+        
+        const status = sub.status?.toLowerCase() || 'pending';
+        const plan = sub.planLabel || '';
+        
+        let statusLabel = language === 'ar' ? 'قيد المراجعة' : 'Pending';
+        let statusColor = 'bg-yellow-500';
+        let textColor = 'text-black';
+        let barColor = 'bg-yellow-500';
+        
+        if (status === 'active' || status === 'confirmed') {
+            statusLabel = language === 'ar' ? 'نشطة' : 'Active';
+            statusColor = 'bg-emerald-500';
+            textColor = 'text-white';
+            barColor = 'bg-emerald-500';
+        } else if (status === 'paused' || status === 'stopped') {
+            statusLabel = language === 'ar' ? 'متوقفة' : 'Paused';
+            statusColor = 'bg-orange-500';
+            textColor = 'text-white';
+            barColor = 'bg-orange-500';
+        } else if (status === 'expired' || status === 'rejected' || status === 'cancelled') {
+            statusLabel = status === 'expired' ? (language === 'ar' ? 'منتهية' : 'Expired') :
+                          status === 'rejected' ? (language === 'ar' ? 'مرفوضة' : 'Rejected') :
+                          (language === 'ar' ? 'ملغاة' : 'Cancelled');
+            statusColor = 'bg-rose-500';
+            textColor = 'text-white';
+            barColor = 'bg-rose-500';
+        }
+
+        // Session logic: 1mo=12, 3mo=36, 6mo=72, 1yr=180
+        let totalSessions = sub.totalSessions || 0;
+        if (!totalSessions && status !== 'pending') {
+            const currentPlan = typeof plan === 'string' ? plan : (plan[language] || plan['ar'] || plan['en'] || '');
+            const planClean = currentPlan.toLowerCase();
+            if (planClean.includes('3') && (planClean.includes('شهر') || planClean.includes('month'))) {
+                totalSessions = 36;
+            } else if (planClean.includes('6') && (planClean.includes('شهر') || planClean.includes('month'))) {
+                totalSessions = 72;
+            } else if ((planClean.includes('12') || planClean.includes('سنة') || planClean.includes('year'))) {
+                totalSessions = 180;
+            } else if (planClean.includes('شهر') || planClean.includes('month')) {
+                totalSessions = 12;
+            } else {
+                totalSessions = 12; // Default
+            }
+        }
+        
+        const displaySessions = status === 'pending' ? 0 : totalSessions;
+        const consumedSessions = sub.consumedSessions || 0;
+        const remainingSessions = Math.max(0, displaySessions - consumedSessions);
+
+        return {
+            statusLabel,
+            statusColor,
+            textColor,
+            barColor,
+            totalSessions: displaySessions,
+            consumedSessions,
+            remainingSessions,
+            isActive: status === 'active' || status === 'confirmed',
+            isPending: status === 'pending'
+        };
+    }, [language]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -1839,8 +1955,15 @@ export function AppProvider({ children }) {
                     setFavoriteSports([]);
                 }
             }
+            
+            // Clear auth cookies on logout
+            deleteCookie('uid');
+            deleteCookie('role');
             return;
         }
+
+        // Set UID cookie immediately on auth state change
+        setCookie('uid', user.uid);
 
         const docRef = doc(db, "users", user.uid);
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -1864,9 +1987,16 @@ export function AppProvider({ children }) {
                 if (data.favoriteSports) {
                     setFavoriteSports(data.favoriteSports);
                 }
+
+                // Sync Role Cookie
+                if (data.role) {
+                    setCookie('role', data.role);
+                } else {
+                    deleteCookie('role'); // Ensure it's clean if role missing
+                }
             } else {
-                const defaultData = { 
-                    fullName: user.displayName || '', 
+                const defaultData = {
+                    fullName: user.displayName || '',
                     photoURL: user.photoURL || '',
                     email: user.email || '',
                     calories: 0,
@@ -1890,10 +2020,10 @@ export function AppProvider({ children }) {
 
     const toggleFavorite = useCallback(async (productId) => {
         const isFav = favorites.includes(productId);
-        const newFavorites = isFav 
+        const newFavorites = isFav
             ? favorites.filter(id => id !== productId)
             : [...favorites, productId];
-        
+
         setFavorites(newFavorites);
 
         if (user) {
@@ -1914,10 +2044,10 @@ export function AppProvider({ children }) {
 
     const toggleFavoriteTrainer = useCallback(async (trainerId) => {
         const isFav = favoriteTrainers.includes(trainerId);
-        const newFavorites = isFav 
+        const newFavorites = isFav
             ? favoriteTrainers.filter(id => id !== trainerId)
             : [...favoriteTrainers, trainerId];
-        
+
         setFavoriteTrainers(newFavorites);
 
         if (user) {
@@ -1938,10 +2068,10 @@ export function AppProvider({ children }) {
 
     const toggleFavoriteSport = useCallback(async (sportId) => {
         const isFav = favoriteSports.includes(sportId);
-        const newFavorites = isFav 
+        const newFavorites = isFav
             ? favoriteSports.filter(id => id !== sportId)
             : [...favoriteSports, sportId];
-        
+
         setFavoriteSports(newFavorites);
 
         if (user) {
@@ -1998,11 +2128,24 @@ export function AppProvider({ children }) {
                 } else {
                     setGyms(querySnapshot.docs.map(doc => {
                         const d = doc.data();
+                        
+                        // Handle sports properly as an array
+                        let sportsArray = [];
+                        if (Array.isArray(d.sports)) {
+                            sportsArray = d.sports;
+                        } else if (d.sports && typeof d.sports === 'object') {
+                            sportsArray = d.sports[language] || d.sports['ar'] || d.sports['en'] || [];
+                        } else {
+                            sportsArray = (language === 'ar' ? (d.sports_ar || []) : (d.sports_en || [])) || d.sports_ar || d.sports_en || [];
+                        }
+
                         return {
-                            id: doc.id, ...d,
+                            id: doc.id, 
+                            ...d,
                             name: getValue(d, 'name', language),
-                            location: getValue(d, 'location', language),
-                            sports: getValue(d, 'sports', language)
+                            location: getValue(d, 'location', language) || getValue(d, 'address', language),
+                            sports: sportsArray,
+                            image: getValue(d, 'image', language)
                         };
                     }));
                 }
@@ -2014,63 +2157,63 @@ export function AppProvider({ children }) {
             try {
                 if (querySnapshot.empty) {
                     const initialPackages = [
-                        { 
-                            order: 1, 
-                            name_ar: "باقة شهر", 
-                            name_en: "1 Month Pro", 
-                            price: "1200", 
-                            currency_ar: "ر.س", 
-                            currency_en: "SAR", 
-                            desc_ar: "باقة تدريب شخصي لمدة شهر كامل - الأنسب للمبتدئين", 
-                            desc_en: "One month personal training - Best for beginners", 
-                            features_ar: ["12 حصة تدريبية", "برنامج غذائي مخصص", "متابعة يومية عبر الواتساب", "تقييم لياقة شهري"], 
-                            features_en: ["12 Training Sessions", "Custom Nutrition Plan", "Daily WhatsApp Follow-up", "Monthly Fitness Assessment"], 
+                        {
+                            order: 1,
+                            name_ar: "باقة شهر",
+                            name_en: "1 Month Pro",
+                            price: "1200",
+                            currency_ar: "ر.س",
+                            currency_en: "SAR",
+                            desc_ar: "باقة تدريب شخصي لمدة شهر كامل - الأنسب للمبتدئين",
+                            desc_en: "One month personal training - Best for beginners",
+                            features_ar: ["12 حصة تدريبية", "برنامج غذائي مخصص", "متابعة يومية عبر الواتساب", "تقييم لياقة شهري"],
+                            features_en: ["12 Training Sessions", "Custom Nutrition Plan", "Daily WhatsApp Follow-up", "Monthly Fitness Assessment"],
                             duration_ar: "1 شهر - 3 حصص/أسبوع",
                             duration_en: "1 Month - 3 Sessions/Week",
-                            badge_ar: "الأكثر طلباً", 
-                            badge_en: "Most Popular", 
-                            featured: true, 
-                            months: 1, 
+                            badge_ar: "الأكثر طلباً",
+                            badge_en: "Most Popular",
+                            featured: true,
+                            months: 1,
                             sport: "general",
                             icon: "dumbbell"
                         },
-                        { 
-                            order: 2, 
-                            name_ar: "باقة 3 أشهر", 
-                            name_en: "3 Months Elite", 
-                            price: "3000", 
+                        {
+                            order: 2,
+                            name_ar: "باقة 3 أشهر",
+                            name_en: "3 Months Elite",
+                            price: "3000",
                             oldPrice: "3600",
                             discount: 17,
-                            currency_ar: "ر.س", 
-                            currency_en: "SAR", 
-                            desc_ar: "اللياقة الأكثر شعبية - نتائج مضمونة مع تدريب مكثف", 
-                            desc_en: "Most popular fitness - Guaranteed results with intensive training", 
-                            features_ar: ["36 حصة تدريبية", "برنامج غذائي متكامل", "متابعة يومية", "تقييم لياقة دوري", "خصم 17%"], 
-                            features_en: ["36 Training Sessions", "Full Nutrition Program", "Daily Follow-up", "Periodic Assessment", "17% Discount"], 
+                            currency_ar: "ر.س",
+                            currency_en: "SAR",
+                            desc_ar: "اللياقة الأكثر شعبية - نتائج مضمونة مع تدريب مكثف",
+                            desc_en: "Most popular fitness - Guaranteed results with intensive training",
+                            features_ar: ["36 حصة تدريبية", "برنامج غذائي متكامل", "متابعة يومية", "تقييم لياقة دوري", "خصم 17%"],
+                            features_en: ["36 Training Sessions", "Full Nutrition Program", "Daily Follow-up", "Periodic Assessment", "17% Discount"],
                             duration_ar: "3 أشهر - 3 حصص/أسبوع",
                             duration_en: "3 Months - 3 Sessions/Week",
-                            featured: false, 
-                            months: 3, 
+                            featured: false,
+                            months: 3,
                             sport: "general",
                             icon: "dumbbell"
                         },
-                        { 
-                            order: 3, 
-                            name_ar: "باقة 6 أشهر", 
-                            name_en: "6 Months Ultimate", 
-                            price: "5400", 
+                        {
+                            order: 3,
+                            name_ar: "باقة 6 أشهر",
+                            name_en: "6 Months Ultimate",
+                            price: "5400",
                             oldPrice: "7200",
                             discount: 25,
-                            currency_ar: "ر.س", 
-                            currency_en: "SAR", 
-                            desc_ar: "تحول كامل في اللياقة - أفضل قيمة مع أكبر خصم", 
-                            desc_en: "Complete fitness transformation - Best value with biggest discount", 
-                            features_ar: ["72 حصة تدريبية", "برنامج غذائي متكامل", "متابعة يومية", "تقييم لياقة شهري", "أولوية اختيار المدرب", "خصم 25%"], 
-                            features_en: ["72 Training Sessions", "Full Nutrition Program", "Daily Follow-up", "Monthly Assessment", "Priority Trainer Choice", "25% Discount"], 
+                            currency_ar: "ر.س",
+                            currency_en: "SAR",
+                            desc_ar: "تحول كامل في اللياقة - أفضل قيمة مع أكبر خصم",
+                            desc_en: "Complete fitness transformation - Best value with biggest discount",
+                            features_ar: ["72 حصة تدريبية", "برنامج غذائي متكامل", "متابعة يومية", "تقييم لياقة شهري", "أولوية اختيار المدرب", "خصم 25%"],
+                            features_en: ["72 Training Sessions", "Full Nutrition Program", "Daily Follow-up", "Monthly Assessment", "Priority Trainer Choice", "25% Discount"],
                             duration_ar: "6 أشهر - 3 حصص/أسبوع",
                             duration_en: "6 Months - 3 Sessions/Week",
-                            featured: false, 
-                            months: 6, 
+                            featured: false,
+                            months: 6,
                             sport: "general",
                             icon: "dumbbell"
                         }
@@ -2080,15 +2223,17 @@ export function AppProvider({ children }) {
                     setPackages(querySnapshot.docs.map(doc => {
                         const d = doc.data();
                         return {
-                            id: doc.id, ...d,
+                            id: doc.id,
+                            ...d,
                             name: getValue(d, 'name', language),
                             price: language === 'ar' ? d.price : (d.price_en || d.price),
                             currency: getValue(d, 'currency', language),
+                            duration: getValue(d, 'duration', language),
                             description: getValue(d, 'description', language) || getValue(d, 'desc', language),
                             features: getValue(d, 'features', language),
                             badge: getValue(d, 'badge', language)
                         };
-                    }));
+                    }).sort((a, b) => (a.months || 0) - (b.months || 0)));
                 }
             } catch (error) { console.error("Error packages:", error); } finally { setLoadingPackages(false); }
         });
@@ -2107,11 +2252,12 @@ export function AppProvider({ children }) {
                 } else {
                     setTrainers(querySnapshot.docs.map(doc => {
                         const d = doc.data();
-                        return { 
-                            id: doc.id, ...d, 
-                            name: getValue(d, 'name', language), 
-                            specialty: getValue(d, 'specialty', language), 
-                            exp: getValue(d, 'exp', language) 
+                        return {
+                            id: doc.id, ...d,
+                            name: getValue(d, 'name', language),
+                            specialty: getValue(d, 'specialty', language),
+                            exp: getValue(d, 'exp', language),
+                            image: getValue(d, 'image', language)
                         };
                     }));
                 }
@@ -2137,17 +2283,17 @@ export function AppProvider({ children }) {
                     setSports(querySnapshot.docs.map(doc => {
                         const s = doc.data();
                         const sportId = s.slug || doc.id;
-                        return { 
+                        return {
                             id: sportId,
-                            ...s, 
-                            name: getValue(s, 'name', language), 
-                            image: getSportImage(sportId, s.image),
-                            description: getValue(s, 'description', language) || getValue(s, 'desc', language), 
-                            stats: { 
-                                level: getValue(s, 'level', language) || (language === 'ar' ? 'كافة المستويات' : 'All Levels'), 
-                                duration: getValue(s, 'duration', language) || (language === 'ar' ? '60 دقيقة' : '60 Min'), 
-                                intensity: getValue(s, 'intensity', language) || (language === 'ar' ? 'عالية' : 'High') 
-                            } 
+                            ...s,
+                            name: getValue(s, 'name', language),
+                            image: getSportImage(sportId, s.image || s.heroBanner || s.heroImg, language),
+                            description: getValue(s, 'description', language) || getValue(s, 'desc', language),
+                            stats: {
+                                level: getValue(s, 'level', language) || (language === 'ar' ? 'كافة المستويات' : 'All Levels'),
+                                duration: getValue(s, 'duration', language) || (language === 'ar' ? '60 دقيقة' : '60 Min'),
+                                intensity: getValue(s, 'intensity', language) || (language === 'ar' ? 'عالية' : 'High')
+                            }
                         };
                     }));
                 }
@@ -2159,78 +2305,79 @@ export function AppProvider({ children }) {
             try {
                 if (querySnapshot.empty) {
                     const initialOffers = [
-                        { 
-                            title_ar: "خصم 50% للإشتراك السنوي", 
-                            title_en: "50% Off Yearly Subscription", 
-                            sub_ar: "لفترة محدودة جداً", 
-                            sub_en: "For a very limited time", 
-                            badge_ar: "عرض خاص", 
-                            badge_en: "Special Offer", 
-                            expiry_ar: "ينتهي في 30 مارس", 
-                            expiry_en: "Ends March 30", 
-                            desc_ar: "احصل على اشتراك كامل لمدة سنة بنصف السعر. يشمل جميع الصالات والمدربين والدعم الغذائي.", 
+                        {
+                            title_ar: "خصم 50% للإشتراك السنوي",
+                            title_en: "50% Off Yearly Subscription",
+                            sub_ar: "لفترة محدودة جداً",
+                            sub_en: "For a very limited time",
+                            badge_ar: "عرض خاص",
+                            badge_en: "Special Offer",
+                            expiry_ar: "ينتهي في 30 مارس",
+                            expiry_en: "Ends March 30",
+                            desc_ar: "احصل على اشتراك كامل لمدة سنة بنصف السعر. يشمل جميع الصالات والمدربين والدعم الغذائي.",
                             desc_en: "Get a full year subscription at half price. Includes all gyms, trainers, and nutritional support.",
                             image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000"
                         },
-                        { 
-                            title_ar: "حصة تجريبية مجانية", 
-                            title_en: "Free Trial Session", 
-                            sub_ar: "مع نخبة من مدربينا", 
-                            sub_en: "With our elite trainers", 
-                            badge_ar: "مجاناً", 
-                            badge_en: "Free", 
-                            expiry_ar: "متاح دائماً للأعضاء الجدد", 
-                            expiry_en: "Always available for new members", 
-                            desc_ar: "جرب خدماتنا قبل الاشتراك. احصل على تقييم بدني كامل وحصة تدريبية لمدة 60 دقيقة مجاناً.", 
+                        {
+                            title_ar: "حصة تجريبية مجانية",
+                            title_en: "Free Trial Session",
+                            sub_ar: "مع نخبة من مدربينا",
+                            sub_en: "With our elite trainers",
+                            badge_ar: "مجاناً",
+                            badge_en: "Free",
+                            expiry_ar: "متاح دائماً للأعضاء الجدد",
+                            expiry_en: "Always available for new members",
+                            desc_ar: "جرب خدماتنا قبل الاشتراك. احصل على تقييم بدني كامل وحصة تدريبية لمدة 60 دقيقة مجاناً.",
                             desc_en: "Try our services before subscribing. Get a full physical assessment and a 60-minute training session for free.",
                             image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1000"
                         },
-                        { 
-                            title_ar: "باقة التغذية المتكاملة", 
-                            title_en: "Integrated Nutrition Package", 
-                            sub_ar: "خصم يصل إلى 30%", 
-                            sub_en: "Discount up to 30%", 
-                            badge_ar: "الأكثر طلباً", 
-                            badge_en: "Most Popular", 
-                            expiry_ar: "لفترة محدودة", 
-                            expiry_en: "Limited time", 
-                            desc_ar: "صمم خطتك الغذائية مع خبراء التغذية لدينا بخصم حصري. الوجبات والمكملات والنصائح في مكان واحد.", 
+                        {
+                            title_ar: "باقة التغذية المتكاملة",
+                            title_en: "Integrated Nutrition Package",
+                            sub_ar: "خصم يصل إلى 30%",
+                            sub_en: "Discount up to 30%",
+                            badge_ar: "الأكثر طلباً",
+                            badge_en: "Most Popular",
+                            expiry_ar: "لفترة محدودة",
+                            expiry_en: "Limited time",
+                            desc_ar: "صمم خطتك الغذائية مع خبراء التغذية لدينا بخصم حصري. الوجبات والمكملات والنصائح في مكان واحد.",
                             desc_en: "Design your nutritional plan with our experts at an exclusive discount. Meals, supplements, and tips in one place.",
                             image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=1000"
                         },
-                        { 
-                            title_ar: "شحن مجاني للمتجر", 
-                            title_en: "Free Store Shipping", 
-                            sub_ar: "على جميع الطلبات فوق 200 ريال", 
-                            sub_en: "On all orders above 200 SAR", 
-                            badge_ar: "حصري", 
-                            badge_en: "Exclusive", 
-                            expiry_ar: "ينتهي قريباً", 
-                            expiry_en: "Ending soon", 
-                            desc_ar: "لا تقلق بشأن تكاليف التوصيل. تسوق أفضل الأجهزة والمكملات والملابس الرياضية واحصل على توصيل لمنزلك مجاناً.", 
+                        {
+                            title_ar: "شحن مجاني للمتجر",
+                            title_en: "Free Store Shipping",
+                            sub_ar: "على جميع الطلبات فوق 200 ريال",
+                            sub_en: "On all orders above 200 SAR",
+                            badge_ar: "حصري",
+                            badge_en: "Exclusive",
+                            expiry_ar: "ينتهي قريباً",
+                            expiry_en: "Ending soon",
+                            desc_ar: "لا تقلق بشأن تكاليف التوصيل. تسوق أفضل الأجهزة والمكملات والملابس الرياضية واحصل على توصيل لمنزلك مجاناً.",
                             desc_en: "Don't worry about delivery costs. Shop for the best equipment, supplements, and sportswear with free delivery.",
                             image: "https://images.unsplash.com/photo-1541534741688-6078c64ec4a9?q=80&w=1000"
                         }
                     ];
                     for (const offer of initialOffers) await addDoc(collection(db, "offers"), offer);
-                    setOffers(initialOffers.map((o, i) => ({ 
-                        ...o, id: `seed-${i}`, 
-                        title: language === 'ar' ? o.title_ar : o.title_en, 
-                        subtitle: language === 'ar' ? o.sub_ar : o.sub_en, 
-                        badge: language === 'ar' ? o.badge_ar : o.badge_en, 
-                        expiry: language === 'ar' ? o.expiry_ar : o.expiry_en, 
-                        description: language === 'ar' ? o.desc_ar : o.desc_en 
+                    setOffers(initialOffers.map((o, i) => ({
+                        ...o, id: `seed-${i}`,
+                        title: language === 'ar' ? o.title_ar : o.title_en,
+                        subtitle: language === 'ar' ? o.sub_ar : o.sub_en,
+                        badge: language === 'ar' ? o.badge_ar : o.badge_en,
+                        expiry: language === 'ar' ? o.expiry_ar : o.expiry_en,
+                        description: language === 'ar' ? o.desc_ar : o.desc_en
                     })));
                 } else {
                     setOffers(querySnapshot.docs.map(doc => {
                         const o = doc.data();
-                        return { 
-                            id: doc.id, ...o, 
-                            title: getValue(o, 'title', language), 
-                            subtitle: getValue(o, 'sub', language) || getValue(o, 'subtitle', language) || (o.discountAmount ? `${o.discountAmount}%` : ''), 
-                            badge: getValue(o, 'badge', language) || (o.discountAmount ? (language === 'ar' ? 'عرض خاص' : 'Special Offer') : ''), 
-                            expiry: getValue(o, 'expiry', language) || (o.validUntil ? (language === 'ar' ? `صالح حتى ${new Date(o.validUntil).toLocaleDateString('ar-SA')}` : `Valid until ${new Date(o.validUntil).toLocaleDateString()}`) : ''), 
-                            description: getValue(o, 'description', language) || getValue(o, 'desc', language)
+                        return {
+                            id: doc.id, ...o,
+                            title: getValue(o, 'title', language),
+                            subtitle: getValue(o, 'sub', language) || getValue(o, 'subtitle', language) || (o.discountAmount ? `${o.discountAmount}%` : ''),
+                            badge: getValue(o, 'badge', language) || (o.discountAmount ? (language === 'ar' ? 'عرض خاص' : 'Special Offer') : ''),
+                            expiry: getValue(o, 'expiry', language) || (o.validUntil ? (language === 'ar' ? `صالح حتى ${new Date(o.validUntil).toLocaleDateString('ar-SA')}` : `Valid until ${new Date(o.validUntil).toLocaleDateString()}`) : ''),
+                            description: getValue(o, 'description', language) || getValue(o, 'desc', language),
+                            image: getValue(o, 'image', language)
                         };
                     }));
                 }
@@ -2242,13 +2389,13 @@ export function AppProvider({ children }) {
             try {
                 if (querySnapshot.empty) {
                     const initialProducts = [
-                        { 
-                            name_ar: "بدلة تايكوندو بريميوم", 
-                            name_en: "Premium Taekwondo Uniform", 
-                            category_ar: "ملابس", 
-                            category_en: "Clothing", 
-                            price: 250, 
-                            rating: 5.0, 
+                        {
+                            name_ar: "بدلة تايكوندو بريميوم",
+                            name_en: "Premium Taekwondo Uniform",
+                            category_ar: "ملابس",
+                            category_en: "Clothing",
+                            price: 250,
+                            rating: 5.0,
                             image: "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=400",
                             description_ar: "بدلة تايكوندو معتمدة، خفيفة الوزن ومتينة، مثالية للبطولات والتدريب اليومي.",
                             description_en: "Certified Taekwondo uniform, lightweight and durable, perfect for tournaments and daily training.",
@@ -2258,13 +2405,13 @@ export function AppProvider({ children }) {
                                 { name_ar: "أسود", name_en: "Black", code: "#000000" }
                             ]
                         },
-                        { 
-                            name_ar: "بدلة كاراتيه احترافية", 
-                            name_en: "Professional Karate Gi", 
-                            category_ar: "ملابس", 
-                            category_en: "Clothing", 
-                            price: 280, 
-                            rating: 4.9, 
+                        {
+                            name_ar: "بدلة كاراتيه احترافية",
+                            name_en: "Professional Karate Gi",
+                            category_ar: "ملابس",
+                            category_en: "Clothing",
+                            price: 280,
+                            rating: 4.9,
                             image: "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=400",
                             description_ar: "بدلة كاراتيه قطنية 100% توفر صوتاً قوياً عند الحركة وراحة تامة.",
                             description_en: "100% cotton Karate Gi providing a crisp snap and complete comfort.",
@@ -2274,13 +2421,13 @@ export function AppProvider({ children }) {
                                 { name_ar: "أسود", name_en: "Black", code: "#000000" }
                             ]
                         },
-                        { 
-                            name_ar: "قفازات النخبة للملاكمة", 
-                            name_en: "Elite Boxing Gloves", 
-                            category_ar: "أدوات", 
-                            category_en: "Tools", 
-                            price: 399, 
-                            rating: 5.0, 
+                        {
+                            name_ar: "قفازات النخبة للملاكمة",
+                            name_en: "Elite Boxing Gloves",
+                            category_ar: "أدوات",
+                            category_en: "Tools",
+                            price: 399,
+                            rating: 5.0,
                             image: "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=400",
                             description_ar: "قفازات ملاكمة احترافية مصنوعة من الجلد الفاخر مع حماية مضاعفة للمعصم.",
                             description_en: "Professional boxing gloves made of premium leather with double wrist protection.",
@@ -2292,13 +2439,13 @@ export function AppProvider({ children }) {
                                 { name_ar: "ذهبي", name_en: "Gold", code: "#D4AF37" }
                             ]
                         },
-                        { 
-                            name_ar: "تيشيرت فتوة برو", 
-                            name_en: "Futwa Pro T-Shirt", 
-                            category_ar: "ملابس", 
-                            category_en: "Clothing", 
-                            price: 150, 
-                            rating: 4.9, 
+                        {
+                            name_ar: "تيشيرت فتوة برو",
+                            name_en: "Futwa Pro T-Shirt",
+                            category_ar: "ملابس",
+                            category_en: "Clothing",
+                            price: 150,
+                            rating: 4.9,
                             image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400",
                             description_ar: "تيشيرت رياضي عالي الجودة مصمم لراحة مثالية أثناء التمارين الشاقة.",
                             description_en: "High-quality sports T-shirt designed for optimal comfort during intense workouts.",
@@ -2309,13 +2456,13 @@ export function AppProvider({ children }) {
                                 { name_ar: "كحلي", name_en: "Navy", code: "#000080" }
                             ]
                         },
-                        { 
-                            name_ar: "حزام التدريب الجلدي", 
-                            name_en: "Leather Training Belt", 
-                            category_ar: "أدوات", 
-                            category_en: "Tools", 
-                            price: 299, 
-                            rating: 4.8, 
+                        {
+                            name_ar: "حزام التدريب الجلدي",
+                            name_en: "Leather Training Belt",
+                            category_ar: "أدوات",
+                            category_en: "Tools",
+                            price: 299,
+                            rating: 4.8,
                             image: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400",
                             description_ar: "حزام جلدي طبيعي يوفر دعماً استثنائياً لأسفل الظهر أثناء رفع الأثقال.",
                             description_en: "Natural leather belt providing exceptional lower back support during heavy lifting.",
@@ -2327,10 +2474,10 @@ export function AppProvider({ children }) {
                         }
                     ];
                     for (const prod of initialProducts) await addDoc(collection(db, "products"), prod);
-                    setProducts(initialProducts.map((p, i) => ({ 
-                        ...p, 
-                        id: `seed-${i}`, 
-                        name: language === 'ar' ? p.name_ar : p.name_en, 
+                    setProducts(initialProducts.map((p, i) => ({
+                        ...p,
+                        id: `seed-${i}`,
+                        name: language === 'ar' ? p.name_ar : p.name_en,
                         category: language === 'ar' ? p.category_ar : p.category_en,
                         description: language === 'ar' ? p.description_ar : p.description_en
                     })));
@@ -2347,15 +2494,16 @@ export function AppProvider({ children }) {
                 } else {
                     setProducts(querySnapshot.docs.map(doc => {
                         const p = doc.data();
-                        return { 
-                            id: doc.id, 
-                            ...p, 
-                            name: language === 'ar' ? p.name_ar : p.name_en, 
-                            category: language === 'ar' ? p.category_ar : p.category_en,
-                            description: language === 'ar' ? p.description_ar : p.description_en
+                        return {
+                            id: doc.id,
+                            ...p,
+                            name: getValue(p, 'name', language),
+                            category: getValue(p, 'category', language),
+                            description: getValue(p, 'description', language) || getValue(p, 'desc', language),
+                            image: getValue(p, 'image', language)
                         };
                     }));
-                    
+
                     const cats = [
                         { id: 'clothing', name_ar: 'ملابس', name_en: 'Clothing', img: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=150' },
                         { id: 'shoes', name_ar: 'أحذية', name_en: 'Shoes', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=150' },
@@ -2389,45 +2537,45 @@ export function AppProvider({ children }) {
         });
         unsubs.push(fetchTasks());
 
-    const fetchGoals = () => onSnapshot(collection(db, "goals"), async (snapshot) => {
-        try {
-            if (snapshot.empty) {
-                const initialGoals = [
-                    { percentage: 85, text_ar: 'أداء مذهل!', text_en: 'Amazing performance!', sub_ar: 'أكملت 12 حصة من أصل 14.', sub_en: '12 out of 14 sessions done.', sport: 'general' },
-                    { percentage: 40, text_ar: 'واصل التقدم!', text_en: 'Keep going!', sub_ar: 'أكملت 2 من أصل 5 تمارين ملاكمة.', sub_en: '2 out of 5 boxing sessions done.', sport: 'boxing' },
-                    { percentage: 65, text_ar: 'احسنت التحرك!', text_en: 'Great movement!', sub_ar: 'أتقنت 3 ركلات جديدة في التايكوندو.', sub_en: 'Mastered 3 new Taekwondo kicks.', sport: 'taekwondo' },
-                    { percentage: 20, text_ar: 'البداية قوية!', text_en: 'Strong start!', sub_ar: 'أول أسبوع لك في الكاراتيه اكتمل.', sub_en: 'Your first Karate week complete.', sport: 'karate' }
-                ];
-                for (const g of initialGoals) await addDoc(collection(db, "goals"), g);
-            } else {
-                setGoals(snapshot.docs.map(doc => {
-                    const g = doc.data();
-                    return { id: doc.id, ...g, text: getValue(g, 'text', language), sub: getValue(g, 'sub', language) };
-                }));
-            }
-        } catch (e) { console.error("Error goals:", e); } finally { setLoadingGoals(false); }
-    });
-    unsubs.push(fetchGoals());
-
-    const fetchActiveSubscription = () => {
-        if (!user) return;
-        const subsRef = collection(db, "subscriptions");
-        const q = query(
-            subsRef, 
-            where("userId", "==", user.uid),
-            orderBy("createdAt", "desc"),
-            limit(1)
-        );
-        return onSnapshot(q, (snapshot) => {
-            if (!snapshot.empty) {
-                setActiveSubscription({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
-            } else {
-                setActiveSubscription(null);
-            }
-            setLoadingSubscription(false);
+        const fetchGoals = () => onSnapshot(collection(db, "goals"), async (snapshot) => {
+            try {
+                if (snapshot.empty) {
+                    const initialGoals = [
+                        { percentage: 85, text_ar: 'أداء مذهل!', text_en: 'Amazing performance!', sub_ar: 'أكملت 12 حصة من أصل 14.', sub_en: '12 out of 14 sessions done.', sport: 'general' },
+                        { percentage: 40, text_ar: 'واصل التقدم!', text_en: 'Keep going!', sub_ar: 'أكملت 2 من أصل 5 تمارين ملاكمة.', sub_en: '2 out of 5 boxing sessions done.', sport: 'boxing' },
+                        { percentage: 65, text_ar: 'احسنت التحرك!', text_en: 'Great movement!', sub_ar: 'أتقنت 3 ركلات جديدة في التايكوندو.', sub_en: 'Mastered 3 new Taekwondo kicks.', sport: 'taekwondo' },
+                        { percentage: 20, text_ar: 'البداية قوية!', text_en: 'Strong start!', sub_ar: 'أول أسبوع لك في الكاراتيه اكتمل.', sub_en: 'Your first Karate week complete.', sport: 'karate' }
+                    ];
+                    for (const g of initialGoals) await addDoc(collection(db, "goals"), g);
+                } else {
+                    setGoals(snapshot.docs.map(doc => {
+                        const g = doc.data();
+                        return { id: doc.id, ...g, text: getValue(g, 'text', language), sub: getValue(g, 'sub', language) };
+                    }));
+                }
+            } catch (e) { console.error("Error goals:", e); } finally { setLoadingGoals(false); }
         });
-    };
-    if (user) unsubs.push(fetchActiveSubscription());
+        unsubs.push(fetchGoals());
+
+        const fetchActiveSubscription = () => {
+            if (!user) return;
+            const subsRef = collection(db, "subscriptions");
+            const q = query(
+                subsRef,
+                where("userId", "==", user.uid),
+                orderBy("createdAt", "desc"),
+                limit(1)
+            );
+            return onSnapshot(q, (snapshot) => {
+                if (!snapshot.empty) {
+                    setActiveSubscription({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
+                } else {
+                    setActiveSubscription(null);
+                }
+                setLoadingSubscription(false);
+            });
+        };
+        if (user) unsubs.push(fetchActiveSubscription());
 
         return () => {
             unsubs.forEach(unsub => {
@@ -2459,6 +2607,10 @@ export function AppProvider({ children }) {
     }, []);
 
     useEffect(() => {
+        if (!userData || userData.role !== 'admin') {
+            setLoadingInquiries(false);
+            return;
+        }
         const q = query(collection(db, "contact_inquiries"), orderBy("createdAt", "desc"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -2468,7 +2620,7 @@ export function AppProvider({ children }) {
             setLoadingInquiries(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [userData]);
 
     const updateContactInfo = async (newInfo) => {
         try {
@@ -2607,10 +2759,10 @@ export function AppProvider({ children }) {
 
     const addToCart = useCallback((product, selection = {}) => {
         const isSubscription = selection.type === 'subscription';
-        const cartId = selection.cartId || (isSubscription 
-            ? `sub-${product.id}` 
+        const cartId = selection.cartId || (isSubscription
+            ? `sub-${product.id}`
             : `${product.id}-${selection.size || 'default'}-${selection.color?.code || 'default'}`);
-            
+
         const existingItemIndex = cart.findIndex(item => item.cartId === cartId);
 
         if (existingItemIndex > -1 && !isSubscription) {
@@ -2630,7 +2782,7 @@ export function AppProvider({ children }) {
                 type: selection.type || 'product',
                 metadata: selection.metadata || {}
             };
-            
+
             if (existingItemIndex > -1) {
                 // If subscription exists, overwrite it (don't duplicate)
                 const newCart = [...cart];
@@ -2692,7 +2844,7 @@ export function AppProvider({ children }) {
 
         const keys = key.split('.');
         let value = translations[language];
-        
+
         for (const k of keys) {
             if (value && typeof value === 'object' && k in value) {
                 value = value[k];
@@ -2713,12 +2865,12 @@ export function AppProvider({ children }) {
     }, [language, gyms, packages, trainers, sports, offers, products, categories, tasks, goals]);
 
     const appContextValue = useMemo(() => ({
-        language, 
-        setLanguage: changeLanguage, 
-        toggleLanguage, 
-        darkMode, 
-        setDarkMode: changeDarkMode, 
-        toggleDarkMode, 
+        language,
+        setLanguage: changeLanguage,
+        toggleLanguage,
+        darkMode,
+        setDarkMode: changeDarkMode,
+        toggleDarkMode,
         t,
         gyms,
         packages,
@@ -2768,7 +2920,13 @@ export function AppProvider({ children }) {
         updateContactInfo,
         submitInquiry,
         deleteInquiry,
-        updateInquiryStatus
+        updateInquiryStatus,
+        getValue,
+        getLoc,
+        getText,
+        getAr,
+        getEn,
+        getSubscriptionDetails
     }), [
         language, changeLanguage, toggleLanguage, darkMode, changeDarkMode, toggleDarkMode, t,
         gyms, packages, trainers, sports, offers, products, categories, tasks, goals,
@@ -2779,7 +2937,8 @@ export function AppProvider({ children }) {
         favoriteTrainers, toggleFavoriteTrainer, favoriteSports, toggleFavoriteSport,
         loadingAuth, isCartOpen, setIsCartOpen, initializeAppData, updateCartItemMetadata,
         activeSubscription, loadingSubscription, contactInfo, inquiries, loadingInquiries,
-        updateContactInfo, submitInquiry, deleteInquiry, updateInquiryStatus
+        updateContactInfo, submitInquiry, deleteInquiry, updateInquiryStatus,
+        getValue, getLoc, getText, getAr, getEn, getSubscriptionDetails
     ]);
 
     return (

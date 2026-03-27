@@ -6,7 +6,7 @@ import {
     Calendar, Clock, User, CheckCircle2, Info, 
     ArrowRight, ArrowLeft, ShieldCheck, Dumbbell,
     Map as MapIcon, Crosshair, Receipt, Lightbulb,
-    HandMetal, Star
+    HandMetal, Star, Sparkles, Settings
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useApp } from "@/context/AppContext";
@@ -16,9 +16,11 @@ import {
     signInWithPhoneNumber, 
     linkWithPhoneNumber 
 } from "firebase/auth";
-import { collection, addDoc, serverTimestamp, getDocs, query, where, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, where, updateDoc, doc } from "firebase/firestore";
 import Link from 'next/link';
+import { X, Save, Phone, Briefcase, Navigation2, Heart } from 'lucide-react';
 import HorizontalDatePicker from '@/components/HorizontalDatePicker';
+import { matchesSport, normalizeArabic } from '@/lib/utils';
 
 function BookingContent() {
     const { t, language, darkMode, setAlert } = useApp();
@@ -72,6 +74,17 @@ function BookingContent() {
     const [confirmationResult, setConfirmationResult] = useState(null);
     const [verifyingPhone, setVerifyingPhone] = useState(false);
     const [tempPhone, setTempPhone] = useState('');
+    const [isAddingAddress, setIsAddingAddress] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [addressFormData, setAddressFormData] = useState({
+        title: '',
+        type: 'home',
+        details: '',
+        location: null
+    });
+
+    const [isEditingContact, setIsEditingContact] = useState(false);
 
     // Fetch User Profile and Trial Status
     useEffect(() => {
@@ -101,6 +114,17 @@ function BookingContent() {
         };
         fetchUserProfile();
     }, [auth.currentUser, isTrial]);
+
+    // Auto-select trainer from URL
+    useEffect(() => {
+        const trainerIdFromUrl = searchParams.get('trainer');
+        if (trainerIdFromUrl && dbTrainers.length > 0 && !bookingData.trainer) {
+            const trainer = dbTrainers.find(t => t.id === trainerIdFromUrl);
+            if (trainer) {
+                setBookingData(prev => ({ ...prev, trainer }));
+            }
+        }
+    }, [dbTrainers, searchParams, bookingData.trainer]);
 
     // Fetch trainer's schedule for the selected date and implement travel buffer
     useEffect(() => {
@@ -201,10 +225,10 @@ function BookingContent() {
     }, [auth.currentUser]);
 
     const steps = [
-        { id: 1, label: t('booking.selectSport') },
-        { id: 2, label: t('booking.selectLocation') },
-        { id: 3, label: t('booking.selectDateTime') },
-        { id: 4, label: t('booking.checkout') }
+        { id: 1, label: language === 'ar' ? 'اختر الرياضة' : 'Select Sport' },
+        { id: 2, label: language === 'ar' ? 'المدرب والموعد' : 'Trainer & Date' },
+        { id: 3, label: language === 'ar' ? 'مكان التدريب' : 'Location' },
+        { id: 4, label: language === 'ar' ? 'تأكيد الحجز' : 'Checkout' }
     ];
 
     // Pricing logic
@@ -228,7 +252,43 @@ function BookingContent() {
 
     const gyms = t('gymsData') || [];
 
-    const sportsOptions = t('booking.sportsList') || [];
+    const allSportsList = t('booking.sportsList') || [];
+    const { sports: appSports } = useApp();
+
+    const sportsOptions = allSportsList.filter(sportName => {
+        if (!bookingData.trainer) return true;
+        
+        // Find the sport object that corresponds to this name to get its ID/slug
+        const sportObj = appSports.find(s => {
+            const nAr = normalizeArabic(s.name_ar || s.name || '');
+            const nEn = (s.name_en || '').toLowerCase();
+            const search = normalizeArabic(sportName || '');
+            const searchEn = (sportName || '').toLowerCase();
+            const sId = (s.id || s.slug || '').toLowerCase();
+            
+            return nAr.includes(search) || search.includes(nAr) || 
+                   nEn.includes(searchEn) || searchEn.includes(nEn) ||
+                   sId === searchEn;
+        });
+        
+        if (!sportObj) return true;
+        
+        return matchesSport(bookingData.trainer, sportObj);
+    });
+
+    // Auto-select sport if only one option for the trainer
+    useEffect(() => {
+        if (bookingData.trainer && sportsOptions.length === 1 && !bookingData.sport) {
+            setBookingData(prev => ({ ...prev, sport: sportsOptions[0] }));
+        }
+    }, [bookingData.trainer, sportsOptions, bookingData.sport]);
+
+    // Auto-advance to step 2 if sport and trainer are already selected (e.g., via URL)
+    useEffect(() => {
+        if (bookingData.trainer && bookingData.sport && step === 1) {
+            setStep(2);
+        }
+    }, [bookingData.trainer, bookingData.sport, step]);
 
     const setupRecaptcha = () => {
         if (window.recaptchaVerifier) return;
@@ -315,8 +375,18 @@ function BookingContent() {
     const saveBooking = async () => {
         setIsSubmitting(true);
         try {
+            // Update user profile with latest data
+            const userRef = doc(db, "users", auth.currentUser.uid);
+            await updateDoc(userRef, {
+                fullName: userProfile?.fullName || '',
+                phone: userProfile?.phone || '',
+                ...(isTrial ? { has_used_trial: true } : {})
+            });
+
             const bookingRef = await addDoc(collection(db, "bookings"), {
                 ...bookingData,
+                userName: userProfile?.fullName || '',
+                userPhone: userProfile?.phone || '',
                 userId: auth.currentUser.uid,
                 userEmail: auth.currentUser.email,
                 id: Math.random().toString(36).substr(2, 9).toUpperCase(),
@@ -327,13 +397,6 @@ function BookingContent() {
                 totalPrice: totalPrice,
                 currency: t('currency')
             });
-
-            if (isTrial) {
-                const userRef = doc(db, "users", auth.currentUser.uid);
-                await updateDoc(userRef, {
-                    has_used_trial: true
-                });
-            }
 
             setIsSuccess(true);
         } catch (error) {
@@ -352,6 +415,11 @@ function BookingContent() {
             router.push('/login');
             return;
         }
+        
+        if (!acceptedTerms) {
+            setShowTerms(true);
+            return;
+        }
 
         if (isTrial && !auth.currentUser.phoneNumber && !userProfile?.phone_verified) {
             setOtpSent(false);
@@ -368,17 +436,33 @@ function BookingContent() {
     const filteredTrainers = trainers.filter(trainer => {
         if (!bookingData.sport) return true;
         
-        const specialtyAr = trainer.specialty?.ar || '';
-        const specialtyEn = trainer.specialty?.en || '';
-        const titleAr = trainer.title?.ar || '';
-        const titleEn = trainer.title?.en || '';
+        // Find the sport object for the selected sport name
+        const sportObj = appSports.find(s => {
+            const nAr = normalizeArabic(s.name_ar || s.name || '');
+            const nEn = (s.name_en || '').toLowerCase();
+            const search = normalizeArabic(bookingData.sport || '');
+            const searchEn = (bookingData.sport || '').toLowerCase();
+            const sId = (s.id || s.slug || '').toLowerCase();
+            
+            return nAr.includes(search) || search.includes(nAr) || 
+                   nEn.includes(searchEn) || searchEn.includes(nEn) ||
+                   sId === searchEn;
+        });
+
+        if (!sportObj) {
+            // Fallback to the old logic if sport object not found
+            const specialtyAr = trainer.specialty?.ar || '';
+            const specialtyEn = trainer.specialty?.en || '';
+            const titleAr = trainer.title?.ar || '';
+            const titleEn = trainer.title?.en || '';
+            const sport = bookingData.sport.toLowerCase();
+            return specialtyAr.includes(bookingData.sport) || 
+                   specialtyEn.toLowerCase().includes(sport) ||
+                   titleAr.includes(bookingData.sport) ||
+                   titleEn.toLowerCase().includes(sport);
+        }
         
-        const sport = bookingData.sport.toLowerCase();
-        
-        return specialtyAr.includes(bookingData.sport) || 
-               specialtyEn.toLowerCase().includes(sport) ||
-               titleAr.includes(bookingData.sport) ||
-               titleEn.toLowerCase().includes(sport);
+        return matchesSport(trainer, sportObj);
     });
 
     // Auto-select trainer if only one match for trial
@@ -507,22 +591,144 @@ function BookingContent() {
                                 exit={{ opacity: 0, x: -20 }}
                                 className="space-y-6"
                             >
-                                {/* Selected Sport Card (from HTML Template) */}
-                                <div className="bg-gradient-to-br from-primary to-orange-600 rounded-[28px] p-5 flex items-center justify-between shadow-xl shadow-primary/20 relative overflow-hidden group">
-                                    <div className="flex items-center gap-4 relative z-10">
-                                        <div className="bg-white/20 backdrop-blur-md w-14 h-14 rounded-2xl flex items-center justify-center border border-white/30 group-hover:scale-110 transition-transform">
-                                            <Dumbbell className="w-7 h-7 text-white" />
-                                        </div>
-                                        <div className="text-start">
-                                            <h3 className="text-white font-black text-lg leading-none mb-1">{bookingData.sport}</h3>
-                                            <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">45 {t('booking.activeTrainees')}</p>
+                                <div className="space-y-4">
+                                    <h2 className="text-lg font-black text-gray-900 dark:text-white px-1 text-start">
+                                        {t('booking.selectYourTrainer')}
+                                    </h2>
+                                    <div className="flex md:grid md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto md:overflow-visible pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+                                        {filteredTrainers.map((trainer) => (
+                                            <button 
+                                                key={trainer.id}
+                                                onClick={() => setBookingData({...bookingData, trainer})}
+                                                className={`flex-shrink-0 w-32 md:w-full bg-white dark:bg-slate-800 rounded-[28px] p-3 border-2 transition-all flex flex-col items-center gap-2 ${bookingData.trainer?.id === trainer.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-transparent shadow-sm'}`}
+                                            >
+                                                <div className="relative">
+                                                    <img src={trainer.image || trainer.profileImage || 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200'} referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={getText(trainer.name)} />
+                                                    {bookingData.trainer?.id === trainer.id && (
+                                                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
+                                                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <h4 className="text-[10px] font-black text-gray-900 dark:text-white text-center line-clamp-1">{getText(trainer.name)}</h4>
+                                                <div className="flex items-center gap-1">
+                                                    <CheckCircle2 className="w-2 h-2 text-amber-500 fill-amber-500" />
+                                                    <span className="text-[8px] font-black text-gray-500">{trainer.rating}</span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h2 className="text-lg font-black text-gray-900 dark:text-white px-1 text-start">
+                                        {t('booking.setDateAndTime')}
+                                    </h2>
+                                    
+                                    <div className="bg-white dark:bg-slate-800 rounded-[32px] p-6 border border-gray-100 dark:border-white/5 shadow-sm">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            <div className="space-y-4 text-start">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
+                                                    <Calendar className="w-4 h-4 text-primary" />
+                                                    {t('booking.dateLabel')}
+                                                </label>
+                                                <HorizontalDatePicker 
+                                                    selectedDate={bookingData.date}
+                                                    onDateChange={(date) => setBookingData({...bookingData, date})}
+                                                    language={language}
+                                                />
+                                            </div>
+
+                                            <div className="space-y-4 text-start">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
+                                                    <Clock className="w-4 h-4 text-blue-500" />
+                                                    {t('booking.timeLabel')}
+                                                </label>
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                                    {[
+                                                        '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
+                                                        '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', 
+                                                        '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM'
+                                                    ].map((time) => {
+                                                        const available = isSlotAvailable(time);
+                                                        return (
+                                                            <button 
+                                                                key={time}
+                                                                disabled={!available}
+                                                                onPointerDown={(e) => {
+                                                                    e.preventDefault();
+                                                                    setBookingData({...bookingData, time});
+                                                                }}
+                                                                className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 ${
+                                                                    !available 
+                                                                    ? 'opacity-30 cursor-not-allowed bg-gray-200 dark:bg-white/5 border-transparent'
+                                                                    : bookingData.time === time 
+                                                                    ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20 scale-[1.05] z-10' 
+                                                                    : 'border-transparent bg-gray-50 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                                                                }`}
+                                                            >
+                                                                {time}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button onClick={() => setStep(1)} className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest border border-white/20 transition-all active:scale-95 relative z-10">
-                                        {language === 'ar' ? 'تغيير' : 'Change'}
-                                    </button>
-                                    {/* Decor */}
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                                </div>
+                            </motion.div>
+                        </AnimatePresence>
+                    )}
+
+                    {step === 3 && (
+                        <AnimatePresence mode="wait">
+                            <motion.div 
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="space-y-6"
+                            >
+                                {/* Context Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-gradient-to-br from-primary to-orange-600 rounded-[28px] p-5 flex items-center justify-between shadow-xl shadow-primary/20 relative overflow-hidden group">
+                                        <div className="flex items-center gap-4 relative z-10">
+                                            <div className="bg-white/20 backdrop-blur-md w-14 h-14 rounded-2xl flex items-center justify-center border border-white/30 group-hover:scale-110 transition-transform">
+                                                <Dumbbell className="w-7 h-7 text-white" />
+                                            </div>
+                                            <div className="text-start">
+                                                <h3 className="text-white font-black text-lg leading-none mb-1">{bookingData.sport}</h3>
+                                                <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">{bookingData.date} • {bookingData.time}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => setStep(1)} className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase tracking-widest border border-white/20 transition-all active:scale-95 relative z-10">
+                                            {language === 'ar' ? 'تغيير' : 'Change'}
+                                        </button>
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800 rounded-[28px] p-5 flex items-center justify-between border-2 border-primary/20 shadow-xl shadow-black/5 relative overflow-hidden group">
+                                        <div className="flex items-center gap-4 relative z-10 text-start">
+                                            <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-primary group-hover:scale-110 transition-transform">
+                                                <img 
+                                                    src={bookingData.trainer?.image || bookingData.trainer?.profileImage || 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200'} 
+                                                    className="w-full h-full object-cover" 
+                                                    alt={getText(bookingData.trainer?.name)} 
+                                                />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-gray-900 dark:text-white font-black text-lg leading-none mb-1">
+                                                    {bookingData.trainer ? getText(bookingData.trainer.name) : '-'}
+                                                </h3>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                                                    <span className="text-[10px] font-black text-gray-500">{bookingData.trainer?.rating}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => setStep(2)} className="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 relative z-10">
+                                            {language === 'ar' ? 'تغيير' : 'Change'}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <h2 className="text-lg font-black text-gray-900 dark:text-white px-1 text-start">
@@ -546,7 +752,7 @@ function BookingContent() {
                                         </p>
                                         <div className="flex items-center gap-1.5 text-primary text-xs font-black">
                                             <ShieldCheck className="w-4 h-4" />
-                                            <span>+50 {t('currency')}</span>
+                                            <span>{isTrial ? (language === 'ar' ? 'مجاني' : 'FREE') : `+50 ${t('currency')}`}</span>
                                         </div>
                                         {bookingData.locationType === 'home' && (
                                             <div className="absolute top-6 right-6 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
@@ -582,170 +788,91 @@ function BookingContent() {
 
                                 {/* Dynamic Section: Address vs Gyms */}
                                 {bookingData.locationType === 'home' ? (
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                                         <div className="bg-white dark:bg-slate-800 rounded-[32px] p-6 md:p-8 border border-gray-100 dark:border-white/5 space-y-6 shadow-sm">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center">
-                                                    <MapPin className="w-6 h-6" />
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center">
+                                                        <MapPin className="w-6 h-6" />
+                                                    </div>
+                                                    <h4 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                                                        {t('booking.addressDetails')}
+                                                    </h4>
                                                 </div>
-                                                <h4 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-wider">
-                                                    {t('booking.addressDetails')}
-                                                </h4>
+                                                <button 
+                                                    onClick={() => setIsAddingAddress(true)}
+                                                    className="bg-primary/10 text-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all"
+                                                >
+                                                    {language === 'ar' ? '+ عنوان جديد' : '+ New Address'}
+                                                </button>
                                             </div>
 
-                                            {/* Saved Addresses Selection */}
                                             {isLoadingAddresses ? (
                                                 <div className="space-y-3 animate-pulse">
-                                                    <div className="h-10 w-32 bg-gray-100 dark:bg-white/5 rounded-lg" />
                                                     <div className="h-20 w-full bg-gray-100 dark:bg-white/5 rounded-2xl" />
                                                     <div className="h-20 w-full bg-gray-100 dark:bg-white/5 rounded-2xl" />
                                                 </div>
-                                            ) : userAddresses.length > 0 && (
-                                                <div className="space-y-4">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 tracking-widest">{language === 'ar' ? 'اختر عنواناً محفوظاً' : 'Choose a saved address'}</label>
-                                                    <div className="grid grid-cols-1 gap-2">
-                                                        {userAddresses.map((addr) => (
-                                                            <button
-                                                                key={addr.id}
-                                                                onClick={() => {
-                                                                    setSelectedAddressId(addr.id);
-                                                                    setBookingData({
-                                                                        ...bookingData,
-                                                                        address: {
-                                                                            city: addr.city || '',
-                                                                            district: addr.district || '',
-                                                                            street: addr.street || '',
-                                                                            building: addr.building || '',
-                                                                            fullAddress: addr.fullAddress || ''
-                                                                        }
-                                                                    });
-                                                                }}
-                                                                className={`p-4 rounded-3xl border-2 text-start transition-all flex items-center justify-between group ${selectedAddressId === addr.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-gray-50 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10 overflow-hidden'}`}
-                                                            >
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedAddressId === addr.id ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
-                                                                        {addr.type === 'work' ? <Building className="w-5 h-5" /> : <Home className="w-5 h-5" />}
-                                                                    </div>
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <p className="text-sm font-black text-gray-900 dark:text-white">{addr.label}</p>
-                                                                            {addr.isPrimary && (
-                                                                                <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-black uppercase">{language === 'ar' ? 'أساسي' : 'Primary'}</span>
-                                                                            )}
-                                                                        </div>
-                                                                        <p className="text-[10px] font-bold text-gray-400 truncate max-w-[200px]">{addr.fullAddress}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedAddressId === addr.id ? 'border-primary bg-primary text-white scale-100' : 'border-gray-200 dark:border-white/10 scale-90 opacity-0 group-hover:opacity-100'}`}>
-                                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                                </div>
-                                                            </button>
-                                                        ))}
+                                            ) : userAddresses.length > 0 ? (
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    {userAddresses.map((addr) => (
                                                         <button
-                                                            onClick={() => setSelectedAddressId('new')}
-                                                            className={`p-4 rounded-3xl border-2 border-dashed text-start transition-all flex items-center gap-3 ${selectedAddressId === 'new' ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-primary/50'}`}
-                                                        >
-                                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${selectedAddressId === 'new' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-white/10 group-hover:bg-primary/10 group-hover:text-primary'}`}>
-                                                                <Plus className="w-5 h-5" />
-                                                            </div>
-                                                            <div className="text-start">
-                                                                <span className="text-sm font-black block">{language === 'ar' ? 'عنوان جديد' : 'New Address'}</span>
-                                                                <span className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">{language === 'ar' ? 'أضف موقعاً غير مسجل' : 'Add location manually'}</span>
-                                                            </div>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            
-                                            {(selectedAddressId === 'new' || userAddresses.length === 0) && (
-                                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1.5 text-start">
-                                                            <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.city')}</label>
-                                                            <select 
-                                                                value={bookingData.address.city}
-                                                                onChange={(e) => setBookingData({...bookingData, address: {...bookingData.address, city: e.target.value}})}
-                                                                className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-white/10 focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all appearance-none"
-                                                            >
-                                                                <option value="">{t('booking.city')}</option>
-                                                                <option value="Riyadh">{language === 'ar' ? 'الرياض' : 'Riyadh'}</option>
-                                                                <option value="Jeddah">{language === 'ar' ? 'جدة' : 'Jeddah'}</option>
-                                                                <option value="Dammam">{language === 'ar' ? 'الدمام' : 'Dammam'}</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="space-y-1.5 text-start">
-                                                            <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.district')}</label>
-                                                            <input 
-                                                                type="text"
-                                                                placeholder={t('booking.district')}
-                                                                value={bookingData.address.district}
-                                                                onChange={(e) => setBookingData({...bookingData, address: {...bookingData.address, district: e.target.value}})}
-                                                                className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-white/10 focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    {/* New Location Picker Field */}
-                                                    <div className="space-y-1.5 text-start">
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase px-2">{language === 'ar' ? 'موقع المنشأة (اللوكيشن)' : 'Location (Map)'}</label>
-                                                        <button 
-                                                            className="w-full bg-primary/5 border-2 border-primary/20 hover:border-primary transition-all rounded-2xl px-6 py-4 flex items-center justify-between group"
-                                                            type="button"
+                                                            key={addr.id}
+                                                            onClick={() => {
+                                                                setSelectedAddressId(addr.id);
+                                                                setBookingData({
+                                                                    ...bookingData,
+                                                                    address: {
+                                                                        city: addr.city || '',
+                                                                        district: addr.district || '',
+                                                                        street: addr.street || '',
+                                                                        building: addr.building || '',
+                                                                        fullAddress: addr.fullAddress || ''
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className={`p-4 rounded-3xl border-2 text-start transition-all flex items-center justify-between group ${selectedAddressId === addr.id ? 'border-primary bg-primary/5 shadow-lg shadow-primary/5' : 'border-gray-50 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10 overflow-hidden'}`}
                                                         >
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                                                    <MapIcon className="w-5 h-5" />
+                                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selectedAddressId === addr.id ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400'}`}>
+                                                                    {addr.type === 'work' ? <Building className="w-5 h-5" /> : <Home className="w-5 h-5" />}
                                                                 </div>
-                                                                <div className="text-start">
-                                                                    <p className="text-sm font-black text-gray-900 dark:text-white">{language === 'ar' ? 'تحديد الموقع على الخريطة' : 'Pick location on map'}</p>
-                                                                    <p className="text-[10px] font-bold text-primary italic uppercase tracking-widest">{language === 'ar' ? 'دقة عالية للحجز' : 'High precision for booking'}</p>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="text-sm font-black text-gray-900 dark:text-white">{addr.label}</p>
+                                                                        {addr.isPrimary && (
+                                                                            <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-black uppercase">{language === 'ar' ? 'أساسي' : 'Primary'}</span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-[10px] font-bold text-gray-400 truncate max-w-[200px]">{addr.fullAddress}</p>
                                                                 </div>
                                                             </div>
-                                                            <ChevronRight className="w-5 h-5 text-primary" />
+                                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedAddressId === addr.id ? 'border-primary bg-primary text-white scale-100' : 'border-gray-200 dark:border-white/10 scale-90 opacity-0 group-hover:opacity-100'}`}>
+                                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                            </div>
                                                         </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-8 space-y-4">
+                                                    <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto">
+                                                        <MapPin className="w-8 h-8 text-gray-400" />
                                                     </div>
-
-                                                    <div className="space-y-1.5 text-start">
-                                                        <label className="text-[10px] font-black text-gray-400 uppercase px-2">{t('booking.addressDetails')}</label>
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder={t('booking.addressExample')} 
-                                                            value={bookingData.address.fullAddress}
-                                                            onChange={(e) => setBookingData({...bookingData, address: {...bookingData.address, fullAddress: e.target.value}})}
-                                                            className="w-full bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-white/10 focus:border-primary rounded-2xl px-4 py-4 text-sm font-bold outline-none transition-all"
-                                                        />
-                                                    </div>
-                                                    <button className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-black transition-all">
-                                                        <Crosshair className="w-5 h-5" />
-                                                        {t('booking.useCurrentLocation')}
+                                                    <p className="text-xs font-bold text-gray-500">{language === 'ar' ? 'لا يوجد عناوين مسجلة' : 'No saved addresses yet'}</p>
+                                                    <button 
+                                                        onClick={() => setIsAddingAddress(true)}
+                                                        className="bg-primary text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.05] transition-all"
+                                                    >
+                                                        {language === 'ar' ? 'إضافة عنوان جديد' : 'Add New Address'}
                                                     </button>
-                                                </motion.div>
+                                                </div>
                                             )}
-                                        </div>
-
-                                        {/* Map Placeholder */}
-                                        <div className="bg-white dark:bg-slate-800 rounded-[32px] overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm flex flex-col h-full">
-                                            <div className="flex-1 min-h-[300px] bg-slate-200 dark:bg-white/5 relative flex items-center justify-center">
-                                                <div className="text-center space-y-3">
-                                                    <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto shadow-xl">
-                                                        <MapIcon className="w-8 h-8 text-primary" />
-                                                    </div>
-                                                    <p className="text-xs font-black text-gray-500 uppercase tracking-widest">{t('booking.viewMap')}</p>
-                                                </div>
-                                            </div>
-                                            <div className="p-6 bg-gray-50 dark:bg-white/5 flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                    <MapPin className="w-4 h-4 text-primary" />
-                                                </div>
-                                                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{t('booking.currentAddressPlaceholder')}</span>
-                                            </div>
                                         </div>
                                     </motion.div>
                                 ) : (
                                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                                         <h4 className="text-[10px] font-black text-gray-400 uppercase px-2 text-start tracking-widest">{t('booking.nearbyGyms')}</h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {gyms.map((gym) => (
+                                            {gyms.filter(gym => !bookingData.sport || gym.sports?.map(s => s.toLowerCase()).includes(bookingData.sport.toLowerCase())).map((gym) => (
                                                 <button 
                                                     key={gym.id}
                                                     onClick={() => setBookingData({...bookingData, selectedGym: gym})}
@@ -793,115 +920,6 @@ function BookingContent() {
                         </AnimatePresence>
                     )}
 
-                    {step === 3 && (
-                        <AnimatePresence mode="wait">
-                            <motion.div 
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                className="space-y-6"
-                            >
-                                <div className="space-y-4">
-                                    <h2 className="text-lg font-black text-gray-900 dark:text-white px-1 text-start">
-                                        {t('booking.selectYourTrainer')}
-                                    </h2>
-                                    <div className="flex md:grid md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto md:overflow-visible pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-                                        {filteredTrainers.map((trainer) => (
-                                            <button 
-                                                key={trainer.id}
-                                                onClick={() => setBookingData({...bookingData, trainer})}
-                                                className={`flex-shrink-0 w-32 md:w-full bg-white dark:bg-slate-800 rounded-[28px] p-3 border-2 transition-all flex flex-col items-center gap-2 ${bookingData.trainer?.id === trainer.id ? 'border-primary shadow-lg shadow-primary/5' : 'border-transparent shadow-sm'}`}
-                                            >
-                                                <div className="relative">
-                                                    <img src={trainer.image || trainer.profileImage || 'https://images.unsplash.com/photo-1548690312-e3b507d17a47?q=80&w=200'} referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={getText(trainer.name)} />
-                                                    {bookingData.trainer?.id === trainer.id && (
-                                                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center">
-                                                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <h4 className="text-[10px] font-black text-gray-900 dark:text-white text-center line-clamp-1">{getText(trainer.name)}</h4>
-                                                <div className="flex items-center gap-1">
-                                                    <CheckCircle2 className="w-2 h-2 text-amber-500 fill-amber-500" />
-                                                    <span className="text-[8px] font-black text-gray-500">{trainer.rating}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <h2 className="text-lg font-black text-gray-900 dark:text-white px-1 text-start">
-                                        {t('booking.setDateAndTime')}
-                                    </h2>
-                                    
-                                    <div className="bg-white dark:bg-slate-800 rounded-[32px] p-6 border border-gray-100 dark:border-white/5 shadow-sm">
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                            {/* Left Column: Date and Notes */}
-                                                <div className="space-y-4 text-start">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
-                                                        <Calendar className="w-4 h-4 text-primary" />
-                                                        {t('booking.dateLabel')}
-                                                    </label>
-                                                    <HorizontalDatePicker 
-                                                        selectedDate={bookingData.date}
-                                                        onDateChange={(date) => setBookingData({...bookingData, date})}
-                                                        language={language}
-                                                    />
-                                                </div>
-
-                                                <div className="space-y-4 text-start">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
-                                                        <Info className="w-4 h-4 text-emerald-500" />
-                                                        {t('booking.extraNotes')}
-                                                    </label>
-                                                    <textarea 
-                                                        placeholder={t('booking.trainerNotesPlaceholder')}
-                                                        value={bookingData.notes}
-                                                        onChange={(e) => setBookingData({...bookingData, notes: e.target.value})}
-                                                        className="w-full bg-gray-50 dark:bg-zinc-900 border border-transparent focus:border-primary/50 rounded-[2rem] px-6 py-5 text-sm font-bold outline-none h-32 lg:h-40 resize-none transition-all shadow-inner"
-                                                    />
-                                                </div>
-
-                                            {/* Right Column: Time Selection */}
-                                            <div className="space-y-4 text-start">
-                                                <label className="text-[10px] font-black text-gray-400 uppercase px-2 flex items-center gap-2 tracking-widest">
-                                                    <Clock className="w-4 h-4 text-blue-500" />
-                                                    {t('booking.timeLabel')}
-                                                </label>
-                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                                    {[
-                                                        '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
-                                                        '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', 
-                                                        '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM'
-                                                    ].map((time) => {
-                                                        const available = isSlotAvailable(time);
-                                                        return (
-                                                            <button 
-                                                                key={time}
-                                                                disabled={!available}
-                                                                onClick={() => setBookingData({...bookingData, time})}
-                                                                className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 ${
-                                                                    !available 
-                                                                    ? 'opacity-30 cursor-not-allowed bg-gray-200 dark:bg-white/5 border-transparent'
-                                                                    : bookingData.time === time 
-                                                                    ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20 scale-[1.05] z-10' 
-                                                                    : 'border-transparent bg-gray-50 dark:bg-zinc-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
-                                                                }`}
-                                                            >
-                                                                {time}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </AnimatePresence>
-                    )}
-
                     {step === 4 && (
                         <AnimatePresence mode="wait">
                             <motion.div 
@@ -923,7 +941,7 @@ function BookingContent() {
                                         <div className="bg-white dark:bg-slate-800 rounded-[32px] p-6 border border-gray-100 dark:border-white/5 shadow-sm space-y-5">
                                             {[
                                                 { label: t('booking.service'), value: bookingData.sport, icon: Dumbbell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-                                                { label: t('booking.selectLocation'), value: bookingData.locationType === 'home' ? (`${t('booking.atHome')} (+50)`) : (bookingData.selectedGym?.name || '-'), icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                                                { label: t('booking.selectLocation'), value: bookingData.locationType === 'home' ? (`${t('booking.atHome')}${!isTrial ? ' (+50)' : ''}`) : (bookingData.selectedGym?.name || '-'), icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-500/10' },
                                                 { label: t('booking.selectTrainer'), value: bookingData.trainer ? getText(bookingData.trainer.name) : '-', icon: User, color: 'text-amber-500', bg: 'bg-amber-500/10' },
                                                 { label: t('booking.selectDateTime'), value: `${bookingData.date} • ${bookingData.time}`, icon: Calendar, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
                                                 isTrial ? {
@@ -948,6 +966,80 @@ function BookingContent() {
                                             ))}
                                         </div>
 
+                                        {/* Customer Info Card */}
+                                        <div className="bg-white dark:bg-slate-800 rounded-[32px] p-6 border border-gray-100 dark:border-white/5 shadow-sm space-y-5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                                        <User className="w-5 h-5" />
+                                                    </div>
+                                                    <h4 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                                                        {language === 'ar' ? 'بيانات العميل' : 'Customer Info'}
+                                                    </h4>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setIsEditingContact(!isEditingContact)}
+                                                    className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-all text-primary"
+                                                >
+                                                    {isEditingContact ? <Save className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+
+                                            {isEditingContact ? (
+                                                <div className="space-y-4 pt-2">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">
+                                                            {language === 'ar' ? 'الاسم الكامل' : 'Full Name'}
+                                                        </label>
+                                                        <input 
+                                                            type="text"
+                                                            value={userProfile?.fullName || ''}
+                                                            onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})}
+                                                            className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 p-3 rounded-xl text-xs font-bold focus:ring-2 ring-primary/20 outline-none"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">
+                                                            {language === 'ar' ? 'رقم الجوال' : 'Phone Number'}
+                                                        </label>
+                                                        <input 
+                                                            type="text"
+                                                            value={userProfile?.phone || ''}
+                                                            onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})}
+                                                            className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 p-3 rounded-xl text-xs font-bold focus:ring-2 ring-primary/20 outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-2 gap-4 pt-2">
+                                                    <div className="text-start">
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+                                                            {language === 'ar' ? 'الاسم' : 'Name'}
+                                                        </p>
+                                                        <p className="text-xs font-black text-gray-900 dark:text-white truncate">
+                                                            {userProfile?.fullName || '-'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-start">
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+                                                            {language === 'ar' ? 'الجوال' : 'Phone'}
+                                                        </p>
+                                                        <p className="text-xs font-black text-gray-900 dark:text-white truncate">
+                                                            {userProfile?.phone || '-'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-start col-span-2 border-t border-gray-50 dark:border-white/5 pt-3">
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+                                                            {language === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
+                                                        </p>
+                                                        <p className="text-xs font-black text-gray-900 dark:text-white truncate pb-2">
+                                                            {auth.currentUser?.email || '-'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-dashed border-amber-200 dark:border-amber-500/20 rounded-3xl p-5 text-start">
                                             <div className="flex gap-3">
                                                 <Lightbulb className="w-5 h-5 text-amber-500 flex-shrink-0" />
@@ -961,33 +1053,105 @@ function BookingContent() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-700 rounded-[32px] p-8 text-white text-start relative overflow-hidden flex flex-col justify-center min-h-[300px] lg:min-h-full">
-                                        <div className="flex items-center gap-3 mb-8 relative z-10">
-                                            <Receipt className="w-6 h-6 text-primary" />
-                                            <h4 className="text-lg font-black uppercase tracking-widest">{t('booking.costSummary')}</h4>
-                                        </div>
-                                        <div className="space-y-6 relative z-10">
-                                            <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                                <span>{t('booking.sessionPrice')}</span>
-                                                <span className="text-white text-base">{basePrice} {t('currency')}</span>
+                                    <div className="bg-white dark:bg-slate-900 rounded-[40px] p-6 border border-gray-100 dark:border-white/5 shadow-2xl relative overflow-hidden flex flex-col min-h-[300px]">
+                                        <div className="flex-1">
+                                            {/* Header */}
+                                            <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-50 dark:border-white/5">
+                                                <div className="flex items-center gap-3">
+                                                    <ShieldCheck className="w-5 h-5 text-red-500" />
+                                                    <h4 className="text-base font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+                                                        {language === 'ar' ? 'ملخص الطلب' : 'Order Summary'}
+                                                    </h4>
+                                                </div>
                                             </div>
-                                            <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                                <span>{t('booking.homeFee')}</span>
-                                                <span className="text-white text-base">{homeFee} {t('currency')}</span>
-                                            </div>
-                                            <div className="pt-8 border-t border-white/10 flex justify-between items-end">
-                                                <span className="text-sm font-black uppercase tracking-widest">{t('booking.totalPrice')}</span>
-                                                <div className="text-end">
-                                                    <span className="text-5xl font-black text-primary leading-none">
-                                                        {isTrial ? (language === 'ar' ? 'مجاني' : 'FREE') : totalPrice}
+
+                                            {/* Cost Items */}
+                                            <div className="space-y-3 mb-4">
+                                                <div className="flex justify-between items-center text-sm font-bold">
+                                                    <span className="text-gray-500">{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</span>
+                                                    <span className="text-gray-900 dark:text-white font-black">
+                                                        {isTrial ? '0' : basePrice} {t('currency')}
                                                     </span>
-                                                    {!isTrial && <span className="text-xs font-black ml-2 text-slate-400 uppercase">{t('currency')}</span>}
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm font-bold">
+                                                    <span className="text-gray-500">{language === 'ar' ? 'رسوم التوصيل' : 'Delivery Fee'}</span>
+                                                    <span className={isTrial ? "text-emerald-500 font-black" : "text-gray-900 dark:text-white font-black"}>
+                                                        {isTrial ? (language === 'ar' ? 'مجاني' : 'FREE') : `${homeFee} ${t('currency')}`}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Total Area */}
+                                            <div className="pt-4 border-t-2 border-dashed border-gray-100 dark:border-white/10 flex justify-between items-center mb-6">
+                                                <span className="text-base font-black text-gray-900 dark:text-white">
+                                                    {language === 'ar' ? 'المجموع الكلي' : 'Grand Total'}
+                                                </span>
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className="text-xs font-black text-red-500 uppercase">{t('currency')}</span>
+                                                    <span className="text-3xl font-black text-red-500 leading-none">
+                                                        {isTrial ? '0' : totalPrice}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
-                                        {/* Circles Background */}
-                                        <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-primary/10 rounded-full blur-3xl"></div>
-                                        <div className="absolute -top-10 -left-10 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl"></div>
+
+                                        {/* Action Button & Terms */}
+                                        <div className="space-y-4">
+                                            {/* Terms Agreement Checkbox */}
+                                            <label className="flex items-start gap-3 cursor-pointer group bg-gray-50 dark:bg-white/5 p-3 rounded-2xl border border-transparent hover:border-primary/20 transition-all">
+                                                <div className="relative flex items-center h-5 pt-0.5">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={acceptedTerms}
+                                                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                                        className="sr-only" 
+                                                    />
+                                                    <div className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${acceptedTerms ? 'bg-primary border-primary' : 'border-gray-300 dark:border-white/20 group-hover:border-primary/50'}`}>
+                                                        {acceptedTerms && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed text-start">
+                                                    {language === 'ar' ? 'أوافق على ' : 'I agree to the '}
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            setShowTerms(true);
+                                                        }}
+                                                        className="text-primary hover:underline font-black"
+                                                    >
+                                                        {language === 'ar' ? 'الشروط والأحكام وسياسة التدريب' : 'Terms & Conditions & Training Policy'}
+                                                    </button>
+                                                </span>
+                                            </label>
+
+                                            <button 
+                                                disabled={isSubmitting || !acceptedTerms}
+                                                onClick={handleConfirm}
+                                                className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:grayscale text-white p-4 rounded-[20px] shadow-xl shadow-red-500/20 flex items-center justify-center gap-3 group transition-all active:scale-[0.98] font-black"
+                                            >
+                                                {isSubmitting ? (
+                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <span className="text-base font-black">
+                                                            {language === 'ar' ? 'إتمام الحجز' : 'Complete Booking'}
+                                                        </span>
+                                                        {language === 'ar' ? (
+                                                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                                                        ) : (
+                                                            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                                        )}
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            <p className="text-[9px] text-center text-gray-400 font-bold leading-relaxed px-4 opacity-75">
+                                                {language === 'ar' 
+                                                    ? 'بالضغط على هذا الزر، أنت توافق على شروط وأحكام كابتينة وسياسة الخصوصية.' 
+                                                    : 'By clicking this button, you agree to Captina\'s Terms & Conditions and Privacy Policy.'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>
@@ -1008,31 +1172,40 @@ function BookingContent() {
                                 {language === 'ar' ? <ChevronRight className="w-6 h-6" /> : <ChevronLeft className="w-6 h-6" />}
                             </button>
                         )}
-                        <button 
-                            disabled={
-                                isSubmitting ||
-                                (step === 1 && !bookingData.sport) ||
-                                (step === 2 && bookingData.locationType === 'gym' && !bookingData.selectedGym) ||
-                                (step === 3 && (!bookingData.trainer || !bookingData.date || !bookingData.time))
-                            }
-                            onClick={step === 4 ? handleConfirm : nextStep}
-                            className="flex-1 bg-primary text-white py-4 rounded-[20px] shadow-xl shadow-primary/20 flex items-center justify-center gap-3 group transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
-                        >
-                            {isSubmitting ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <>
-                                    <span className="text-xs font-black uppercase tracking-widest">
-                                        {step === 4 ? t('booking.confirmBooking') : t('booking.continue')}
-                                    </span>
-                                    {language === 'ar' ? (
-                                        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                                    ) : (
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                    )}
-                                </>
-                            )}
-                        </button>
+                        {step === 4 ? (
+                            <div className="flex-1 text-center">
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                    {language === 'ar' ? 'يرجى مراجعة تفاصيل طلبك أعلاه' : 'Please review your booking details above'}
+                                </p>
+                            </div>
+                        ) : (
+                            <button 
+                                disabled={
+                                        isSubmitting ||
+                                        (step === 1 && !bookingData.sport) ||
+                                        (step === 2 && (!bookingData.trainer || !bookingData.date || !bookingData.time)) ||
+                                        (step === 3 && bookingData.locationType === 'gym' && !bookingData.selectedGym) ||
+                                        (step === 3 && bookingData.locationType === 'home' && !bookingData.address)
+                                }
+                                onClick={nextStep}
+                                className="flex-1 bg-primary text-white py-4 rounded-[20px] shadow-xl shadow-primary/20 flex items-center justify-center gap-3 group transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
+                            >
+                                {isSubmitting ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <span className="text-xs font-black uppercase tracking-widest">
+                                            {t('booking.continue')}
+                                        </span>
+                                        {language === 'ar' ? (
+                                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                                        ) : (
+                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        )}
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -1183,6 +1356,71 @@ function BookingContent() {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Terms & Conditions Modal */}
+            <AnimatePresence>
+                {showTerms && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white dark:bg-slate-800 rounded-[32px] max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl overflow-hidden"
+                        >
+                            <div className="p-6 md:p-8 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center font-black">!</div>
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                                        {TERMS_AND_CONDITIONS[language].title}
+                                    </h3>
+                                </div>
+                                <button onClick={() => setShowTerms(false)} className="bg-gray-100 dark:bg-white/5 p-2 rounded-xl text-gray-400 hover:text-primary transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 md:p-8 overflow-y-auto space-y-8 no-scrollbar">
+                                {TERMS_AND_CONDITIONS[language].sections.map((section, idx) => (
+                                    <div key={idx} className="space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary h-px flex-1"></div>
+                                            <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-2">{section.title}</h4>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary h-px flex-1"></div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {section.items.map((item, i) => (
+                                                <div key={i} className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-white/[0.02] rounded-24 transition-colors hover:bg-white dark:hover:bg-white/[0.05] border border-transparent hover:border-gray-100 dark:hover:border-white/5">
+                                                    <div className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-primary shadow-sm border border-gray-100 dark:border-white/5 flex-shrink-0">
+                                                        {i + 1}
+                                                    </div>
+                                                    <p className="text-xs font-bold text-gray-600 dark:text-gray-400 leading-relaxed text-start">{item}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="p-6 md:p-8 bg-gray-50 dark:bg-white/5 border-t border-gray-100 dark:border-white/5">
+                                <button 
+                                    onClick={() => {
+                                        setAcceptedTerms(true);
+                                        setShowTerms(false);
+                                    }}
+                                    className="w-full bg-primary text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+                                >
+                                    {language === 'ar' ? 'فهمت وأوافق على الشروط' : 'I Understand & Agree'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
@@ -1198,3 +1436,52 @@ export default function Booking() {
         </Suspense>
     );
 }
+
+const TERMS_AND_CONDITIONS = {
+    ar: {
+        title: "الشروط والأحكام وسياسة التدريب",
+        sections: [
+            {
+                title: "قواعد التدريب في المنشأة (الجيم)",
+                items: [
+                    "يجب الالتزام بالزي الرياضي المناسب.",
+                    "مدة الحصة 60 دقيقة شاملة الإحماء والتهدئة.",
+                    "لا يتحمل كابتينا مسؤولية أي ممتلكات شخصية مفقودة.",
+                    "يجب اتباع إرشادات المدرب بدقة لتجنب الإصابات."
+                ]
+            },
+            {
+                title: "قواعد التدريب المنزلي",
+                items: [
+                    "توفير مساحة آمنة ومناسبة للتدريب (2*2 متر على الأقل).",
+                    "يتم إضافة رسوم انتقال للمدرب (50 ريال) يتم دفعها مع الحصة.",
+                    "في حال إلغاء الحصة قبل أقل من 4 ساعات، تعتبر الحصة مستهلكة.",
+                    "توفير بيئة هادئة ومناسبة لضمان جودة التدريب."
+                ]
+            }
+        ]
+    },
+    en: {
+        title: "Terms & Conditions & Training Policy",
+        sections: [
+            {
+                title: "Gym Training Rules",
+                items: [
+                    "Proper sports attire is mandatory.",
+                    "Session duration is 60 minutes including warm-up and cool-down.",
+                    "Captina is not responsible for any lost personal belongings.",
+                    "Follow the trainer's instructions strictly to avoid injuries."
+                ]
+            },
+            {
+                title: "Home Training Rules",
+                items: [
+                    "Provide a safe and suitable training space (at least 2*2 meters).",
+                    "A home training travel fee (50 SAR) is added per session.",
+                    "Cancellations made less than 4 hours before the session are non-refundable.",
+                    "Ensure a quiet and appropriate environment for high-quality training."
+                ]
+            }
+        ]
+    }
+};

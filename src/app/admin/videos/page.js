@@ -14,7 +14,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy,
 import ImageUpload from '../components/ImageUpload';
 
 export default function AdminVideosPage() {
-    const { language, darkMode, setAlert } = useApp();
+    const { language, darkMode, setAlert, sports = [] } = useApp();
     const [videos, setVideos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,6 +28,7 @@ export default function AdminVideosPage() {
         title: { ar: '', en: '' },
         description: { ar: '', en: '' },
         category: 'educational',
+        sportId: '', // To link the video to a specific sport
         videoUrl: '', // This can be a YouTube embed or direct URL
         thumbnailUrl: '',
         duration: '',
@@ -105,6 +106,7 @@ export default function AdminVideosPage() {
             title: { ar: '', en: '' },
             description: { ar: '', en: '' },
             category: 'educational',
+            sportId: '',
             videoUrl: '',
             thumbnailUrl: '',
             duration: '',
@@ -133,6 +135,7 @@ export default function AdminVideosPage() {
             title: normalizeText(video.title),
             description: normalizeText(video.description),
             category: video.category,
+            sportId: video.sportId || '',
             videoUrl: video.videoUrl,
             thumbnailUrl: video.thumbnailUrl,
             duration: video.duration,
@@ -262,10 +265,19 @@ export default function AdminVideosPage() {
                                     <Clock className="w-3 h-3 text-white" />
                                     <span className="text-white text-[10px] font-black">{video.duration || '00:00'}</span>
                                 </div>
-                                <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-                                    <span className="text-white text-[9px] font-black uppercase tracking-widest">
-                                        {categories.find(c => c.id === video.category)?.label}
-                                    </span>
+                                <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                                    <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
+                                        <span className="text-white text-[9px] font-black uppercase tracking-widest">
+                                            {categories.find(c => c.id === video.category)?.label}
+                                        </span>
+                                    </div>
+                                    {video.sportId && (
+                                        <div className="bg-primary/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20">
+                                            <span className="text-white text-[9px] font-black uppercase tracking-widest">
+                                                {sports.find(s => s.id === video.sportId)?.name || video.sportId}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -394,7 +406,7 @@ export default function AdminVideosPage() {
                                             placeholder={formLang === 'ar' ? 'أدخل الوصف بالعربية' : 'Enter description in English'}
                                         />
                                     </div>
-                                    {/* Category & Status */}
+                                    {/* Category & Sport */}
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Category</label>
                                         <select 
@@ -403,6 +415,17 @@ export default function AdminVideosPage() {
                                             onChange={(e) => setFormData({...formData, category: e.target.value})}
                                         >
                                             {categories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">{language === 'ar' ? 'الرياضة التابعة لها' : 'Related Sport'}</label>
+                                        <select 
+                                            className="w-full bg-gray-50 dark:bg-white/5 border-none rounded-[1.25rem] py-4 px-6 text-sm font-bold textClass outline-none focus:ring-2 ring-primary/20 transition-all shadow-inner"
+                                            value={formData.sportId || ''}
+                                            onChange={(e) => setFormData({...formData, sportId: e.target.value})}
+                                        >
+                                            <option value="">{language === 'ar' ? 'عام (لا تنتمي لرياضة معينة)' : 'General (Not related to a specific sport)'}</option>
+                                            {sports.map(s => <option key={s.id} value={s.id}>{s.name || s.id}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-2">

@@ -1,19 +1,24 @@
 import EditTrainerContent from "./EditTrainerContent";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { trainersData } from "@/lib/trainersData";
 
 export const generateStaticParams = async () => {
+    // Start with static IDs and special 'new' id
+    const staticIds = Object.keys(trainersData);
+    const params = [...staticIds, 'new'].map(id => ({ id }));
+
     try {
-        const q = query(collection(db, "users"), where("role", "==", "trainer"));
-        const querySnapshot = await getDocs(q);
-        const params = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-        }));
-        params.push({ id: 'new' });
-        return params;
+        // Supplement with active trainers from Firestore
+        const trainersSnap = await getDocs(collection(db, "trainers"));
+        const dbIds = trainersSnap.docs.map(doc => doc.id);
+        
+        // Merge and unique
+        const allIds = Array.from(new Set([...staticIds, ...dbIds, 'new']));
+        return allIds.map(id => ({ id }));
     } catch (error) {
         console.error("Error generating static params for admin trainers:", error);
-        return [{ id: 'new' }, { id: '1' }];
+        return params;
     }
 };
 

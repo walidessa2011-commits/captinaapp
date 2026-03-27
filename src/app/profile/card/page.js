@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     ChevronLeft, ChevronRight, CreditCard, Shield,
-    Star, Sparkles, QrCode, User, Calendar, Dumbbell
+    Star, Sparkles, QrCode, User, Calendar, Dumbbell, Clock
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import { useRouter } from 'next/navigation';
@@ -24,17 +24,22 @@ export default function MembershipCard() {
             if (!authUser) return;
             try {
                 const subsRef = collection(db, "subscriptions");
+                // Removed the "in" query to avoid composite index requirement
                 const q = query(
                     subsRef,
                     where("userId", "==", authUser.uid),
-                    where("status", "in", ["confirmed", "pending"]),
                     orderBy("createdAt", "desc"),
-                    limit(1)
+                    limit(5)
                 );
                 const snap = await getDocs(q);
-                if (!snap.empty) {
-                    const doc = snap.docs[0];
-                    setSubscription({ id: doc.id, ...doc.data() });
+                // Look for the first active or relevant subscription client-side
+                const activeDoc = snap.docs.find(doc => ["active", "confirmed", "paused", "pending"].includes(doc.data().status));
+                
+                if (activeDoc) {
+                    setSubscription({ id: activeDoc.id, ...activeDoc.data() });
+                } else if (!snap.empty) {
+                    // Fallback to latest available
+                    setSubscription({ id: snap.docs[0].id, ...snap.docs[0].data() });
                 }
             } catch (err) {
                 console.error("Error fetching subscription:", err);
@@ -128,10 +133,33 @@ export default function MembershipCard() {
                             </div>
                             <div className="text-end">
                                 {subscription ? (
-                                    <div className="flex items-center gap-1.5 bg-emerald-500/20 px-3 py-1.5 rounded-full border border-emerald-500/30">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">
-                                            {language === 'ar' ? 'نشطة' : 'Active'}
+                                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
+                                        subscription.status === 'active' || subscription.status === 'confirmed' ? 'bg-emerald-500/20 border-emerald-500/30' : 
+                                        subscription.status === 'paused' ? 'bg-amber-500/20 border-amber-500/30' :
+                                        subscription.status === 'expired' ? 'bg-rose-500/20 border-rose-500/30' :
+                                        'bg-gray-500/20 border-gray-500/30'
+                                    }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                                            subscription.status === 'active' || subscription.status === 'confirmed' ? 'bg-emerald-400' :
+                                            subscription.status === 'paused' ? 'bg-amber-400' :
+                                            subscription.status === 'expired' ? 'bg-rose-400' :
+                                            'bg-gray-400'
+                                        }`}></span>
+                                        <span className={`text-[9px] font-black uppercase tracking-widest ${
+                                            subscription.status === 'active' || subscription.status === 'confirmed' ? 'text-emerald-400' :
+                                            subscription.status === 'paused' ? 'text-amber-400' :
+                                            subscription.status === 'expired' ? 'text-rose-400' :
+                                            'text-gray-400'
+                                        }`}>
+                                            {language === 'ar' ? (
+                                                subscription.status === 'active' || subscription.status === 'confirmed' ? 'نشطة' :
+                                                subscription.status === 'paused' ? 'متوقفة' : 
+                                                subscription.status === 'expired' ? 'منتهية' : 'قيد الانتظار'
+                                            ) : (
+                                                subscription.status === 'active' || subscription.status === 'confirmed' ? 'Active' :
+                                                subscription.status === 'paused' ? 'Paused' :
+                                                subscription.status === 'expired' ? 'Expired' : 'Pending'
+                                            )}
                                         </span>
                                     </div>
                                 ) : (
@@ -196,23 +224,51 @@ export default function MembershipCard() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                                <div className="bg-white/5 rounded-2xl p-4 border border-white/5 col-span-2">
                                     <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">
                                         {language === 'ar' ? 'نوع الباقة' : 'Plan Type'}
                                     </p>
                                     <p className="text-xs font-black text-white truncate">
                                         {subscription
-                                            ? getText(subscription.planName) || getText(subscription.sportName) || (language === 'ar' ? 'اشتراك فعّال' : 'Active Plan')
+                                            ? getText(subscription.planLabel) || getText(subscription.planName) || getText(subscription.sportName) || (language === 'ar' ? 'اشتراك فعّال' : 'Active Plan')
                                             : (language === 'ar' ? 'بدون باقة' : 'No Plan')
                                         }
                                     </p>
                                 </div>
-                                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">
-                                        {language === 'ar' ? 'رقم العضوية' : 'Member ID'}
+                                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <Calendar className="w-2.5 h-2.5" />
+                                        {language === 'ar' ? 'تاريخ البدء' : 'Start Date'}
                                     </p>
-                                    <p className="text-xs font-black text-primary font-mono truncate">
-                                        {authUser?.uid?.slice(0, 8)?.toUpperCase() || '---'}
+                                    <p className="text-xs font-black text-white truncate">
+                                        {subscription?.startDate || '---'}
+                                    </p>
+                                </div>
+                                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <Calendar className="w-2.5 h-2.5" />
+                                        {language === 'ar' ? 'تاريخ الانتهاء' : 'End Date'}
+                                    </p>
+                                    <p className="text-xs font-black text-white truncate">
+                                        {subscription?.endDate || '---'}
+                                    </p>
+                                </div>
+                                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <Sparkles className="w-2.5 h-2.5 text-emerald-500" />
+                                        {language === 'ar' ? 'الحصص المتبقية' : 'Remaining Sessions'}
+                                    </p>
+                                    <p className="text-xs font-black text-emerald-400 truncate">
+                                        {subscription?.totalSessions ? `${Math.max(0, subscription.totalSessions - (subscription.consumedSessions || 0))} / ${subscription.totalSessions}` : '---'}
+                                    </p>
+                                </div>
+                                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                                    <p className="text-[8px] font-black text-amber-500/70 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                        {language === 'ar' ? 'تجميد الحصص' : 'Paused Sessions'}
+                                    </p>
+                                    <p className="text-xs font-black text-amber-400 truncate">
+                                        {subscription?.pausedSessions || subscription?.pausedDays || 0} {language === 'ar' ? 'حصة مسترجعة' : 'sessions'}
                                     </p>
                                 </div>
                             </div>

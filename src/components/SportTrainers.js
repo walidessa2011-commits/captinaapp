@@ -5,20 +5,13 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { Search, Users, Star, ArrowRight } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
+import { matchesSport } from "@/lib/utils";
 import TrainerCard from './TrainerCard';
 
-export default function SportTrainers({ sportName, sportId }) {
+export default function SportTrainers({ sportName, sportId, sport }) {
     const { language, darkMode } = useApp();
     const [trainers, setTrainers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    // Helper: get display text from bilingual or plain string
-    const getText = (val) => {
-        if (typeof val === 'object' && val !== null) {
-            return val[language] || val['ar'] || val['en'] || '';
-        }
-        return val || '';
-    };
 
     useEffect(() => {
         const fetchTrainers = async () => {
@@ -32,19 +25,9 @@ export default function SportTrainers({ sportName, sportId }) {
                     ...doc.data()
                 }));
 
-                // Filter by sportName (English or Arabic) or sportId
-                const filtered = allTrainers.filter(trainer => {
-                    // Expertise can be an array of strings or objects
-                    const expertise = (trainer.expertise || []).map(e => getText(e).toLowerCase());
-                    const specialty = getText(trainer.specialty).toLowerCase();
-                    
-                    const matchesSport = expertise.some(e => 
-                        e.includes(sportId.toLowerCase()) || 
-                        e.includes(sportName.toLowerCase())
-                    ) || specialty.includes(sportId.toLowerCase()) || specialty.includes(sportName.toLowerCase());
-                    
-                    return matchesSport;
-                });
+                // Use the robust matching utility
+                const sportObj = sport || { id: sportId, name: { ar: sportName, en: sportName } };
+                const filtered = allTrainers.filter(trainer => matchesSport(trainer, sportObj));
 
                 setTrainers(filtered);
             } catch (error) {
@@ -55,7 +38,7 @@ export default function SportTrainers({ sportName, sportId }) {
         };
 
         fetchTrainers();
-    }, [sportName, sportId]);
+    }, [sportName, sportId, sport]);
 
     if (!isLoading && trainers.length === 0) return null;
 

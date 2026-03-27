@@ -9,25 +9,21 @@ import {
 import { useRouter } from 'next/navigation';
 import { useApp } from "@/context/AppContext";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import SportTrainers from "@/components/SportTrainers";
+import { matchesSport } from "@/lib/utils";
 import Link from 'next/link';
+import { getSportImage } from "@/lib/sportsData";
 
 export default function SportProfile({ params }) {
     const id = params.id;
-    const { t, language, darkMode, favoriteSports, toggleFavoriteSport } = useApp();
+    const { t, language, darkMode, favoriteSports, toggleFavoriteSport, getText } = useApp();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('about');
     const [sport, setSport] = useState(null);
     const [loading, setLoading] = useState(true);
-
-    const getText = (field) => {
-        if (!field) return '';
-        if (typeof field === 'object') {
-            return field[language] || field['ar'] || field['en'] || '';
-        }
-        return field;
-    };
+    const [relatedVideos, setRelatedVideos] = useState([]);
+    const [videosLoading, setVideosLoading] = useState(false);
 
     useEffect(() => {
         const fetchSport = async () => {
@@ -58,6 +54,28 @@ export default function SportProfile({ params }) {
 
         if (id) fetchSport();
     }, [id, t]);
+
+    useEffect(() => {
+        const fetchRelatedVideos = async () => {
+            if (!sport) return;
+            setVideosLoading(true);
+            try {
+                const q = query(collection(db, "library"), where("status", "==", "active"));
+                const snapshot = await getDocs(q);
+                const videosList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Filter using utility
+                const matched = videosList.filter(v => matchesSport(v, sport));
+                setRelatedVideos(matched);
+            } catch (error) {
+                console.error("Error fetching related videos:", error);
+            } finally {
+                setVideosLoading(false);
+            }
+        };
+
+        if (activeTab === 'videos') fetchRelatedVideos();
+    }, [sport, activeTab]);
 
     if (loading) {
         return (
@@ -96,17 +114,11 @@ export default function SportProfile({ params }) {
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
             
             <div className="relative h-[35vh] md:h-[50vh] w-full overflow-hidden shadow-2xl">
-                {(sport.heroBanner || sport.image || sport.heroImg) ? (
-                    <img 
-                        src={sport.heroBanner || sport.image || sport.heroImg}
-                        className="w-full h-full object-cover"
-                        alt={getText(sport.name)}
-                    />
-                ) : (
-                    <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                        <ImageIcon className="w-12 h-12 text-gray-400" />
-                    </div>
-                )}
+                <img 
+                    src={getSportImage(id, sport.heroBanner || sport.image || sport.heroImg, language)}
+                    className="w-full h-full object-cover"
+                    alt={getText(sport.name)}
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-[#0a0f1a] via-black/30 to-transparent"></div>
                 
                 <div className="absolute top-8 inset-x-0 px-6 flex justify-between items-center z-30">
@@ -201,7 +213,7 @@ export default function SportProfile({ params }) {
                                                 {language === 'ar' ? 'الفوائد والنتائج' : 'Benefits & Results'}
                                             </h3>
                                             <div className="grid md:grid-cols-2 gap-3">
-                                                {sport.benefits.map((benefit, i) => (
+                                                {(sport.benefits || []).map((benefit, i) => (
                                                     <div key={i} className="flex items-center gap-3 bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-100 dark:border-white/5">
                                                         <div className="w-6 h-6 bg-primary/10 rounded-lg flex items-center justify-center text-primary flex-shrink-0">
                                                             <Shield className="w-3 h-3" />
@@ -287,7 +299,7 @@ export default function SportProfile({ params }) {
 
                         {activeTab === 'trainers' && (
                             <div className="text-start">
-                                <SportTrainers sportId={id} sportName={getText(sport.name)} />
+                                <SportTrainers sportId={id} sportName={getText(sport.name)} sport={sport} />
                             </div>
                         )}
 
@@ -297,32 +309,49 @@ export default function SportProfile({ params }) {
                                     <div className="w-2 h-8 bg-primary rounded-full"></div>
                                     {language === 'ar' ? 'فيديوهات تدريبية' : 'Training Videos'}
                                 </h2>
-                                {(sport.videos || []).length > 0 ? (
+                                
+                                {videosLoading ? (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {sport.videos.map((vid, i) => (
-                                            <div key={i} className="group flex flex-col gap-4">
-                                                <div className="relative aspect-video rounded-[2.5rem] overflow-hidden bg-black shadow-premium border border-white/5">
-                                                    {vid.thumbnail && (
-                                                        <img src={vid.thumbnail} className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" alt={vid.title} />
-                                                    )}
-                                                    <div className="absolute inset-0 flex items-center justify-center">
-                                                        <Link href={vid.url} target="_blank" className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:scale-110 transition-transform">
-                                                            <Play className="w-6 h-6 fill-current ml-1" />
-                                                        </Link>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1 uppercase tracking-tight">{getText(vid.title)}</h3>
-                                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Certified Training Material</p>
-                                                </div>
-                                            </div>
+                                        {[1, 2].map(i => (
+                                            <div key={i} className="aspect-video bg-gray-100 dark:bg-white/5 animate-pulse rounded-[2.5rem]"></div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="py-20 text-center bg-gray-50 dark:bg-white/5 rounded-[2.5rem] border border-dashed border-gray-200 dark:border-white/10">
-                                        <Play className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                        <p className="text-gray-500 font-bold">{language === 'ar' ? 'لا توجد فيديوهات متوفرة' : 'No training videos available yet'}</p>
-                                    </div>
+                                    <>
+                                        {/* Combine sport-specific videos and matched library videos */}
+                                        {((sport.videos || []).length > 0 || relatedVideos.length > 0) ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                {[...(sport.videos || []), ...relatedVideos].map((vid, i) => (
+                                                    <div key={i} className="group flex flex-col gap-4">
+                                                        <div className="relative aspect-video rounded-[2.5rem] overflow-hidden bg-black shadow-premium border border-white/5">
+                                                            {(vid.thumbnail || vid.thumbnailUrl) && (
+                                                                <img src={vid.thumbnail || vid.thumbnailUrl} className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" alt={getText(vid.title)} />
+                                                            )}
+                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                <Link href={vid.url || vid.videoUrl} target="_blank" className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/30 hover:scale-110 transition-transform">
+                                                                    <Play className="w-6 h-6 fill-current ml-1" />
+                                                                </Link>
+                                                            </div>
+                                                            {vid.category && (
+                                                                <div className="absolute top-4 right-4 bg-primary/90 backdrop-blur-md px-3 py-1 rounded-xl border border-white/20">
+                                                                    <span className="text-white text-[9px] font-black uppercase tracking-widest">{vid.category}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1 uppercase tracking-tight">{getText(vid.title)}</h3>
+                                                            <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">{vid.description ? getText(vid.description) : 'Certified Training Material'}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="py-20 text-center bg-gray-50 dark:bg-white/5 rounded-[2.5rem] border border-dashed border-gray-200 dark:border-white/10">
+                                                <Play className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                                <p className="text-gray-500 font-bold">{language === 'ar' ? 'لا توجد فيديوهات متوفرة' : 'No training videos available yet'}</p>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )}

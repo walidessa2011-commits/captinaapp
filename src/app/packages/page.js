@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Zap, Shield, Crown, ArrowLeft, Sparkles, Star, ChevronLeft, ChevronRight, ArrowRight, Tag, Clock, Gift, Dumbbell } from 'lucide-react';
+import { Check, Zap, Shield, Crown, ArrowLeft, Sparkles, Star, ChevronLeft, ChevronRight, ArrowRight, Tag, Clock, Gift, Dumbbell, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
 import { useRouter } from 'next/navigation';
@@ -127,23 +127,7 @@ export default function Packages() {
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ duration: 0.3 }}
                         >
-                            {/* Billing Cycle Toggle */}
-                            <div className="flex justify-center mb-8">
-                                <div className={`p-1.5 rounded-2xl flex items-center justify-center gap-1 ${darkMode ? 'bg-white/5 border border-white/10' : 'bg-gray-100 border border-gray-200'} shadow-inner`}>
-                                    <button 
-                                        onClick={() => setBillingCycle('monthly')}
-                                        className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${billingCycle === 'monthly' ? (darkMode ? 'bg-primary text-white shadow-xl shadow-primary/40' : 'bg-white text-slate-900 shadow-md') : 'text-gray-500 hover:text-primary'}`}
-                                    >
-                                        {language === 'ar' ? 'شهري' : 'Monthly'}
-                                    </button>
-                                    <button 
-                                        onClick={() => setBillingCycle('yearly')}
-                                        className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${billingCycle === 'yearly' ? (darkMode ? 'bg-primary text-white shadow-xl shadow-primary/40' : 'bg-white text-slate-900 shadow-md') : 'text-gray-500 hover:text-primary'}`}
-                                    >
-                                        {language === 'ar' ? 'سنوي' : 'Yearly'}
-                                    </button>
-                                </div>
-                            </div>
+                            {/* No billing toggle needed as we show all 4 plans now */}
 
                             <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 scroll-smooth pb-12">
                                 {packagesList.map((pkg, i) => (
@@ -158,7 +142,7 @@ export default function Packages() {
                                                     <h3 className="text-xl font-black mb-2 leading-tight uppercase tracking-tight">{pkg.name}</h3>
                                                     <div className={`flex items-center gap-2 font-bold text-[10px] ${pkg.featured ? 'text-white/80' : 'text-gray-400'}`}>
                                                         <Clock className="w-4 h-4" />
-                                                        <span>{pkg.duration || (language === 'ar' ? `${pkg.months} شهر` : `${pkg.months} Month`)}</span>
+                                                        <span>{pkg.duration}</span>
                                                     </div>
                                                 </div>
                                                 <div className={`p-3 rounded-2xl ${pkg.featured ? 'bg-white/20' : 'bg-gray-100 dark:bg-white/10'}`}>
@@ -172,8 +156,8 @@ export default function Packages() {
                                             </p>
 
                                             {/* Features List */}
-                                            <ul className="space-y-4 mb-8 text-start">
-                                                {Array.isArray(pkg.features) && pkg.features.map((feat, idx) => (
+                                            <ul className="space-y-4 mb-8 text-start relative z-10">
+                                                {(Array.isArray(pkg.features) ? pkg.features : typeof pkg.features === 'string' ? pkg.features.split(',').map(s => s.trim()) : [])?.map((feat, idx) => (
                                                     <li key={idx} className="flex items-center gap-3 text-[11px] font-bold">
                                                         <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${pkg.featured ? 'bg-white/20' : 'bg-emerald-50 dark:bg-emerald-500/10'}`}>
                                                             <Check className={`w-3 h-3 ${pkg.featured ? 'text-white' : 'text-emerald-500'}`} />
@@ -193,38 +177,59 @@ export default function Packages() {
                                             )}
 
                                             {/* Bottom Section */}
-                                            <div className={`flex items-center justify-between border-t pt-6 ${pkg.featured ? 'border-white/10' : 'border-gray-50 dark:border-white/5'}`}>
-                                                <button 
-                                                    onClick={() => {
-                                                        addToCart(pkg, { 
-                                                            type: 'subscription', 
-                                                            metadata: { 
-                                                                packageId: pkg.id,
-                                                                isTrial: pkg.id === 'trial',
-                                                                billingCycle: billingCycle
-                                                            } 
-                                                        });
-                                                        setIsCartOpen(true);
-                                                    }}
-                                                    className={`px-7 py-3 rounded-2xl text-[10px] font-black transition-all active:scale-95 shadow-lg ${pkg.featured ? 'bg-white text-[#7C3AED] hover:shadow-xl' : 'bg-primary text-white hover:shadow-xl'}`}
-                                                >
-                                                    {language === 'ar' ? 'أضف للسلة' : 'Add to Cart'}
-                                                </button>
-
-                                                <div className="text-end">
-                                                    {pkg.oldPrice && (
-                                                        <span className={`block text-[10px] line-through font-bold mb-0.5 ${pkg.featured ? 'text-white/40' : 'text-gray-300'}`}>
-                                                            {pkg.oldPrice} {pkg.currency}
-                                                        </span>
-                                                    )}
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className="text-3xl font-black tracking-tighter">
-                                                            {billingCycle === 'monthly' ? (pkg.price || '0') : (pkg.priceYearly || (parseFloat(pkg.price) * 10) || '0')}
-                                                        </span>
-                                                        <span className={`text-[10px] font-bold ${pkg.featured ? 'text-white/60' : 'text-primary'}`}>
-                                                            {pkg.currency}
-                                                        </span>
+                                            <div className={`flex flex-col gap-4 border-t pt-5 ${pkg.featured ? 'border-white/10' : 'border-gray-50 dark:border-white/5'}`}>
+                                                {/* Price Header inside Bottom Section */}
+                                                <div className="flex items-center justify-between w-full">
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${pkg.featured ? 'text-white/60' : 'text-gray-400'}`}>
+                                                        {language === 'ar' ? 'السعر' : 'Price'}
+                                                    </span>
+                                                    <div className="text-end">
+                                                        {pkg.oldPrice && (
+                                                            <span className={`block text-[10px] line-through font-bold mb-0.5 ${pkg.featured ? 'text-white/40' : 'text-gray-300'}`}>
+                                                                {pkg.oldPrice} {pkg.currency}
+                                                            </span>
+                                                        )}
+                                                        <div className="flex items-baseline gap-1">
+                                                            <span className="text-3xl font-black tracking-tighter">
+                                                                {pkg.price}
+                                                            </span>
+                                                            <span className={`text-[10px] font-bold ${pkg.featured ? 'text-white/60' : 'text-primary'}`}>
+                                                                {pkg.currency}
+                                                            </span>
+                                                        </div>
                                                     </div>
+                                                </div>
+
+                                                {/* Buttons Grid */}
+                                                <div className="grid grid-cols-2 gap-2 w-full mt-2">
+                                                    <Link 
+                                                        href={`/packages/${pkg.id}`}
+                                                        className={`flex items-center justify-center gap-2 py-3.5 rounded-[1rem] text-[10px] font-black transition-all active:scale-95 shadow-sm border ${pkg.featured ? 'border-white/20 text-white hover:bg-white/10' : 'border-gray-200 dark:border-white/10 text-slate-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                                    >
+                                                        {language === 'ar' ? 'عرض التفاصيل' : 'View Details'}
+                                                    </Link>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const packageImage = pkg.months ? {
+                                                                1: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop",
+                                                                3: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop",
+                                                                6: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=1470&auto=format&fit=crop",
+                                                                12: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=1470&auto=format&fit=crop"
+                                                            }[Number(pkg.months)] : null;
+                                                            addToCart({...pkg, image: pkg.image || packageImage}, { 
+                                                                type: 'subscription', 
+                                                                metadata: { 
+                                                                    packageId: pkg.id,
+                                                                    isTrial: pkg.id === 'trial'
+                                                                } 
+                                                            });
+                                                            setIsCartOpen(true);
+                                                        }}
+                                                        className={`flex items-center justify-center gap-2 py-3.5 rounded-[1rem] text-[10px] font-black transition-all active:scale-95 shadow-lg ${pkg.featured ? 'bg-white text-[#7C3AED] hover:shadow-xl' : 'bg-primary text-white hover:shadow-xl'}`}
+                                                    >
+                                                        {language === 'ar' ? 'أضف للسلة' : 'Add to Cart'}
+                                                        <ShoppingCart className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>

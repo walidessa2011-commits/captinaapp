@@ -38,6 +38,7 @@ const menuItems = [
     { title: 'Sports', title_ar: 'الرياضات', href: '/admin/sports', icon: Dumbbell },
     { title: 'Bookings', title_ar: 'الحجوزات', href: '/admin/bookings', icon: CalendarCheck },
     { title: 'Orders', title_ar: 'الطلبات', href: '/admin/orders', icon: CreditCard },
+    { title: 'Requests', title_ar: 'الطلبات الإدارية', href: '/admin/requests', icon: CalendarCheck },
     { title: 'Reports', title_ar: 'التقارير', href: '/admin/reports', icon: BarChart3 },
     { title: 'Support', title_ar: 'الدعم الفني', href: '/admin/support', icon: MessageCircle },
 ];

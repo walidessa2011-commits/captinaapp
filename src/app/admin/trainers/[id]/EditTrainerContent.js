@@ -27,7 +27,9 @@ import {
     Clock,
     Trophy,
     GraduationCap,
-    Lightbulb
+    Lightbulb,
+    ChevronDown,
+    Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
@@ -36,7 +38,7 @@ import ImageUpload from "../../components/ImageUpload";
 
 export default function EditTrainerContent({ params }) {
     const { id } = params;
-    const { language, setAlert } = useApp();
+    const { language, setAlert, sports, getText } = useApp();
     const router = useRouter();
     const isNew = id === 'new';
     
@@ -152,17 +154,49 @@ export default function EditTrainerContent({ params }) {
         setFormData(prev => ({ ...prev, [field]: newList }));
     };
 
-    const addListItem = (field) => {
+    const addListItem = (field, customItem) => {
+        const newItem = customItem || { ar: '', en: '' };
         setFormData(prev => ({ 
             ...prev, 
-            [field]: [...prev[field], { ar: '', en: '' }] 
+            [field]: [...prev[field], newItem] 
         }));
     };
 
     const removeListItem = (field, index) => {
-        const newList = [...formData[field]];
-        newList.splice(index, 1);
-        setFormData(prev => ({ ...prev, [field]: newList }));
+        setFormData(prev => {
+            const newList = [...prev[field]];
+            newList.splice(index, 1);
+            return { ...prev, [field]: newList };
+        });
+    };
+
+    const toggleSportExpertise = (sport) => {
+        // Use a functional update to ensure we're working with the very latest state
+        // This prevents data loss when adding multiple items quickly or from stale closures
+        setFormData(prev => {
+            const expertise = [...prev.expertise];
+            const sportNameAr = sport.name_ar || (sport.name && sport.name.ar) || '';
+            const sportNameEn = sport.name_en || (sport.name && sport.name.en) || '';
+            const sportId = sport.id || sport.slug || '';
+
+            if (!sportId) return prev; // Cannot add a sport without a valid identifier
+
+            // Check if already exists by ID
+            const index = expertise.findIndex(item => item.id === sportId);
+
+            if (index > -1) {
+                // Remove if already exists (toggle off)
+                expertise.splice(index, 1);
+            } else {
+                // Add new structured object
+                expertise.push({
+                    id: sportId,
+                    ar: sportNameAr,
+                    en: sportNameEn
+                });
+            }
+            return { ...prev, expertise };
+        });
     };
 
     const handleSave = async (e) => {
@@ -182,20 +216,46 @@ export default function EditTrainerContent({ params }) {
 
         setIsSaving(true);
         try {
-            const trainerData = {
-                ...formData,
+            // 1. Recursive cleanup function for nested objects/arrays
+            const cleanData = (obj) => {
+                if (Array.isArray(obj)) {
+                    return obj
+                        .map(item => (typeof item === 'object' && item !== null ? cleanData(item) : item))
+                        .filter(item => item !== undefined);
+                }
+                if (typeof obj === 'object' && obj !== null) {
+                    const newObj = {};
+                    Object.keys(obj).forEach(key => {
+                        if (obj[key] !== undefined) {
+                            newObj[key] = cleanData(obj[key]);
+                        }
+                    });
+                    return newObj;
+                }
+                return obj;
+            };
+
+            // 2. Prepare data, separating the internal state 'id' from firestore data
+            const { id: _ignoreId, ...rest } = formData;
+            
+            // 3. Apply base transformations
+            const trainerDataRaw = {
+                ...rest,
                 experience: Number(formData.experience) || 0,
                 rating: Number(formData.rating) || 5.0,
                 price: Number(formData.price) || 0,
                 updatedAt: serverTimestamp()
             };
 
+            // 4. Perform the deep cleanup to remove any potential 'undefined'
+            const trainerData = cleanData(trainerDataRaw);
+
             if (isNew) {
                 trainerData.createdAt = serverTimestamp();
                 await addDoc(collection(db, "trainers"), trainerData);
                 setAlert({
                     title: language === 'ar' ? 'تمت الإضافة بنجاح' : 'Added Successfully',
-                    message: language === 'ar' ? 'تم إضافة بيانات المدرب بنجاح والآن هو متاح في النظام.' : 'Trainer data has been added and is now live.',
+                    message: language === 'ar' ? 'تم إضافة بيانات المدرب بنجاح.' : 'Trainer data has been added.',
                     type: 'success'
                 });
             } else {
@@ -210,10 +270,14 @@ export default function EditTrainerContent({ params }) {
             
             router.push('/admin/trainers');
         } catch (error) {
-            console.error("Error saving trainer:", error);
+            console.error("Error saving trainer profile:", error);
+            // Specific error messages for permission vs generic
+            const isPermissionError = error.code === 'permission-denied';
             setAlert({
-                title: language === 'ar' ? 'خطأ' : 'Error',
-                message: language === 'ar' ? 'حدث خطأ أثناء حفظ التعديلات.' : 'Error saving changes.',
+                title: language === 'ar' ? 'فشل الحفظ' : 'Saving Failed',
+                message: isPermissionError 
+                    ? (language === 'ar' ? 'ليس لديك الصلاحيات الكافية لحفظ هذا التعديل.' : 'You do not have enough permissions.')
+                    : (language === 'ar' ? `حدث خطأ: ${error.message}` : `Error occurred: ${error.message}`),
                 type: 'error'
             });
         } finally {
@@ -495,35 +559,123 @@ export default function EditTrainerContent({ params }) {
                                     <Lightbulb className="w-4 h-4" />
                                     {language === 'ar' ? 'مجالات الخبرة / الرياضات' : 'Areas of Expertise / Sports'}
                                 </h3>
-                                <div className="space-y-3">
-                                    {formData.expertise.map((item, index) => (
-                                        <div key={index} className="flex gap-2">
-                                            <input 
-                                                type="text"
-                                                value={item[activeLang]}
-                                                onChange={(e) => handleListChange('expertise', index, e.target.value)}
-                                                placeholder={activeLang === 'ar' ? 'مثال: ملاكمة، كيك بوكسينغ' : 'e.g. Boxing, Kickboxing'}
-                                                className="flex-grow bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl py-2 px-4 text-sm font-bold dark:text-white outline-none focus:border-amber-500 transition-all"
-                                            />
-                                            <button 
-                                                type="button"
-                                                onClick={() => removeListItem('expertise', index)}
-                                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                
+                                <div className="space-y-4">
+                                    {/* Sports Selection From Database */}
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] px-1">
+                                            {language === 'ar' ? 'اختر من الرياضات المتوفرة' : 'Select From Available Sports'}
+                                        </p>
+                                         <div className="relative group">
+                                            <select 
+                                                onChange={(e) => {
+                                                    const selectedSport = sports.find(s => s.id === e.target.value);
+                                                    if (selectedSport) toggleSportExpertise(selectedSport);
+                                                    e.target.value = ""; // Reset to default placeholder
+                                                }}
+                                                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-slate-900 dark:text-white font-bold focus:border-amber-500 focus:bg-white transition-all outline-none md:text-sm text-base appearance-none cursor-pointer pr-10"
+                                                defaultValue=""
                                             >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <button 
-                                        type="button"
-                                        onClick={() => addListItem('expertise')}
-                                        className="w-full py-2 bg-gray-50 dark:bg-white/5 border border-dashed border-gray-200 dark:border-white/10 rounded-xl text-xs font-black text-gray-500 hover:text-amber-500 hover:border-amber-500/50 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        {language === 'ar' ? 'إضافة مجال خبرة' : 'Add Expertise'}
-                                    </button>
-                                </div>
-                            </div>
+                                                <option value="" disabled>{language === 'ar' ? 'اختر رياضة لإضافتها...' : 'Select a sport to add...'}</option>
+                                                {sports.filter(s => !formData.expertise.some(item => item.id === s.id)).map(sport => (
+                                                    <option key={sport.id} value={sport.id}>
+                                                        {getText(sport.name)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className={`absolute ${language === 'ar' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-amber-500 transition-colors`}>
+                                                <ChevronDown className="w-4 h-4" />
+                                            </div>
+                                         </div>
+                                         {/* Selected Sports Chips */}
+                                         <div className="flex flex-wrap gap-2 mt-3">
+                                             {formData.expertise.filter(item => item.id).map((item) => (
+                                                 <div 
+                                                    key={item.id} 
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/20 animate-in fade-in zoom-in"
+                                                 >
+                                                     <Target className="w-3.5 h-3.5" />
+                                                     <span>{getText(item)}</span>
+                                                     <button 
+                                                        type="button" 
+                                                        onClick={() => {
+                                                            const idx = formData.expertise.findIndex(e => e.id === item.id);
+                                                            removeListItem('expertise', idx);
+                                                        }}
+                                                        className="p-0.5 hover:bg-white/20 rounded-md transition-all ms-1"
+                                                     >
+                                                         <X className="w-3 h-3" />
+                                                     </button>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+
+                                     {/* Custom Expertise (Manual Entry) */}
+                                     <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-white/5">
+                                         <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] px-1">
+                                             {language === 'ar' ? 'خبرات / شهادات إضافية مخصصة' : 'Additional Custom Expertise / Certs'}
+                                         </p>
+                                         <div className="flex gap-2">
+                                             <div className="relative group flex-grow">
+                                                 <input 
+                                                     type="text" 
+                                                     id="customExpertiseInput"
+                                                     placeholder={language === 'ar' ? 'أدخل خبرة مخصصة...' : 'Enter custom expertise...'}
+                                                     className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-slate-900 dark:text-white font-bold focus:border-amber-500 focus:bg-white transition-all outline-none md:text-sm text-base pl-10"
+                                                     onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            const val = e.target.value.trim();
+                                                            if (val) {
+                                                                addListItem('expertise', { ar: val, en: val });
+                                                                e.target.value = '';
+                                                            }
+                                                        }
+                                                     }}
+                                                 />
+                                                 <div className={`absolute ${language === 'ar' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 opacity-40 text-gray-400`}>
+                                                    <Plus className="w-4 h-4" />
+                                                 </div>
+                                             </div>
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => {
+                                                     const input = document.getElementById('customExpertiseInput');
+                                                     const val = input.value.trim();
+                                                     if (val) {
+                                                         addListItem('expertise', { ar: val, en: val });
+                                                         input.value = '';
+                                                     }
+                                                 }}
+                                                 className="px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-premium"
+                                             >
+                                                 {language === 'ar' ? 'إضافة' : 'Add'}
+                                             </button>
+                                         </div>
+
+                                         <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                             {formData.expertise.filter(item => !item.id).map((item, index) => (
+                                                 <div key={index} className="flex gap-2 group animate-in slide-in-from-right-2 duration-300">
+                                                     <div className="flex-grow bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl py-2 px-4 text-sm font-bold dark:text-white flex items-center justify-between">
+                                                         <span>{item[language] || item.ar || item.en}</span>
+                                                     </div>
+                                                     <button 
+                                                         type="button"
+                                                         onClick={() => {
+                                                            const actualIndex = formData.expertise.indexOf(item);
+                                                            removeListItem('expertise', actualIndex);
+                                                         }}
+                                                         className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all opacity-40 group-hover:opacity-100"
+                                                     >
+                                                         <Trash2 className="w-4 h-4" />
+                                                     </button>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
 
                              {/* Achievements */}
                              <div className="space-y-4">

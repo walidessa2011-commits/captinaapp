@@ -20,7 +20,7 @@ const iconMap = {
 };
 
 export default function TrainerProfileContent({ trainerId }) {
-    const { t, language, darkMode, setAlert } = useApp();
+    const { t, language, darkMode, setAlert, getText } = useApp();
     const router = useRouter();
     const id = trainerId;
 
@@ -44,12 +44,7 @@ export default function TrainerProfileContent({ trainerId }) {
         fetchTrainer();
     }, [id]);
 
-    const getText = (val) => {
-        if (typeof val === 'object' && val !== null) {
-            return val[language] || val['ar'] || val['en'] || '';
-        }
-        return val || '';
-    };
+
 
     const getTrainerInfo = () => {
         if (trainersData[id]) return trainersData[id];
@@ -108,46 +103,46 @@ export default function TrainerProfileContent({ trainerId }) {
         })),
         reviews: (trainerInfo ? trainerInfo.reviews : []).map(r => ({
             id: r.id,
-            user: r.user[language],
+            user: getText(r.user),
             rating: r.rating,
-            date: r.date[language],
-            comment: r.comment[language]
+            date: getText(r.date),
+            comment: getText(r.comment)
         })),
         price: dbTrainer.price || 150
     } : {
-        name: trainerInfo.name[language],
+        name: getText(trainerInfo.name),
         coverImage: trainerInfo.coverImage,
         profileImage: trainerInfo.profileImage,
-        title: trainerInfo.title[language],
-        specialty: trainerInfo.specialty[language],
+        title: getText(trainerInfo.title),
+        specialty: getText(trainerInfo.specialty),
         rating: trainerInfo.rating,
         reviewsCount: trainerInfo.reviewsCount,
-        experience: trainerInfo.experience[language],
-        location: trainerInfo.location[language],
-        bio: trainerInfo.bio[language],
+        experience: getText(trainerInfo.experience),
+        location: getText(trainerInfo.location),
+        bio: getText(trainerInfo.bio),
         stats: trainerInfo.stats.map(s => ({
-            label: s.label[language],
+            label: getText(s.label),
             val: s.val
         })),
         achievements: trainerInfo.achievements.map(a => ({
-            title: a.title[language],
+            title: getText(a.title),
             date: a.date
         })),
         certificates: trainerInfo.certificates.map(c => ({
-            name: c.name[language],
+            name: getText(c.name),
             issuer: c.issuer
         })),
         specializations: trainerInfo.specializations.map((iconName, index) => ({
             id: index + 1,
-            name: language === 'ar' ? trainerInfo.specialty[language].split(' - ')[index] || iconName : iconName,
+            name: language === 'ar' ? getText(trainerInfo.specialty).split(' - ')[index] || iconName : iconName,
             icon: iconMap[iconName] || Target
         })),
         reviews: trainerInfo.reviews.map(r => ({
             id: r.id,
-            user: r.user[language],
+            user: getText(r.user),
             rating: r.rating,
-            date: r.date[language],
-            comment: r.comment[language]
+            date: getText(r.date),
+            comment: getText(r.comment)
         })),
         price: trainerInfo?.price || 150
     };

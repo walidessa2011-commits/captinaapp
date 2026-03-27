@@ -7,12 +7,13 @@ import {
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
 import { useRouter } from 'next/navigation';
+import GymsMap from "./GymsMap";
 
 export default function Gyms() {
-    const { t, language, darkMode, gyms: allGyms } = useApp();
+    const { t, language, darkMode, gyms: allGyms, getText } = useApp();
     const router = useRouter();
 
-    const gyms = (allGyms || []).filter(g => g.type === 'Internal');
+    const gyms = (allGyms || []).filter(g => g.status !== 'inactive');
 
     return (
         <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-32 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -44,6 +45,9 @@ export default function Gyms() {
                         </p>
                     </div>
                 </div>
+
+                {/* Professional Map View */}
+                <GymsMap customGyms={gyms} className="h-[300px] md:h-[350px]" />
                 {/* Gyms Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {gyms.map((gym, idx) => (
@@ -62,7 +66,7 @@ export default function Gyms() {
                                         <img 
                                             src={gym.image} 
                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
-                                            alt={gym.name} 
+                                            alt={getText(gym.name)} 
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                                         
@@ -75,15 +79,29 @@ export default function Gyms() {
                                         </div>
     
                                         {/* Branch Title over Image */}
-                                        <div className="absolute bottom-4 start-6">
+                                        <div className="absolute bottom-4 start-6 pe-12">
                                             <h3 className="text-xl font-black text-white tracking-tight leading-none mb-1">
-                                                {gym.name}
+                                                {getText(gym.name)}
                                             </h3>
                                             <div className="flex items-center gap-2 text-white/70 text-[10px] font-bold">
                                                 <MapPin className="w-3 h-3 text-primary" />
-                                                <span className="truncate max-w-[200px]">{gym.location}</span>
+                                                <span className="truncate max-w-[200px]">{getText(gym.location || gym.address)}</span>
                                             </div>
                                         </div>
+
+                                        {/* Quick Link to Location */}
+                                        {gym.location_link && (
+                                            <a 
+                                                href={gym.location_link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="absolute bottom-4 end-4 w-10 h-10 rounded-2xl bg-white/20 hover:bg-white backdrop-blur-md flex items-center justify-center text-white hover:text-primary border border-white/30 shadow-lg transition-all active:scale-90"
+                                                title={language === 'ar' ? 'التوجه للموقع' : 'Get Directions'}
+                                            >
+                                                <Navigation className="w-5 h-5" />
+                                            </a>
+                                        )}
                                     </div>
     
                                     {/* Content Section */}
@@ -98,7 +116,7 @@ export default function Gyms() {
                                                         {language === 'ar' ? 'المدربين' : 'Trainers'}
                                                     </span>
                                                     <span className="text-sm font-black text-slate-900 dark:text-white">
-                                                        {gym.trainers} {language === 'ar' ? 'أبطال' : 'Pros'}
+                                                        {gym.trainers_count || gym.trainers || 0} {language === 'ar' ? 'أبطال' : 'Pros'}
                                                     </span>
                                                 </div>
                                             </div>

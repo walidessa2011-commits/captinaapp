@@ -4,7 +4,7 @@ import "./globals.css";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
 import Link from 'next/link';
-import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2, LogOut, Lock, Settings, Shield, PlaySquare } from 'lucide-react';
+import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2, LogOut, Lock, Settings, Shield, PlaySquare, Sparkles } from 'lucide-react';
 import { AppProvider, useApp } from "@/context/AppContext";
 import { usePathname, useRouter } from 'next/navigation';
 import { auth, db } from "@/lib/firebase";
@@ -15,7 +15,7 @@ import GlobalModal from "@/components/GlobalModal";
 import CartDrawer from "@/components/CartDrawer";
 
 function LayoutContent({ children }) {
-    const { t, language, darkMode, setAlert, user, userData, loadingAuth, cartCount, setIsCartOpen } = useApp();
+    const { t, language, darkMode, setAlert, user, userData, loadingAuth, cartCount, setIsCartOpen, getLoc } = useApp();
     const pathname = usePathname();
     const isAdminPage = pathname.startsWith('/admin');
     const isAdminLoginPage = pathname === '/admin/login';
@@ -125,7 +125,7 @@ function LayoutContent({ children }) {
         return () => unsubscribe();
     }, [user]);
 
-    const displayName = userData?.fullName || user?.displayName || (language === 'ar' ? "ضيف" : "Guest");
+    const displayName = getLoc(userData?.fullName) || user?.displayName || (language === 'ar' ? "ضيف" : "Guest");
     const profileImg = user?.photoURL || "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100";
 
     const handleLogout = () => {
@@ -187,6 +187,7 @@ function LayoutContent({ children }) {
                                             >
                                                 {[
                                                     { name: t('home'), href: '/', icon: Home },
+                                                    { name: language === 'ar' ? 'حصة تجريبية' : 'Trial Session', href: '/booking?trial=true', icon: Sparkles },
                                                     { name: t('packages'), href: '/packages', icon: CreditCard },
                                                     { name: t('trainers'), href: '/trainers', icon: TrainersIcon },
                                                     { name: t('store'), href: '/store', icon: Store },

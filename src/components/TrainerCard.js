@@ -7,7 +7,7 @@ import { useApp } from "@/context/AppContext";
 import { trainersData } from "@/lib/trainersData";
 
 export default function TrainerCard({ trainer, idx }) {
-    const { language, darkMode, favoriteTrainers, toggleFavoriteTrainer } = useApp();
+    const { language, darkMode, favoriteTrainers, toggleFavoriteTrainer, getText } = useApp();
     
     const isFavorite = favoriteTrainers.includes(trainer.id);
 
@@ -15,14 +15,6 @@ export default function TrainerCard({ trainer, idx }) {
         e.preventDefault();
         e.stopPropagation();
         toggleFavoriteTrainer(trainer.id);
-    };
-    
-    // Helper: get display text from bilingual or plain string
-    const getText = (val) => {
-        if (typeof val === 'object' && val !== null) {
-            return val[language] || val['ar'] || val['en'] || '';
-        }
-        return val || '';
     };
 
     // Process specialties/expertise

@@ -155,46 +155,55 @@ export default function CheckoutPage() {
 
         setIsSubmitting(true);
         try {
-            const orderData = {
-                userId: user.uid,
-                userEmail: user.email || '',
-                userName: formData.fullName || '',
-                userPhone: formData.phone || '',
-                deliveryInfo: {
-                    address: formData.address || '',
-                    city: formData.city || ''
-                },
-                paymentMethod: paymentMethod || 'credit_card',
-                items: cart.map(item => ({
-                    id: item.productId || item.id || '',
-                    cartId: item.cartId || '',
-                    name: item.name_en || item.name || '',
-                    name_en: item.name_en || item.name || '',
-                    name_ar: item.name_ar || '',
-                    image: item.image || '',
-                    price: item.price || 0,
-                    quantity: item.quantity || 1,
-                    size: item.size || 'N/A',
-                    color: item.color || 'N/A',
-                    type: item.type || 'product',
-                    metadata: item.metadata || {}
-                })),
-                itemsNames: cart.map(item => item.name_en || item.name || ''),
-                totalAmount: cartTotal || 0,
-                totalPrice: cartTotal || 0, // for MyOrders compatibility
-                status: 'processing',
-                statusText: language === 'ar' ? 'قيد المعالجة' : 'Processing',
-                createdAt: serverTimestamp()
-            };
+            const storeItems = cart.filter(item => item.type !== 'subscription');
+            const subscriptionItems = cart.filter(item => item.type === 'subscription');
+            const storeTotal = storeItems.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0);
+            
+            let orderIdStr = `req_${Date.now()}`;
 
-            const orderRef = await addDoc(collection(db, "orders"), orderData);
+            if (storeItems.length > 0) {
+                const orderData = {
+                    userId: user.uid,
+                    userEmail: user.email || '',
+                    userName: formData.fullName || '',
+                    userPhone: formData.phone || '',
+                    deliveryInfo: {
+                        address: formData.address || '',
+                        city: formData.city || ''
+                    },
+                    paymentMethod: paymentMethod || 'credit_card',
+                    items: storeItems.map(item => ({
+                        id: item.productId || item.id || '',
+                        cartId: item.cartId || '',
+                        name: item.name_en || item.name || '',
+                        name_en: item.name_en || item.name || '',
+                        name_ar: item.name_ar || '',
+                        image: item.image || '',
+                        price: item.price || 0,
+                        quantity: item.quantity || 1,
+                        size: item.size || 'N/A',
+                        color: item.color || 'N/A',
+                        type: item.type || 'product',
+                        metadata: item.metadata || {}
+                    })),
+                    itemsNames: storeItems.map(item => item.name_en || item.name || ''),
+                    totalAmount: storeTotal,
+                    totalPrice: storeTotal, // for MyOrders compatibility
+                    status: 'processing',
+                    statusText: language === 'ar' ? 'قيد المعالجة' : 'Processing',
+                    createdAt: serverTimestamp()
+                };
+
+                const orderRef = await addDoc(collection(db, "orders"), orderData);
+                orderIdStr = orderRef.id;
+            }
 
             // SPECIAL CASE: Handle Subscriptions and Bookings from Cart items
-            for (const item of cart) {
-                if (item.type === 'subscription' && item.metadata) {
+            for (const item of subscriptionItems) {
+                if (item.metadata) {
                     const subData = {
                         ...item.metadata,
-                        orderId: orderRef.id,
+                        orderId: orderIdStr,
                         userId: user.uid,
                         status: 'pending',
                         paymentStatus: 'pending',
@@ -217,13 +226,15 @@ export default function CheckoutPage() {
                         // Create booking record for trial
                         await addDoc(collection(db, "bookings"), {
                             userId: user.uid,
-                            orderId: orderRef.id,
+                            orderId: orderIdStr,
                             trainer: {
                                 id: item.metadata.trainerId || '',
                                 name: item.metadata.trainerName || ''
                             },
                             date: item.metadata.bookedDate || item.metadata.startDate || '',
                             time: item.metadata.bookedTime || item.metadata.preferredTime || '',
+                            clientName: formData.fullName || user.displayName || '',
+                            phone: formData.phone || '',
                             trainingLocation: {
                                 type: item.metadata.location || 'home',
                                 address: item.metadata.location === 'home' ? (formData.address || '') : (item.metadata.preSelectedGymId || ''),
@@ -586,7 +597,7 @@ export default function CheckoutPage() {
                     </div>
 
                     <div className="space-y-6 order-2 lg:sticky lg:top-8 h-fit">
-                        <section className="bg-slate-900 border border-white/5 p-5 lg:p-6 rounded-[2rem] shadow-2xl relative overflow-hidden text-start">
+                        <section className="bg-slate-900 border border-white/5 p-5 lg:p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden text-start">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-[40px] -translate-y-1/2 translate-x-1/2"></div>
                             
                             <h3 className="text-white text-[10px] lg:text-xs font-black uppercase tracking-widest mb-6 lg:mb-8 flex items-center gap-3">
@@ -594,35 +605,54 @@ export default function CheckoutPage() {
                                 {language === 'ar' ? 'ملخص الطلب' : 'Order Summary'}
                             </h3>
                             
-                            <div className="space-y-4 mb-8 max-h-[300px] overflow-y-auto custom-scrollbar pe-2">
+                            <div className="space-y-3 mb-8 max-h-[400px] overflow-y-auto custom-scrollbar pe-2">
                                 {cart.map((item) => (
-                                    <div key={item.cartId} className="flex justify-between items-center text-white/70">
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] font-black truncate max-w-[120px] uppercase tracking-tighter dark:text-white">{item.name}</span>
-                                            {item.type === 'subscription' ? (
-                                                <span className="text-[9px] font-bold opacity-50 uppercase tracking-widest text-primary">
-                                                    {item.metadata?.trainerName ? `${language === 'ar' ? 'مع ' : 'With '} ${item.metadata.trainerName}` : (language === 'ar' ? 'بدون مدرب' : 'Self-training')}
-                                                </span>
-                                            ) : (
-                                                <span className="text-[9px] font-bold opacity-50 uppercase tracking-widest text-white/70">
-                                                    {item.quantity}x {item.size !== 'N/A' && item.size ? item.size : ''} {item.color && item.color !== 'N/A' ? `/ ${item.color?.name_en || item.color}` : ''}
-                                                </span>
-                                            )}
-                                            {isTrialItem(item) && item.metadata?.bookedDate && (
-                                                <div className="flex flex-col gap-0.5 mt-1 border-l border-primary/30 pl-2">
-                                                    <span className="text-[8px] font-black text-primary/80 flex items-center gap-1 uppercase">
-                                                        <Calendar className="w-2.5 h-2.5" />
-                                                        {item.metadata.bookedDate} @ {item.metadata.bookedTime}
-                                                    </span>
-                                                    <span className="text-[8px] font-black text-primary/60 flex items-center gap-1 uppercase">
-                                                        <MapPin className="w-2.5 h-2.5" />
-                                                        {item.metadata.location === 'gym' ? (item.metadata.preSelectedGymName || (language === 'ar' ? 'النادي' : 'The Club')) : (language === 'ar' ? 'المنزل' : 'At Home')}
-                                                    </span>
-                                                </div>
-                                            )}
+                                    <motion.div 
+                                        key={item.cartId} 
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex gap-3 p-3 bg-white/5 rounded-3xl border border-white/5 group hover:border-primary/30 transition-all text-start relative overflow-hidden"
+                                    >
+                                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br from-primary/5 to-transparent transition-opacity pointer-events-none" />
+                                        
+                                        <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/5 shrink-0 shadow-sm relative z-10">
+                                            <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
                                         </div>
-                                        <span className="text-xs font-black text-white shrink-0 tracking-tighter">{item.price * item.quantity} <small className="text-[8px] opacity-40 uppercase">SAR</small></span>
-                                    </div>
+
+                                        <div className="flex-1 flex flex-col justify-center min-w-0 relative z-10">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <h4 className="text-[11px] font-black text-white truncate uppercase tracking-tighter">{item.name}</h4>
+                                                <span className="text-[11px] font-black text-primary shrink-0 tracking-tighter">
+                                                    {item.price * item.quantity} <small className="text-[7px] opacity-40 uppercase">SAR</small>
+                                                </span>
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                                {item.type === 'subscription' ? (
+                                                    <span className="text-[8px] font-bold text-primary/80 uppercase tracking-widest">
+                                                        {item.metadata?.trainerName ? `${language === 'ar' ? 'مع ' : 'With '} ${item.metadata.trainerName}` : (language === 'ar' ? 'بدون مدرب' : 'Self-training')}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">
+                                                        {item.quantity}x {item.size !== 'N/A' && item.size ? item.size : ''} {item.color && item.color !== 'N/A' ? `/ ${item.color?.name_en || item.color}` : ''}
+                                                    </span>
+                                                )}
+                                                
+                                                {isTrialItem(item) && item.metadata?.bookedDate && (
+                                                    <div className="flex items-center gap-2 border-l border-white/10 pl-2">
+                                                        <span className="text-[8px] font-bold text-white/50 flex items-center gap-1 uppercase">
+                                                            <Calendar className="w-2.5 h-2.5 text-primary/60" />
+                                                            {item.metadata.bookedDate}
+                                                        </span>
+                                                        <span className="text-[8px] font-bold text-white/50 flex items-center gap-1 uppercase">
+                                                            <MapPin className="w-2.5 h-2.5 text-primary/60" />
+                                                            {item.metadata.location === 'gym' ? (item.metadata.preSelectedGymName || (language === 'ar' ? 'النادي' : 'Club')) : (language === 'ar' ? 'المنزل' : 'Home')}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </motion.div>
                                 ))}
                             </div>
 

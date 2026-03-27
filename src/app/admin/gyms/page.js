@@ -16,12 +16,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import ImageUpload from "../components/ImageUpload";
-import { Loader2 } from 'lucide-react';
+import { Loader2, Navigation as NavIcon } from 'lucide-react';
 import Pagination from '../components/Pagination';
+import GymsMap from '../../gyms/GymsMap';
 
 export default function AdminGyms() {
-    const { language, setAlert } = useApp();
+    const { language, setAlert, sports, getText } = useApp();
     const [gyms, setGyms] = useState([]);
+    const [allTrainers, setAllTrainers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -34,19 +36,22 @@ export default function AdminGyms() {
     const [formLang, setFormLang] = useState('ar');
     const [formData, setFormData] = useState({
         name: { ar: '', en: '' },
-        address: { ar: '', en: '' },
+        location: { ar: '', en: '' },
+        type: 'Internal',
+        rating: '5.0',
+        location_link: '',
+        phone: '',
+        halls: '',
+        trainers_count: '', // Renamed from trainers to avoid conflict with linked trainers
         image: '',
         status: 'active',
-        features: []
+        linked_sports: [], // Objects: {id, ar, en}
+        linked_trainers: [], // Objects: {id, name: {ar, en}}
+        social: { instagram: '', twitter: '' },
+        latitude: '',
+        longitude: '',
+        embed_map: ''
     });
-
-    // Helper: get display text from bilingual or plain string
-    const getText = (val) => {
-        if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
-            return val[language] || val['ar'] || val['en'] || '';
-        }
-        return val || '';
-    };
 
     // Helper: normalize to bilingual object
     const normalizeText = (val) => {
@@ -66,8 +71,18 @@ export default function AdminGyms() {
         }
     };
 
+    const fetchTrainers = async () => {
+        try {
+            const trainersSnap = await getDocs(collection(db, "trainers"));
+            setAllTrainers(trainersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (error) {
+            console.error("Error fetching trainers:", error);
+        }
+    };
+
     useEffect(() => {
         fetchGyms();
+        fetchTrainers();
     }, []);
 
     const handleDelete = (gymId, gymName) => {
@@ -92,19 +107,41 @@ export default function AdminGyms() {
             setEditingGym(gym);
             setFormData({
                 name: normalizeText(gym.name),
-                address: normalizeText(gym.address),
+                location: normalizeText(gym.location || gym.address),
+                type: gym.type || 'Internal',
+                rating: gym.rating || '5.0',
+                location_link: gym.location_link || '',
+                phone: gym.phone || '',
+                halls: gym.halls || '',
+                trainers_count: gym.trainers_count || gym.trainers || '',
                 image: gym.image || '',
                 status: gym.status || 'active',
-                features: gym.features || []
+                linked_sports: Array.isArray(gym.linked_sports) ? gym.linked_sports : [],
+                linked_trainers: Array.isArray(gym.linked_trainers) ? gym.linked_trainers : [],
+                social: gym.social || { instagram: '', twitter: '' },
+                latitude: gym.latitude || '',
+                longitude: gym.longitude || '',
+                embed_map: gym.embed_map || ''
             });
         } else {
             setEditingGym(null);
             setFormData({
                 name: { ar: '', en: '' },
-                address: { ar: '', en: '' },
+                location: { ar: '', en: '' },
+                type: 'Internal',
+                rating: '5.0',
+                location_link: '',
+                phone: '',
+                halls: '',
+                trainers_count: '',
                 image: '',
                 status: 'active',
-                features: []
+                linked_sports: [],
+                linked_trainers: [],
+                social: { instagram: '', twitter: '' },
+                latitude: '',
+                longitude: '',
+                embed_map: ''
             });
         }
         setFormLang('ar');
@@ -117,8 +154,23 @@ export default function AdminGyms() {
 
         setIsSaving(true);
         try {
+            // Helper to remove undefined fields recursively
+            const recursivelyRemoveUndefined = (obj) => {
+                if (typeof obj !== 'object' || obj === null) return obj;
+                if (Array.isArray(obj)) return obj.map(recursivelyRemoveUndefined);
+                
+                return Object.keys(obj).reduce((acc, key) => {
+                    const value = obj[key];
+                    if (value !== undefined) {
+                        acc[key] = recursivelyRemoveUndefined(value);
+                    }
+                    return acc;
+                }, {});
+            };
+
             const gymData = {
-                ...formData,
+                ...recursivelyRemoveUndefined(formData),
+                trainers_count: (formData.linked_trainers || []).length,
                 updatedAt: serverTimestamp()
             };
 
@@ -162,30 +214,45 @@ export default function AdminGyms() {
         }
     };
 
-    const handleAddFeature = (e) => {
-        if (e.key === 'Enter' && e.target.value.trim()) {
-            e.preventDefault();
-            const newFeature = e.target.value.trim();
-            if (!formData.features.includes(newFeature)) {
-                setFormData(prev => ({
-                    ...prev,
-                    features: [...prev.features, newFeature]
-                }));
+    const toggleSportSelection = (sport) => {
+        setFormData(prev => {
+            const list = [...prev.linked_sports];
+            const sportId = sport.id || sport.slug;
+            const index = list.findIndex(s => s.id === sportId);
+
+            if (index > -1) {
+                list.splice(index, 1);
+            } else {
+                list.push({
+                    id: sportId,
+                    ar: sport.name_ar || (sport.name && sport.name.ar) || '',
+                    en: sport.name_en || (sport.name && sport.name.en) || ''
+                });
             }
-            e.target.value = '';
-        }
+            return { ...prev, linked_sports: list };
+        });
     };
 
-    const removeFeature = (feature) => {
-        setFormData(prev => ({
-            ...prev,
-            features: prev.features.filter(f => f !== feature)
-        }));
+    const toggleTrainerSelection = (trainer) => {
+        setFormData(prev => {
+            const list = [...prev.linked_trainers];
+            const index = list.findIndex(t => t.id === trainer.id);
+
+            if (index > -1) {
+                list.splice(index, 1);
+            } else {
+                list.push({
+                    id: trainer.id,
+                    name: trainer.name || { ar: 'Unnamed', en: 'Unnamed' }
+                });
+            }
+            return { ...prev, linked_trainers: list };
+        });
     };
 
     const filteredGyms = gyms.filter(gym => 
         getText(gym.name).toLowerCase().includes(searchTerm.toLowerCase()) || 
-        getText(gym.address).toLowerCase().includes(searchTerm.toLowerCase())
+        getText(gym.location || gym.address).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Reset to page 1 when search changes
@@ -255,6 +322,17 @@ export default function AdminGyms() {
                 </div>
             </div>
 
+            {/* Map Section */}
+            {!isLoading && filteredGyms.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+                        <MapPin className="w-6 h-6 text-emerald-500" />
+                        {language === 'ar' ? 'مواقع الفروع على الخريطة' : 'Gym Locations Map'}
+                    </h2>
+                    <GymsMap customGyms={filteredGyms} />
+                </div>
+            )}
+
             {/* Grids */}
             {isLoading ? (
                 <div className="flex items-center justify-center p-20">
@@ -297,7 +375,7 @@ export default function AdminGyms() {
                                         </div>
                                         <p className="flex items-center gap-1.5 text-xs font-bold text-gray-500 mb-4 line-clamp-1">
                                             <MapPin className="w-3.5 h-3.5 shrink-0" />
-                                            {getText(gym.address) || (language === 'ar' ? 'عنوان غير محدد' : 'No address specified')}
+                                            {getText(gym.location || gym.address) || (language === 'ar' ? 'عنوان غير محدد' : 'No address specified')}
                                         </p>
 
                                         <div className="flex items-center gap-2 mt-auto pt-4 border-t border-gray-100 dark:border-white/10">
@@ -309,6 +387,18 @@ export default function AdminGyms() {
                                                 <Edit className="w-4 h-4" />
                                                 {language === 'ar' ? 'تعديل' : 'Edit'}
                                             </button>
+
+                                            {gym.location_link && (
+                                                <a 
+                                                    href={gym.location_link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title={language === 'ar' ? 'فتح الموقع' : 'Open Location'}
+                                                    className="p-2 border border-emerald-100 text-emerald-500 hover:bg-emerald-50 dark:border-emerald-500/30 dark:hover:bg-emerald-500/10 rounded-xl transition-colors"
+                                                >
+                                                    <NavIcon className="w-4 h-4" />
+                                                </a>
+                                            )}
                                             
                                             <button 
                                                 onClick={() => handleToggleStatus(gym.id, gym.status)}
@@ -421,8 +511,8 @@ export default function AdminGyms() {
                                                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                 <input 
                                                     type="text"
-                                                    value={formData.address[formLang]}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, address: { ...prev.address, [formLang]: e.target.value } }))}
+                                                    value={formData.location[formLang]}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, location: { ...prev.location, [formLang]: e.target.value } }))}
                                                     dir={formLang === 'ar' ? 'rtl' : 'ltr'}
                                                     className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 pl-11 pr-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
                                                     placeholder={formLang === 'ar' ? 'مثال: الرياض، حي المروج' : 'e.g. Riyadh, Al Murooj'}
@@ -430,26 +520,207 @@ export default function AdminGyms() {
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
-                                                {language === 'ar' ? 'المميزات / الخدمات (اضغط Enter للإضافة)' : 'Features / Services (Press Enter to add)'}
-                                            </label>
-                                            <div className="flex flex-wrap gap-2 mb-2">
-                                                {formData.features.map((feature, i) => (
-                                                    <span key={i} className="flex items-center gap-1 px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-bold border border-emerald-100 dark:border-emerald-500/20">
-                                                        {feature}
-                                                        <button type="button" onClick={() => removeFeature(feature)} className="hover:text-rose-500">
-                                                            <XCircle className="w-3 h-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
+                                        {/* Row: Type & Rating & Link */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
+                                                    {language === 'ar' ? 'نوع النادي' : 'Gym Type'}
+                                                </label>
+                                                <select 
+                                                    value={formData.type}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all appearance-none"
+                                                >
+                                                    <option value="Internal">{language === 'ar' ? 'داخلي (كابتينا)' : 'Internal (Captina)'}</option>
+                                                    <option value="Partner">{language === 'ar' ? 'شريك خارجي' : 'Partner (External)'}</option>
+                                                </select>
                                             </div>
-                                            <input 
-                                                type="text"
-                                                onKeyDown={handleAddFeature}
-                                                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
-                                                placeholder={language === 'ar' ? 'مثال: مسبح، مواقف، مدرب خاص...' : 'e.g. Pool, Parking, Personal Trainer...'}
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'التقييم' : 'Rating'}</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.rating}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="5.0"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2 lg:col-span-1">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'رابط الموقع (خرائط)' : 'Location Link (Maps)'}</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.location_link}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, location_link: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="https://maps.google.com/..."
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Row: Phone & Latitude & Longitude */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'رقم الهاتف' : 'Phone'}</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.phone}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="+966..."
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'خط العرض (Latitude)' : 'Latitude'}</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.latitude}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, latitude: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="24.811..."
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'خط الطول (Longitude)' : 'Longitude'}</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.longitude}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, longitude: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="46.762..."
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'كود الخريطة المضمن (Embed Code)' : 'Map Embed Code (iframe)'}</label>
+                                            <textarea 
+                                                value={formData.embed_map}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, embed_map: e.target.value }))}
+                                                dir="ltr"
+                                                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-[10px] font-mono dark:text-white outline-none focus:border-emerald-500 transition-all min-h-[80px]"
+                                                placeholder='<iframe src="..." ...></iframe>'
                                             />
+                                        </div>
+
+                                        {/* Row: Counts */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'عدد القاعات' : 'Halls'}</label>
+                                                <input 
+                                                    type="number"
+                                                    value={formData.halls}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, halls: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">{language === 'ar' ? 'عدد المدربين (يدوي)' : 'Trainers (Manual Count)'}</label>
+                                                <input 
+                                                    type="number"
+                                                    value={formData.trainers_count}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, trainers_count: e.target.value }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Social Links */ }
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">Instagram</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.social?.instagram || ''}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, social: { ...prev.social, instagram: e.target.value } }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="@captina_monsia"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">Twitter</label>
+                                                <input 
+                                                    type="text"
+                                                    value={formData.social?.twitter || ''}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, social: { ...prev.social, twitter: e.target.value } }))}
+                                                    className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all"
+                                                    placeholder="@captina_monsia"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Sports Selection (Dropdown) */}
+                                        <div className="space-y-4 pt-2 border-t border-gray-100 dark:border-white/10">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
+                                                    {language === 'ar' ? 'الرياضات المتاحة (اختيار من القائمة)' : 'Available Sports (Select from List)'}
+                                                </label>
+                                                <div className="relative group">
+                                                    <select 
+                                                        onChange={(e) => {
+                                                            const selected = sports.find(s => s.id === e.target.value);
+                                                            if (selected) toggleSportSelection(selected);
+                                                            e.target.value = "";
+                                                        }}
+                                                        className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all appearance-none cursor-pointer"
+                                                        defaultValue=""
+                                                    >
+                                                        <option value="" disabled>{language === 'ar' ? 'اختر رياضة لإضافتها...' : 'Select a sport to add...'}</option>
+                                                        {sports.filter(s => !formData.linked_sports.some(ls => ls.id === s.id)).map(s => (
+                                                            <option key={s.id} value={s.id}>{getText(s.name)}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    {formData.linked_sports.map((sport) => (
+                                                        <span key={sport.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md animate-in zoom-in">
+                                                            {getText(sport)}
+                                                            <button type="button" onClick={() => toggleSportSelection(sport)} className="hover:bg-white/20 rounded p-0.5">
+                                                                <XCircle className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Trainers Selection (Dropdown) */}
+                                        <div className="space-y-4 pt-2 border-t border-gray-100 dark:border-white/10">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1">
+                                                    {language === 'ar' ? 'المدربين في هذا النادي (اختيار)' : 'Trainers in this Gym (Select)'}
+                                                </label>
+                                                <div className="relative group">
+                                                    <select 
+                                                        onChange={(e) => {
+                                                            const selected = allTrainers.find(t => t.id === e.target.value);
+                                                            if (selected) toggleTrainerSelection(selected);
+                                                            e.target.value = "";
+                                                        }}
+                                                        className="w-full bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl py-3 px-4 text-sm font-bold dark:text-white outline-none focus:border-emerald-500 transition-all appearance-none cursor-pointer"
+                                                        defaultValue=""
+                                                    >
+                                                        <option value="" disabled>{language === 'ar' ? 'اختر مدرباً لربطه...' : 'Select a trainer to link...'}</option>
+                                                        {allTrainers.filter(t => !formData.linked_trainers.some(lt => lt.id === t.id)).map(t => (
+                                                            <option key={t.id} value={t.id}>{getText(t.name)}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                    {formData.linked_trainers.map((trainer) => (
+                                                        <span key={trainer.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md animate-in zoom-in">
+                                                            {getText(trainer.name)}
+                                                            <button type="button" onClick={() => toggleTrainerSelection(trainer)} className="hover:bg-white/20 dark:hover:bg-slate-900/10 rounded p-0.5">
+                                                                <XCircle className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 

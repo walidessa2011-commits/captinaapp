@@ -20,7 +20,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 export default function AdminReports() {
-    const { language, darkMode } = useApp();
+    const { language, darkMode, getText } = useApp();
     const [isLoading, setIsLoading] = useState(true);
     const [stats, setStats] = useState({
         totalRevenue: 0,
@@ -58,6 +58,10 @@ export default function AdminReports() {
             const bookingsSnap = await getDocs(collection(db, "bookings"));
             const bookings = bookingsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+            // Fetch Attendances
+            const attendanceSnap = await getDocs(query(collection(db, "attendance"), orderBy("date", "desc")));
+            const attendances = attendanceSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
             // Calculate Stats
             const revenue = subscriptions.reduce((acc, sub) => acc + (parseFloat(sub.amount) || 0), 0);
             
@@ -91,11 +95,14 @@ export default function AdminReports() {
                 monthlyRevenue,
                 topTrainers: sortedTrainers,
                 recentSubscriptions: subscriptions.slice(0, 10),
+                recentAttendances: attendances.slice(0, 50),
+                totalAttendances: attendances.filter(a => a.action > 0).length,
                 allData: {
                     users,
                     trainers,
                     subscriptions,
-                    bookings
+                    bookings,
+                    attendances
                 }
             });
         } catch (error) {
@@ -138,6 +145,7 @@ export default function AdminReports() {
             [language === 'ar' ? 'المشتركين النشطين' : 'Active Subscribers', stats.activeSubscribers],
             [language === 'ar' ? 'إجمالي المدربين' : 'Total Trainers', stats.totalTrainers],
             [language === 'ar' ? 'إجمالي الحجوزات' : 'Total Bookings', stats.totalBookings],
+            [language === 'ar' ? 'إجمالي تسجيل الحضور' : 'Total Attendances', stats.totalAttendances || 0],
         ];
 
         doc.autoTable({
@@ -257,6 +265,34 @@ export default function AdminReports() {
             headStyles: { fillColor: [245, 158, 11] } // Amber color
         });
 
+        yPos = doc.lastAutoTable.finalY + 20;
+
+        // Attendance Logs
+        if (yPos > 240) { doc.addPage(); yPos = 20; }
+        doc.setFontSize(16);
+        doc.text(language === 'ar' ? 'سجل الحضور' : 'Attendance Logs', 20, yPos);
+        yPos += 10;
+
+        const attendanceData = (stats.recentAttendances || []).slice(0, 30).map(a => [
+            a.userName || 'N/A',
+            a.packageName || 'N/A',
+            a.action > 0 ? '+1' : '-1',
+            a.date?.toDate ? a.date.toDate().toLocaleDateString() : new Date(a.date).toLocaleDateString()
+        ]);
+
+        doc.autoTable({
+            startY: yPos,
+            head: [[
+                language === 'ar' ? 'المستخدم' : 'User',
+                language === 'ar' ? 'الباقة' : 'Package',
+                language === 'ar' ? 'الإجراء' : 'Action',
+                language === 'ar' ? 'التاريخ' : 'Date'
+            ]],
+            body: attendanceData,
+            theme: 'striped',
+            headStyles: { fillColor: [147, 51, 234] } // Purple
+        });
+
         doc.save(`Captina_Admin_Reports_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
@@ -348,8 +384,8 @@ export default function AdminReports() {
                                     <tr key={i} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                         <td className="px-8 py-5">
                                             <div className="flex flex-col">
-                                                <span className="text-xs font-black truncate max-w-[150px]">{sub.userName || sub.userEmail || 'N/A'}</span>
-                                                <span className="text-[10px] text-gray-500 font-bold">{sub.packageName}</span>
+                                                <span className="text-xs font-black truncate max-w-[150px]">{getText(sub.userName) || sub.userEmail || 'N/A'}</span>
+                                                <span className="text-[10px] text-gray-500 font-bold">{getText(sub.packageName)}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
@@ -420,6 +456,58 @@ export default function AdminReports() {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            {/* Attendance Logs Table (Full Width) */}
+            <div className={`${cardBg} rounded-[3rem] border overflow-hidden mt-8`}>
+                <div className="p-8 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/[0.02]">
+                    <h2 className="text-lg font-black uppercase tracking-tighter flex items-center gap-3">
+                        <UserCheck className="w-5 h-5 text-purple-500" />
+                        {language === 'ar' ? 'سجل الحضور الحديث' : 'Recent Attendance Logs'}
+                    </h2>
+                    <div className="px-4 py-2 bg-purple-500/10 text-purple-500 rounded-full text-xs font-black">
+                        {language === 'ar' ? `إجمالي الحضور: ${stats.totalAttendances || 0}` : `Total Attendances: ${stats.totalAttendances || 0}`}
+                    </div>
+                </div>
+                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table className="w-full text-start px-4 relative">
+                        <thead className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-50 dark:border-white/5 shadow-sm z-10">
+                            <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                <th className="px-8 py-5 text-start">{language === 'ar' ? 'المستخدم' : 'User'}</th>
+                                <th className="px-8 py-5 text-start">{language === 'ar' ? 'الباقة' : 'Package'}</th>
+                                <th className="px-8 py-5 text-start">{language === 'ar' ? 'الإجراء' : 'Action'}</th>
+                                <th className="px-8 py-5 text-start">{language === 'ar' ? 'التاريخ/الوقت' : 'Date/Time'}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                            {stats.recentAttendances?.map((record, i) => (
+                                <tr key={i} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                    <td className="px-8 py-5">
+                                        <span className="text-xs font-black">{getText(record.userName)}</span>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <span className="text-[10px] text-gray-500 font-bold">{getText(record.packageName)}</span>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-black ${record.action > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                            {record.action > 0 ? '+1' : '-1'}
+                                        </span>
+                                    </td>
+                                    <td className="px-8 py-5 font-bold text-[10px] text-gray-400">
+                                        {record.date?.toDate ? record.date.toDate().toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }) : new Date(record.date).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                    </td>
+                                </tr>
+                            ))}
+                            {(!stats.recentAttendances || stats.recentAttendances.length === 0) && (
+                                <tr>
+                                    <td colSpan="4" className="px-8 py-10 text-center text-gray-400 text-xs font-bold">
+                                        {language === 'ar' ? 'لا توجد سجلات حضور حتى الآن' : 'No attendance logs found yet'}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

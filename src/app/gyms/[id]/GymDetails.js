@@ -23,11 +23,12 @@ import {
     CheckCircle2
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
+import GymsMap from "../GymsMap";
 
 export default function GymDetails({ params }) {
     const id = params.id;
     const router = useRouter();
-    const { gyms, language, darkMode, addToCart, setIsCartOpen } = useApp();
+    const { gyms, trainers, language, darkMode, addToCart, setIsCartOpen, getText } = useApp();
     const [activeImageIndex, setActiveImageIndex] = useState(0);
 
     const gym = gyms.find(g => g.id === id);
@@ -46,8 +47,9 @@ export default function GymDetails({ params }) {
         );
     }
 
-    const images = gym.images || [gym.image];
-    const sports = gym.sports || [];
+    const images = (gym.images && gym.images.length > 0) ? gym.images : [gym.image];
+    const sports = gym.linked_sports || gym.sports || [];
+    const trainersCount = gym.trainers_count || gym.trainers || 0;
 
     const nextImage = () => setActiveImageIndex((prev) => (prev + 1) % images.length);
     const prevImage = () => setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
@@ -67,7 +69,7 @@ export default function GymDetails({ params }) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="w-full h-full object-cover"
-                        alt={gym.name}
+                        alt={getText(gym.name)}
                     />
                 </AnimatePresence>
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-[#0a0f1a] via-black/20 to-transparent"></div>
@@ -105,7 +107,7 @@ export default function GymDetails({ params }) {
                                 transition={{ delay: 0.1 }}
                                 className="text-4xl md:text-7xl font-black text-white tracking-tighter uppercase leading-none drop-shadow-2xl"
                             >
-                                {gym.name}
+                                {getText(gym.name)}
                             </motion.h1>
                             <motion.div 
                                 initial={{ opacity: 0, y: 20 }}
@@ -120,7 +122,7 @@ export default function GymDetails({ params }) {
                                 <div className="w-1.5 h-1.5 rounded-full bg-white/30"></div>
                                 <div className="flex items-center gap-2 font-bold">
                                     <MapPin className="w-5 h-5 text-primary" />
-                                    <span className="text-sm tracking-wide">{gym.location}</span>
+                                    <span className="text-sm tracking-wide">{getText(gym.location || gym.address)}</span>
                                 </div>
                             </motion.div>
                         </div>
@@ -164,8 +166,8 @@ export default function GymDetails({ params }) {
                         <section className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                             {[
                                 { label: language === 'ar' ? 'عدد الصالات' : 'Halls Count', val: gym.halls || 1, icon: Building, color: 'from-blue-500/10 to-blue-500/20 text-blue-500' },
-                                { label: language === 'ar' ? 'مدربي النخبة' : 'Elite Coaches', val: gym.trainers || 0, icon: Users2, color: 'from-amber-500/10 to-amber-500/20 text-amber-500' },
-                                { label: language === 'ar' ? 'التقييم العام' : 'Global Rating', val: gym.rating, icon: Trophy, color: 'from-emerald-500/10 to-emerald-500/20 text-emerald-500' },
+                                { label: language === 'ar' ? 'مدربي النخبة' : 'Elite Coaches', val: trainersCount, icon: Users2, color: 'from-amber-500/10 to-amber-500/20 text-amber-500' },
+                                { label: language === 'ar' ? 'التقييم العام' : 'Global Rating', val: gym.rating || '5.0', icon: Trophy, color: 'from-emerald-500/10 to-emerald-500/20 text-emerald-500' },
                                 { label: language === 'ar' ? 'تجربة مميزة' : 'Premium Exp', val: 'VIP', icon: Zap, color: 'from-rose-500/10 to-rose-500/20 text-rose-500' },
                             ].map((stat, i) => (
                                 <Box key={i} className={`p-6 rounded-[2rem] bg-gradient-to-br ${stat.color} border border-white/10 flex flex-col items-center gap-2 text-center`}>
@@ -185,11 +187,47 @@ export default function GymDetails({ params }) {
                                         <div className="w-12 h-12 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                                             <Target className="w-6 h-6 text-primary" />
                                         </div>
-                                        <span className="text-sm font-black uppercase tracking-tight">{sport}</span>
+                                        <span className="text-sm font-black uppercase tracking-tight">{getText(sport)}</span>
                                     </div>
                                 ))}
                             </div>
                         </section>
+
+                        {/* Trainers Section */}
+                        {gym.linked_trainers && gym.linked_trainers.length > 0 && (
+                            <section>
+                                <SectionHeader title={language === 'ar' ? 'مدربي الفرع' : 'Branch Coaches'} icon={Users2} />
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+                                    {gym.linked_trainers.map((linkedTrainer, i) => {
+                                        const fullTrainer = trainers.find(t => t.id === linkedTrainer.id);
+                                        const trainerName = fullTrainer ? getText(fullTrainer.name) : getText(linkedTrainer.name);
+                                        const trainerImage = fullTrainer?.image || "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=1000";
+
+                                        return (
+                                            <motion.div 
+                                                key={i}
+                                                whileHover={{ y: -5 }}
+                                                className="group cursor-pointer"
+                                                onClick={() => router.push(`/trainers/${linkedTrainer.id}`)}
+                                            >
+                                                <div className="relative aspect-square rounded-3xl overflow-hidden mb-3 border border-gray-100 dark:border-white/10 shadow-premium">
+                                                    <img 
+                                                        src={trainerImage} 
+                                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                                                        alt={trainerName}
+                                                    />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                </div>
+                                                <h4 className="text-xs font-black text-center uppercase tracking-tight line-clamp-1">{trainerName}</h4>
+                                                <p className="text-[10px] font-bold text-primary text-center uppercase tracking-widest mt-1 opacity-60">
+                                                    {language === 'ar' ? 'كابتن معتمد' : 'Certified Coach'}
+                                                </p>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        )}
 
                         {/* Facilities Checklist */}
                         <section>
@@ -212,18 +250,32 @@ export default function GymDetails({ params }) {
                         {/* Map & Location */}
                         <div className="p-8 rounded-[2.5rem] bg-white dark:bg-[#1a2235]/60 border border-gray-100 dark:border-white/10 shadow-premium">
                             <h3 className="text-xl font-black mb-6 uppercase tracking-tight">{language === 'ar' ? 'موقعنا' : 'Location'}</h3>
-                            <div className="relative w-full h-48 rounded-[2rem] overflow-hidden mb-6 group">
-                                <img src="https://images.unsplash.com/photo-1526778548025-fa2f459cd5ce?q=80&w=400" className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" alt="map" />
-                                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                    <a href={gym.location_link} target="_blank" className="px-6 py-3 bg-white text-slate-900 font-black rounded-full shadow-2xl flex items-center gap-2 hover:bg-primary hover:text-white transition-all transform hover:scale-105">
-                                        <Navigation className="w-5 h-5" />
-                                        {language === 'ar' ? 'عرض على الخريطة' : 'View Map'}
-                                    </a>
-                                </div>
-                            </div>
+                            
+                            {gym.embed_map ? (
+                                <div 
+                                    className="w-full h-[300px] mb-6 rounded-[2rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium"
+                                    dangerouslySetInnerHTML={{ __html: gym.embed_map.replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, 'height="100%"') }} 
+                                />
+                            ) : (
+                                <GymsMap customGyms={[gym]} className="h-[300px] mb-6" />
+                            )}
+
                             <p className="text-sm font-bold opacity-60 leading-relaxed mb-6">
-                                {gym.location}
+                                {getText(gym.location || gym.address)}
                             </p>
+
+                            {/* Get Directions Button */}
+                            {gym.location_link && (
+                                <a 
+                                    href={gym.location_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-3 w-full py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mb-6 group"
+                                >
+                                    <MapPin className="w-4 h-4 group-hover:animate-bounce" />
+                                    {language === 'ar' ? 'الذهاب للموقع (خرائط جوجل)' : 'Get Directions (Google Maps)'}
+                                </a>
+                            )}
                             
                             <div className="h-px bg-gray-100 dark:bg-white/10 mb-6"></div>
 

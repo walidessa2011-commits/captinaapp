@@ -35,7 +35,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useEffect } from 'react';
 
 export default function SettingsPage() {
-    const { language, setLanguage, darkMode, setDarkMode, t, setAlert, userData } = useApp();
+    const { language, setLanguage, darkMode, setDarkMode, t, setAlert, userData, getLoc } = useApp();
     const router = useRouter();
     const [user] = useAuthState(auth);
     const [activeSection, setActiveSection] = useState('profile');
@@ -163,7 +163,7 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="text-start">
                                             <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight leading-none mb-1">
-                                                {userData?.fullName || user?.displayName || (language === 'ar' ? 'بطل كابتينا' : 'Captina Hero')}
+                                                {getLoc(userData?.fullName) || user?.displayName || (language === 'ar' ? 'بطل كابتينا' : 'Captina Hero')}
                                             </h2>
                                             <p className="text-[9px] text-gray-500 dark:text-gray-400 font-bold tracking-widest uppercase mb-2 truncate max-w-[150px]">{user?.email}</p>
                                             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 rounded-lg border border-emerald-500/10 text-[7px] font-black uppercase tracking-widest">
@@ -182,7 +182,7 @@ export default function SettingsPage() {
                                         </h3>
                                         <div className="space-y-4">
                                             {[
-                                                { icon: User, label: language === 'ar' ? 'الاسم الكامل' : 'Full Name', value: userData?.fullName || user?.displayName || '...' },
+                                                { icon: User, label: language === 'ar' ? 'الاسم الكامل' : 'Full Name', value: getLoc(userData?.fullName) || user?.displayName || '...' },
                                                 { icon: Mail, label: language === 'ar' ? 'البريد الإلكتروني' : 'Email Address', value: userData?.email || user?.email || '...' },
                                                 { icon: Phone, label: language === 'ar' ? 'رقم الهاتف' : 'Mobile Access', value: userData?.phone || user?.phoneNumber || '+966' },
                                                 { icon: Cake, label: language === 'ar' ? 'تاريخ الميلاد' : 'Date of Birth', value: userData?.birthday || '---' },

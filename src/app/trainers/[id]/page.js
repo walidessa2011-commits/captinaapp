@@ -1,18 +1,31 @@
 import TrainerProfileContent from './TrainerProfileContent';
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { trainersData } from "@/lib/trainersData";
 
 export const generateStaticParams = async () => {
+    // Start with static trainer IDs from our local data file
+    const staticParams = Object.keys(trainersData).map((id) => ({
+        id: id,
+    }));
+
     try {
-        const q = query(collection(db, "users"), where("role", "==", "trainer"));
+        // Supplement with active trainers from Firestore
+        const q = query(collection(db, "trainers"), where("status", "==", "active"));
         const querySnapshot = await getDocs(q);
-        const params = querySnapshot.docs.map((doc) => ({
+        const dbParams = querySnapshot.docs.map((doc) => ({
             id: doc.id,
         }));
-        return params.length > 0 ? params : [{ id: '1' }];
+        
+        // Merge and ensure unique IDs
+        const allParams = [...staticParams, ...dbParams];
+        const uniqueIds = Array.from(new Set(allParams.map(p => p.id)));
+        
+        return uniqueIds.map(id => ({ id }));
     } catch (error) {
         console.error("Error generating static params for trainers:", error);
-        return [{ id: '1' }];
+        // Fallback to static data and at least '1'
+        return staticParams.length > 0 ? staticParams : [{ id: '1' }];
     }
 };
 

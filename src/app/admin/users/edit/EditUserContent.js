@@ -17,21 +17,46 @@ import {
     Lock,
     Users,
     Check,
-    Languages
+    Languages,
+    RefreshCw,
+    History,
+    Calendar,
+    ArrowRightCircle,
+    Copy,
+    Activity
 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { 
+    collection, 
+    getDocs, 
+    doc, 
+    updateDoc, 
+    addDoc, 
+    serverTimestamp, 
+    getDoc, 
+    query, 
+    where, 
+    orderBy, 
+    limit 
+} from "firebase/firestore";
 import { motion, AnimatePresence } from 'framer-motion';
 import ImageUpload from "../../components/ImageUpload";
+import Pagination from "../../components/Pagination"; // Assuming this path
 
-export default function EditUserContent({ params }) {
-    const { id } = params;
-    const { language, setAlert } = useApp();
+export default function EditUserContent() {
+    const { language, setAlert, darkMode, getText, getSubscriptionDetails } = useApp();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const id = searchParams.get('id');
+
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSubLoading, setIsSubLoading] = useState(true);
+    const [userSubscriptions, setUserSubscriptions] = useState([]);
+    const [attendanceHistory, setAttendanceHistory] = useState([]);
+    const [formLang, setFormLang] = useState('ar');
     const [formData, setFormData] = useState({
         fullName: { ar: '', en: '' },
         phone: '',
@@ -40,7 +65,6 @@ export default function EditUserContent({ params }) {
         photoURL: '',
         createdAt: ''
     });
-    const [formLang, setFormLang] = useState(language);
     const [previewImage, setPreviewImage] = useState(null);
 
     // Normalize text to object { ar, en }
@@ -50,14 +74,17 @@ export default function EditUserContent({ params }) {
         return { ar: text, en: text };
     };
 
-    // Helper to get text based on current language
-    const getText = (textObj) => {
-        if (!textObj) return '';
-        return textObj[language] || textObj['ar'] || textObj['en'] || '';
-    };
-
     useEffect(() => {
         const fetchUser = async () => {
+            if (!id) {
+                setAlert({
+                    show: true,
+                    message: language === 'ar' ? 'معرف المستخدم مفقود' : 'User ID is missing',
+                    type: 'error'
+                });
+                router.push('/admin/users');
+                return;
+            }
             try {
                 const userDoc = await getDoc(doc(db, "users", id));
                 if (userDoc.exists()) {
@@ -93,6 +120,92 @@ export default function EditUserContent({ params }) {
 
         if (id) fetchUser();
     }, [id, language, router, setAlert]);
+
+    useEffect(() => {
+        const fetchSubscriptionData = async () => {
+            if (!id) return;
+            setIsSubLoading(true);
+            try {
+                // Fetch Subscriptions
+                const subQ = query(collection(db, "subscriptions"), where("userId", "==", id));
+                const subSnap = await getDocs(subQ);
+                let allSubs = subSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+                
+                // Sort by date desc
+                allSubs.sort((a, b) => {
+                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (new Date(a.createdAt).getTime() || 0);
+                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (new Date(b.createdAt).getTime() || 0);
+                    return dateB - dateA;
+                });
+                setUserSubscriptions(allSubs);
+
+                // Fetch Attendance History
+                const attQ = query(
+                    collection(db, "attendance"), 
+                    where("userId", "==", id),
+                    orderBy("date", "desc"),
+                    limit(10)
+                );
+                const attSnap = await getDocs(attQ);
+                setAttendanceHistory(attSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })));
+
+            } catch (err) {
+                console.error("Error fetching subscription data:", err);
+            } finally {
+                setIsSubLoading(false);
+            }
+        };
+
+        fetchSubscriptionData();
+    }, [id]);
+
+    const handleUpdateAttendance = async (subId, increment) => {
+        const sub = userSubscriptions.find(s => s.id === subId);
+        if (!sub) return;
+
+        let newConsumed = (sub.consumedSessions || 0) + increment;
+        if (newConsumed < 0) newConsumed = 0;
+        
+        setIsSaving(true);
+        try {
+            await updateDoc(doc(db, "subscriptions", subId), {
+                consumedSessions: newConsumed,
+                updatedAt: serverTimestamp()
+            });
+
+            const attendanceRecord = {
+                userId: id,
+                userName: getText(formData.fullName) || formData.email || 'Unknown',
+                subscriptionId: subId,
+                sportName: getText(sub.sportName) || sub.sportId || 'Unknown Sport',
+                packageName: getText(sub.packageName || sub.planLabel) || 'Unknown Package',
+                action: increment,
+                date: new Date(),
+                isAdminAction: true
+            };
+
+            const docRef = await addDoc(collection(db, "attendance"), attendanceRecord);
+
+            // Update local state
+            setUserSubscriptions(prev => prev.map(s => s.id === subId ? { ...s, consumedSessions: newConsumed } : s));
+            setAttendanceHistory(prev => [{ id: docRef.id, ...attendanceRecord }, ...prev].slice(0, 10));
+
+            setAlert({
+                show: true,
+                message: language === 'ar' ? 'تم تسجيل الحضور بنجاح' : 'Attendance registered successfully',
+                type: 'success'
+            });
+        } catch (error) {
+            console.error("Error updating attendance:", error);
+            setAlert({
+                show: true,
+                message: language === 'ar' ? 'حدث خطأ أثناء تحديث الحصص' : 'Error updating sessions',
+                type: 'error'
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -252,6 +365,136 @@ export default function EditUserContent({ params }) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Active Subscription & Attendance Panel */}
+                            {userSubscriptions.length > 0 ? (
+                                <div className="space-y-6">
+                                    {userSubscriptions.filter(s => {
+                                        const details = getSubscriptionDetails(s);
+                                        return details && !['expired', 'cancelled', 'rejected'].includes(s.status?.toLowerCase());
+                                    }).map((sub) => {
+                                        const details = getSubscriptionDetails(sub);
+                                        const progress = (details.consumedSessions / (details.totalSessions || 1)) * 100;
+
+                                        return (
+                                            <div key={sub.id} className="bg-white dark:bg-[#111827] rounded-[2rem] p-6 border border-gray-100 dark:border-white/5 shadow-xl relative overflow-hidden group">
+                                                <div className={`absolute top-0 left-0 w-2 h-full ${details.barColor}`}></div>
+                                                
+                                                <div className="flex items-center justify-between mb-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2.5 ${details.statusColor.replace('bg-', 'bg-opacity-10 ')} ${details.statusColor} rounded-xl`}>
+                                                            <Activity className="w-5 h-5" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
+                                                                {getText(sub.sportName) || (language === 'ar' ? 'رياضة غير محددة' : 'Unknown Sport')}
+                                                            </h3>
+                                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${details.statusColor} text-white`}>
+                                                                {details.statusLabel}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4 mb-6">
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="text-gray-400 font-bold">{language === 'ar' ? 'الحصص المستهلكة' : 'Sessions Consumed'}</span>
+                                                        <span className="font-black dark:text-white">{details.consumedSessions} / {details.totalSessions}</span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                                        <motion.div 
+                                                            initial={{ width: 0 }}
+                                                            animate={{ width: `${progress}%` }}
+                                                            className={`h-full ${details.barColor}`}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleUpdateAttendance(sub.id, 1)}
+                                                        disabled={isSaving || details.isPending}
+                                                        className={`flex-grow py-3 ${details.barColor} hover:opacity-90 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95 disabled:grayscale disabled:opacity-50`}
+                                                    >
+                                                        <CheckCircle2 className="w-4 h-4" />
+                                                        {language === 'ar' ? 'تسجيل حضور' : 'Log Attendance'}
+                                                    </button>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handleUpdateAttendance(sub.id, -1)}
+                                                        disabled={isSaving || details.consumedSessions <= 0}
+                                                        className="px-4 py-3 bg-gray-50 dark:bg-white/5 text-gray-400 hover:text-rose-500 rounded-xl transition-colors"
+                                                        title={language === 'ar' ? 'تراجع' : 'Undo'}
+                                                    >
+                                                        <RefreshCw className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Attendance History */}
+                                    {attendanceHistory.length > 0 && (
+                                        <div className="bg-white dark:bg-[#111827] rounded-[2rem] p-6 border border-gray-100 dark:border-white/5">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <History className="w-4 h-4 text-primary" />
+                                                <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
+                                                    {language === 'ar' ? 'سجل الحضور الأخير' : 'Recent Attendance'}
+                                                </h4>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {attendanceHistory.map((log) => (
+                                                    <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-white/5 rounded-2xl border border-transparent hover:border-gray-200 dark:hover:border-white/10 transition-all">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-1.5 rounded-lg ${log.action > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                                                {log.action > 0 ? <CheckCircle2 className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[10px] font-black dark:text-white leading-none mb-1">{getText(log.sportName)}</p>
+                                                                <p className="text-[9px] font-bold text-gray-400">
+                                                                    {log.date?.toDate ? log.date.toDate().toLocaleString() : new Date(log.date).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`text-[10px] font-black ${log.action > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            {log.action > 0 ? '+1' : '-1'}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Linked Accounts Help */}
+                                    {(getText(formData.fullName).toLowerCase().includes('walid') || getText(formData.fullName).includes('وليد')) && (
+                                        <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl">
+                                            <div className="flex gap-3">
+                                                <ShieldAlert className="w-4 h-4 text-blue-500 shrink-0" />
+                                                <p className="text-[10px] font-bold text-blue-600/80 leading-relaxed">
+                                                    {language === 'ar' 
+                                                        ? 'ملاحظة: هذا المستخدم قد يمتلك حسابات متعددة (مدرب/متدرب). إذا لم يظهر الاشتراك المتوقع، تأكد من أنك في حساب "المتدرب" الصحيح.' 
+                                                        : 'Note: This user may have multiple accounts (Trainer/Trainee). If the expected subscription is missing, ensure you are viewing the correct "Trainee" account.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                !isSubLoading && (
+                                    <div className="bg-gray-50 dark:bg-white/5 rounded-[2rem] p-8 border border-gray-100 dark:border-white/5 text-center">
+                                        <div className="w-16 h-16 rounded-[2rem] bg-gray-100 dark:bg-white/10 flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-gray-200 dark:border-white/10">
+                                            <ShieldAlert className="w-8 h-8 text-gray-300" />
+                                        </div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white mb-2 uppercase tracking-wider">
+                                            {language === 'ar' ? 'لا توجد اشتراكات' : 'No Subscriptions'}
+                                        </h4>
+                                        <p className="text-[11px] font-bold text-gray-400 max-w-[200px] mx-auto">
+                                            {language === 'ar' ? 'هذا المستخدم ليس لديه أي اشتراكات سابقة أو حالية في النظام.' : 'This user has no past or current subscriptions in the system.'}
+                                        </p>
+                                    </div>
+                                )
+                            )}
                         </div>
 
                         {/* Edit Form */}

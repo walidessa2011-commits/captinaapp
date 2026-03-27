@@ -3,6 +3,7 @@ import React, { use, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Play, Clock, Share2, Search, PlaySquare, X } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
+import { getYouTubeEmbedUrl, getYouTubeId } from "@/lib/utils";
 import { useRouter } from 'next/navigation';
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -204,9 +205,9 @@ export default function CategoryVideos({ params }) {
                                 <X className="w-6 h-6" />
                             </button>
                             
-                            {activeVideo.videoUrl.includes('youtube.com') || activeVideo.videoUrl.includes('youtu.be') ? (
+                            {getYouTubeId(activeVideo.videoUrl) ? (
                                 <iframe 
-                                    src={activeVideo.videoUrl.replace('watch?v=', 'embed/').split('&')[0]}
+                                    src={getYouTubeEmbedUrl(activeVideo.videoUrl)}
                                     className="w-full h-full"
                                     allowFullScreen
                                     title="Video Player"

@@ -43,8 +43,10 @@ export default function AdminPackages() {
         discount: '0',
         durationText: { ar: '', en: '' },
         features: { ar: [], en: [] },
+        badge: { ar: '', en: '' },
         featured: false,
         months: '1',
+        sessionsPerWeek: '3',
         sport: 'general',
         order: '1'
     });
@@ -99,8 +101,10 @@ export default function AdminPackages() {
                     ar: pkg.features_ar || (Array.isArray(pkg.features) ? pkg.features : []),
                     en: pkg.features_en || (Array.isArray(pkg.features) ? pkg.features : [])
                 },
+                badge: normalizeText(pkg.badge_ar || pkg.badge),
                 featured: pkg.featured || false,
                 months: String(pkg.months || 1),
+                sessionsPerWeek: String(pkg.sessionsPerWeek || 3),
                 sport: pkg.sport || 'general',
                 order: String(pkg.order || 1)
             });
@@ -114,8 +118,10 @@ export default function AdminPackages() {
                 discount: '0',
                 durationText: { ar: '', en: '' },
                 features: { ar: [], en: [] },
+                badge: { ar: '', en: '' },
                 featured: false,
                 months: '1',
+                sessionsPerWeek: '3',
                 sport: 'general',
                 order: String(packages.length + 1)
             });
@@ -140,8 +146,11 @@ export default function AdminPackages() {
                 duration_en: formData.durationText.en,
                 features_ar: formData.features.ar,
                 features_en: formData.features.en,
+                badge_ar: formData.badge.ar,
+                badge_en: formData.badge.en,
                 featured: formData.featured,
                 months: Number(formData.months),
+                sessionsPerWeek: Number(formData.sessionsPerWeek),
                 sport: formData.sport,
                 order: Number(formData.order),
                 updatedAt: serverTimestamp(),
@@ -150,6 +159,7 @@ export default function AdminPackages() {
                 description: language === 'ar' ? formData.description.ar : formData.description.en,
                 features: language === 'ar' ? formData.features.ar : formData.features.en,
                 duration: language === 'ar' ? formData.durationText.ar : formData.durationText.en,
+                badge: language === 'ar' ? formData.badge.ar : formData.badge.en,
                 currency: language === 'ar' ? 'ر.س' : 'SAR'
             };
 
@@ -224,6 +234,7 @@ export default function AdminPackages() {
                             <tr className="border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-start">{language === 'ar' ? 'الباقة' : 'Package'}</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-start">{language === 'ar' ? 'السعر' : 'Price'}</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-start">{language === 'ar' ? 'الحصص/أسبوع' : 'Sessions/Wk'}</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-start">{language === 'ar' ? 'المدة' : 'Duration'}</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-start">{language === 'ar' ? 'الميزة' : 'Featured'}</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-widest text-end">{language === 'ar' ? 'إجراءات' : 'Actions'}</th>
@@ -248,6 +259,11 @@ export default function AdminPackages() {
                                             <span className="text-sm font-black text-slate-900 dark:text-white">{pkg.price} {language === 'ar' ? 'ر.س' : 'SAR'}</span>
                                             {pkg.discount > 0 && <span className="text-[10px] text-rose-500 font-bold">-{pkg.discount}%</span>}
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-xs font-black">
+                                            {pkg.sessionsPerWeek || 3} {language === 'ar' ? 'حصص' : 'sessions'}
+                                        </span>
                                     </td>
                                     <td className="px-6 py-4 text-sm font-bold text-gray-500">
                                         {pkg.duration_ar || pkg.duration || pkg.durationText}
@@ -318,6 +334,10 @@ export default function AdminPackages() {
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Description ({formLang})</label>
                                             <input type="text" value={formData.description[formLang]} onChange={(e) => setFormData(p => ({ ...p, description: { ...p.description, [formLang]: e.target.value } }))} className="w-full bg-gray-50 dark:bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold outline-none focus:border-purple-500" required />
                                         </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Badge Text ({formLang})</label>
+                                            <input type="text" value={formData.badge[formLang]} onChange={(e) => setFormData(p => ({ ...p, badge: { ...p.badge, [formLang]: e.target.value } }))} placeholder="e.g. Most Popular" className="w-full bg-gray-50 dark:bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold outline-none focus:border-purple-500" />
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -336,6 +356,10 @@ export default function AdminPackages() {
                                         <div className="space-y-2">
                                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Months</label>
                                             <input type="number" value={formData.months} onChange={(e) => setFormData(p => ({ ...p, months: e.target.value }))} className="w-full bg-gray-50 dark:bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold outline-none focus:border-purple-500" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest">{language === 'ar' ? 'الحصص/أسبوع' : 'Sessions/Week'}</label>
+                                            <input type="number" min="1" max="7" value={formData.sessionsPerWeek} onChange={(e) => setFormData(p => ({ ...p, sessionsPerWeek: e.target.value }))} className="w-full bg-gray-50 dark:bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold outline-none focus:border-purple-500" />
                                         </div>
                                     </div>
 

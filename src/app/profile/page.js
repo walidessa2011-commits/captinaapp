@@ -8,11 +8,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { signOut, updateProfile } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { updateDoc, doc, getDoc, collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
+import { updateDoc, doc, getDoc, collection, query, where, getDocs, limit, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { storage, auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
@@ -23,7 +23,9 @@ export default function Profile() {
         favoriteTrainers, toggleFavoriteTrainer, trainers,
         favoriteSports, toggleFavoriteSport, sports,
         appContent,
-        user, userData, loadingAuth
+        user, userData, loadingAuth,
+        addToCart, setIsCartOpen,
+        getSubscriptionDetails
     } = useApp();
 
     const getText = (field) => {
@@ -45,6 +47,39 @@ export default function Profile() {
     const [upcomingSchedules, setUpcomingSchedules] = useState([]);
     const [loadingSchedules, setLoadingSchedules] = useState(true);
     const [trainingStats, setTraingStats] = useState({ sessions: 0, activeSports: 0, streak: 0 });
+    const subDetails = useMemo(() => getSubscriptionDetails(activeSubscription), [activeSubscription, getSubscriptionDetails]);
+
+    const [isRenewDropdownOpen, setIsRenewDropdownOpen] = useState(false);
+    const [requestLoading, setRequestLoading] = useState(false);
+
+    const handleSubscriptionRequest = async (type) => {
+        if (!user || !activeSubscription) return;
+        setRequestLoading(true);
+        try {
+            await addDoc(collection(db, "subscription_requests"), {
+                userId: user.uid,
+                currentSubscriptionId: activeSubscription.id,
+                type: type, // 'renew', 'upgrade', 'change_sport'
+                status: 'pending',
+                createdAt: serverTimestamp()
+            });
+            setAlert({
+                title: language === 'ar' ? 'تم إرسال الطلب' : 'Request Sent',
+                message: language === 'ar' ? 'تم إرسال طلبك بنجاح. سيتواصل معك فريق الدعم قريباً.' : 'Your request has been sent successfully. Support team will contact you soon.',
+                type: 'success'
+            });
+            setIsRenewDropdownOpen(false);
+        } catch (error) {
+            console.error("Error sending request:", error);
+            setAlert({
+                title: language === 'ar' ? 'خطأ' : 'Error',
+                message: language === 'ar' ? 'حدث خطأ أثناء إرسال الطلب، الرجاء المحاولة مرة أخرى.' : 'Error sending request, please try again.',
+                type: 'error'
+            });
+        } finally {
+            setRequestLoading(false);
+        }
+    };
  
      useEffect(() => {
          if (!loadingAuth && !user) {
@@ -52,30 +87,36 @@ export default function Profile() {
              return;
          }
  
-                      const fetchProfile = async () => {
+         const fetchProfile = () => {
              if (user) {
-                 try {
-                     // Fetch latest subscription
-                     const subsRef = collection(db, "subscriptions");
-                     const q = query(
-                         subsRef, 
-                         where("userId", "==", user.uid),
-                         orderBy("createdAt", "desc"),
-                         limit(1)
-                     );
-                     const subSnap = await getDocs(q);
-                     if (!subSnap.empty) {
-                         setActiveSubscription({ id: subSnap.docs[0].id, ...subSnap.docs[0].data() });
+                 // Listen to latest subscription
+                 const subsRef = collection(db, "subscriptions");
+                 const q = query(
+                     subsRef, 
+                     where("userId", "==", user.uid),
+                     orderBy("createdAt", "desc"),
+                     limit(1)
+                 );
+                 
+                 const unsubSub = onSnapshot(q, (snapshot) => {
+                     if (!snapshot.empty) {
+                         setActiveSubscription({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
                      }
+                     setLoadingSub(false);
+                 }, (err) => {
+                     console.error("Error listening to subscription:", err);
+                     setLoadingSub(false);
+                 });
 
-                     // Fetch Training Schedules
-                     const schedulesRef = collection(db, "training_schedules");
-                     const sq = query(
-                         schedulesRef,
-                         where("userId", "==", user.uid)
-                     );
-                     const schedulesSnap = await getDocs(sq);
-                     const schedulesList = schedulesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                 // Listen to Training Schedules
+                 const schedulesRef = collection(db, "training_schedules");
+                 const sq = query(
+                     schedulesRef,
+                     where("userId", "==", user.uid)
+                 );
+                 
+                 const unsubSchedules = onSnapshot(sq, async (snapshot) => {
+                     const schedulesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                      
                      // Logic for "Upcoming Sessions" based on current weekly cycle
                      const now = new Date();
@@ -84,7 +125,8 @@ export default function Profile() {
 
                      const timeToMinutes = (timeStr) => {
                          if (!timeStr) return 0;
-                         const [time, period] = timeStr.split(' ');
+                         const cleanTime = timeStr.includes(' ') ? timeStr : timeStr + ' AM'; // fallback
+                         const [time, period] = cleanTime.split(' ');
                          let [hours, minutes] = time.split(':').map(Number);
                          if (period === 'PM' && hours !== 12) hours += 12;
                          if (period === 'AM' && hours === 12) hours = 0;
@@ -104,8 +146,8 @@ export default function Profile() {
                      }).sort((a, b) => a.absoluteMinutes - b.absoluteMinutes);
 
                      setUpcomingSchedules(sortedUpcoming);
-
-                     // Fetch Dynamic Stats: Completed Sessions
+                     
+                     // Fetch Dynamic Stats: Completed Sessions (staying as getDocs for stats usually ok, but can be onSnapshot too)
                      const bookingsRef = collection(db, "bookings");
                      const completedQuery = query(
                          bookingsRef,
@@ -113,25 +155,30 @@ export default function Profile() {
                          where("status", "==", "completed")
                      );
                      const completedSnap = await getDocs(completedQuery);
-                     const completedCount = completedSnap.size;
-
-                     // Update training stats state
+                     
                      setTraingStats({
-                         sessions: completedCount,
+                         sessions: completedSnap.size,
                          activeSports: new Set(schedulesList.map(s => s.name_en || s.name_ar)).size,
                          streak: userData?.streak || 0 
                      });
-
-                 } catch (error) {
-                     console.error("Error fetching profile details:", error);
-                 } finally {
-                     setLoadingSub(false);
+                     
                      setLoadingSchedules(false);
-                 }
+                 }, (err) => {
+                     console.error("Error listening to schedules:", err);
+                     setLoadingSchedules(false);
+                 });
+
+                 return () => {
+                     unsubSub();
+                     unsubSchedules();
+                 };
              }
          };
 
-         fetchProfile();
+         const unsubs = fetchProfile();
+         return () => {
+             if (unsubs) unsubs();
+         };
      }, [user, loadingAuth, router]);
 
     const handleImageUpload = async (file, type) => {
@@ -193,7 +240,7 @@ export default function Profile() {
     }
 
     const trainee = {
-        name: userData?.fullName || user?.displayName || (language === 'ar' ? "مستخدم جديد" : "New User"),
+        name: getText(userData?.fullName) || user?.displayName || (language === 'ar' ? "مستخدم جديد" : "New User"),
         email: user?.email || "No email",
         phone: userData?.phone || (language === 'ar' ? "لا يوجد رقم" : "No phone"),
         goal: userData?.goal || (language === 'ar' ? "لم يتم تحديد هدف بعد" : "No goal set yet"),
@@ -338,7 +385,165 @@ export default function Profile() {
 
                 {/* Quick Actions Grid - Premium Buttons */}
                 <div className="grid grid-cols-2 gap-4 mb-8">
-                    {activeSubscription ? (
+                        {/* Package Info Section */}
+                        <div className="col-span-2 space-y-4">
+                            <div className="flex items-center gap-2 px-2">
+                                <div className={`w-1.5 h-4 ${subDetails?.barColor || 'bg-gray-400'} rounded-full`}></div>
+                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">{content.currentPackage}</h3>
+                            </div>
+                            <motion.div 
+                                className={`bg-gradient-to-br ${subDetails ? subDetails.statusColor.replace('bg-', 'bg-opacity-10 from-') + ' to-slate-900 border-' + subDetails.statusColor.replace('bg-', '') + '/20' : 'from-gray-500/10 to-slate-900 border-white/5'} rounded-[2rem] p-6 border relative overflow-visible shadow-premium`}
+                            >
+                                {/* Special Post-Trial Offer Badge */}
+                                {!activeSubscription && userData?.has_used_trial && (
+                                    <div className="absolute top-0 left-0 right-0 bg-amber-500 py-1 text-center z-20 rounded-t-[2rem]">
+                                        <span className="text-[9px] font-black text-black uppercase tracking-[0.2em] animate-pulse">
+                                            {language === 'ar' ? 'عرض خاص: خصم 20% على باقتك الأولى!' : 'SPECIAL OFFER: 20% OFF YOUR FIRST PACKAGE!'}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className={`absolute top-0 right-0 w-32 h-32 ${subDetails?.statusColor?.replace('bg-', 'bg-opacity-10 bg-') || 'bg-gray-500/10'} blur-3xl rounded-full`}></div>
+                                
+                                <div className="flex justify-between items-start mb-6 relative z-10 p-1">
+                                    <div className="text-start">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <Package className={`w-4 h-4 ${subDetails?.statusColor?.replace('bg-', 'text-') || 'text-gray-400'}`} />
+                                            <h4 className={`text-xs font-black uppercase tracking-wider ${subDetails?.statusColor?.replace('bg-', 'text-') || 'text-gray-400'}`}>
+                                                {activeSubscription ? getText(activeSubscription.planLabel) : (language === 'ar' ? 'لا يوجد اشتراك نشط' : 'No Active Subscription')}
+                                            </h4>
+                                        </div>
+                                        <p className="text-[11px] font-bold text-gray-400">
+                                            {activeSubscription 
+                                                ? (language === 'ar' ? `بدءاً من ${activeSubscription.startDate}` : `Starting ${activeSubscription.startDate}`)
+                                                : (language === 'ar' ? 'اشترك الآن للحصول على باقة تدريب' : 'Subscribe now to get a training package')
+                                            }
+                                        </p>
+                                    </div>
+                                    <span className={`${subDetails?.statusColor || 'bg-gray-500'} ${subDetails?.textColor || 'text-white'} px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none shadow-lg mt-1`}>
+                                        {activeSubscription 
+                                            ? subDetails?.statusLabel
+                                            : (language === 'ar' ? 'غير مشترك' : 'Not Joined')
+                                        }
+                                    </span>
+                                </div>
+                                
+                                {activeSubscription && subDetails && (
+                                    (() => {
+                                        const totalSess = subDetails.totalSessions;
+                                        const consumedSess = subDetails.consumedSessions;
+                                        const remainingSess = subDetails.remainingSessions;
+                                        const progressPercent = totalSess > 0 ? (remainingSess / totalSess) * 100 : (subDetails.isPending ? 100 : 0);
+                                        
+                                        let progressColor = 'from-emerald-400 to-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
+                                        let textColor = 'text-emerald-500';
+                                        if (progressPercent <= 25) {
+                                            progressColor = 'from-rose-400 to-rose-600 shadow-[0_0_15px_rgba(244,63,94,0.5)]';
+                                            textColor = 'text-rose-500';
+                                        } else if (progressPercent <= 50) {
+                                            progressColor = 'from-amber-400 to-amber-600 shadow-[0_0_15px_rgba(245,158,11,0.5)]';
+                                            textColor = 'text-amber-500';
+                                        }
+
+                                        return (
+                                            <div className="mb-6 relative z-10 p-1">
+                                                <div className="flex justify-between text-[11px] font-black text-gray-300 mb-2">
+                                                    <span>{getText(activeSubscription.sportName) || (language === 'ar' ? 'رياضة' : 'Sport')}</span>
+                                                    <span className={textColor}>{remainingSess} {language === 'ar' ? 'حصص متبقية' : 'Sessions left'}</span>
+                                                </div>
+                                                <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden border border-white/5">
+                                                    <motion.div 
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${progressPercent}%` }}
+                                                        transition={{ duration: 1, ease: "easeOut" }}
+                                                        className={`bg-gradient-to-r ${progressColor} h-full rounded-full`}
+                                                    ></motion.div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()
+                                )}
+
+                                {!activeSubscription && !userData?.has_used_trial && (
+                                    <motion.button 
+                                        initial={{ scale: 0.95 }}
+                                        animate={{ scale: [0.95, 1.02, 0.95] }}
+                                        transition={{ repeat: Infinity, duration: 2 }}
+                                        onClick={() => {
+                                            const pkg = { id: 'trial', name: language === 'ar' ? 'حصّة تجريبية' : 'Free Trial', price: 0 };
+                                            addToCart(pkg, { 
+                                                type: 'subscription', 
+                                                metadata: { 
+                                                    packageId: 'trial',
+                                                    isTrial: true
+                                                } 
+                                            });
+                                            setIsCartOpen(true);
+                                        }}
+                                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 shadow-xl shadow-emerald-500/20 mb-4 flex items-center justify-center gap-2"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        {language === 'ar' ? 'احجز حصة مجانية الآن' : 'Book Free Trial Now'}
+                                    </motion.button>
+                                )}
+
+                                <div className="relative z-20">
+                                    {(activeSubscription && subDetails?.isActive) ? (
+                                        <>
+                                            <button 
+                                                onClick={() => setIsRenewDropdownOpen(!isRenewDropdownOpen)}
+                                                className="w-full bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border-emerald-500/20 border py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 flex items-center justify-center gap-2"
+                                            >
+                                                {language === 'ar' ? 'خيارات الاشتراك' : 'Subscription Options'}
+                                                <ChevronRight className={`w-4 h-4 transition-transform ${isRenewDropdownOpen ? 'rotate-90' : ''}`} />
+                                            </button>
+
+                                            {/* Renew Dropdown */}
+                                            {isRenewDropdownOpen && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#1a2235] rounded-2xl border border-gray-100 dark:border-white/10 shadow-2xl overflow-hidden z-50 p-2 space-y-1"
+                                                >
+                                                    <button 
+                                                        disabled={requestLoading}
+                                                        onClick={() => handleSubscriptionRequest('renew')}
+                                                        className="w-full text-start px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-xs font-bold flex items-center justify-between group disabled:opacity-50"
+                                                    >
+                                                        <span>{language === 'ar' ? 'طلب تجديد الاشتراك' : 'Request Renewal'}</span>
+                                                        <TrendingUp className="w-4 h-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    </button>
+                                                    <button 
+                                                        disabled={requestLoading}
+                                                        onClick={() => handleSubscriptionRequest('upgrade')}
+                                                        className="w-full text-start px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-xs font-bold flex items-center justify-between group disabled:opacity-50"
+                                                    >
+                                                        <span>{language === 'ar' ? 'طلب ترقية الباقة (مدة أعلى)' : 'Request Upgrade (Longer Duration)'}</span>
+                                                        <Sparkles className="w-4 h-4 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    </button>
+                                                    <button 
+                                                        disabled={requestLoading}
+                                                        onClick={() => handleSubscriptionRequest('change_sport')}
+                                                        className="w-full text-start px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-xs font-bold flex items-center justify-between group disabled:opacity-50"
+                                                    >
+                                                        <span>{language === 'ar' ? 'طلب تغيير الرياضة' : 'Request Sport Change'}</span>
+                                                        <Target className="w-4 h-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </>
+                                    ) : (!activeSubscription || activeSubscription.status === 'expired' || activeSubscription.status === 'rejected') ? (
+                                        <button 
+                                            onClick={() => router.push('/packages')}
+                                            className="w-full bg-orange-500 hover:bg-orange-600 text-white border-transparent shadow-orange-500/20 shadow-xl border py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            {language === 'ar' ? 'اشترك الآن' : 'Subscribe Now'}
+                                        </button>
+                                    ) : null}
+                                </div>
+                            </motion.div>
+                        </div>
+
+                    {activeSubscription && (
                         <>
                             <button 
                                 onClick={() => router.push('/profile/training?tab=classes')}
@@ -363,23 +568,11 @@ export default function Profile() {
                                 </span>
                             </button>
                         </>
-                    ) : (
-                        <button 
-                            onClick={() => router.push('/packages')}
-                            className="bg-primary text-white rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:scale-[1.02] transition-all active:scale-95 group"
-                        >
-                            <div className="p-2 bg-white/20 rounded-xl group-hover:bg-white/30 transition-colors">
-                                <Calendar className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-black uppercase tracking-wider">
-                                {language === 'ar' ? 'اشترك الآن' : 'Join Now'}
-                            </span>
-                        </button>
                     )}
                     
                     <button 
                         onClick={() => router.push('/profile/orders')}
-                        className={`bg-white dark:bg-white/5 text-slate-900 dark:text-white border border-gray-100 dark:border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-[1.02] transition-all active:scale-95 outline-none group ${activeSubscription ? 'col-span-2' : ''}`}
+                        className={`bg-white dark:bg-white/5 text-slate-900 dark:text-white border border-gray-100 dark:border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-[1.02] transition-all active:scale-95 outline-none group`}
                     >
                         <div className="p-2 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl group-hover:bg-emerald-500/20 dark:group-hover:bg-emerald-500/10 transition-colors text-emerald-500">
                             <ShoppingBag className="w-5 h-5" />
@@ -389,12 +582,22 @@ export default function Profile() {
                     
                     <button 
                         onClick={() => router.push('/profile/card')}
-                        className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:scale-[1.02] transition-all active:scale-95 outline-none group col-span-2"
+                        className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:scale-[1.02] transition-all active:scale-95 outline-none group"
                     >
                         <div className="p-2 bg-primary/20 rounded-xl group-hover:bg-primary/30 transition-colors text-primary">
                             <QrCode className="w-5 h-5" />
                         </div>
                         <span className="text-sm font-black uppercase tracking-wider">{language === 'ar' ? 'بطاقتي' : 'My Card'}</span>
+                    </button>
+
+                    <button 
+                        onClick={() => router.push('/profile/addresses')}
+                        className="bg-white dark:bg-white/5 text-slate-900 dark:text-white border border-gray-100 dark:border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-[1.02] transition-all active:scale-95 outline-none group col-span-2"
+                    >
+                        <div className="p-2 bg-rose-500/10 dark:bg-rose-500/5 rounded-xl group-hover:bg-rose-500/20 dark:group-hover:bg-rose-500/10 transition-colors text-rose-500">
+                            <MapPin className="w-5 h-5" />
+                        </div>
+                        <span className="text-sm font-black uppercase tracking-wider">{language === 'ar' ? 'عناويني' : 'My Addresses'}</span>
                     </button>
                 </div>
 
@@ -468,89 +671,7 @@ export default function Profile() {
                             )}
                         </div>
 
-                        {/* Package Info - Live Data Card */}
-                        <motion.div 
-                            whileHover={{ y: -5 }}
-                            className={`bg-gradient-to-br ${activeSubscription ? 'from-amber-500/20 to-slate-900 border-amber-500/30' : 'from-gray-500/10 to-slate-900 border-white/5'} rounded-[2rem] p-6 border relative overflow-hidden shadow-premium group`}
-                        >
-                            {/* Special Post-Trial Offer Badge */}
-                            {!activeSubscription && userData?.has_used_trial && (
-                                <div className="absolute top-0 left-0 right-0 bg-amber-500 py-1 text-center z-20">
-                                    <span className="text-[9px] font-black text-black uppercase tracking-[0.2em] animate-pulse">
-                                        {language === 'ar' ? 'عرض خاص: خصم 20% على باقتك الأولى!' : 'SPECIAL OFFER: 20% OFF YOUR FIRST PACKAGE!'}
-                                    </span>
-                                </div>
-                            )}
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full"></div>
-                            
-                            <div className="flex justify-between items-start mb-6 relative z-10">
-                                <div className="text-start">
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                        <Package className={`w-4 h-4 ${activeSubscription ? 'text-amber-500' : 'text-gray-400'}`} />
-                                        <h4 className={`text-xs font-black uppercase tracking-wider ${activeSubscription ? 'text-amber-500' : 'text-gray-400'}`}>
-                                            {activeSubscription ? activeSubscription.planLabel : (language === 'ar' ? 'لا يوجد اشتراك نشط' : 'No Active Subscription')}
-                                        </h4>
-                                    </div>
-                                    <p className="text-[11px] font-bold text-gray-400">
-                                        {activeSubscription 
-                                            ? (language === 'ar' ? `بدءاً من ${activeSubscription.startDate}` : `Starting ${activeSubscription.startDate}`)
-                                            : (language === 'ar' ? 'اشترك الآن للحصول على باقة تدريب' : 'Subscribe now to get a training package')
-                                        }
-                                    </p>
-                                </div>
-                                <span className={`${activeSubscription?.status === 'confirmed' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-black'} px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none shadow-lg`}>
-                                    {activeSubscription 
-                                        ? (activeSubscription.status === 'confirmed' ? (language === 'ar' ? 'نشطة' : 'Active') : (language === 'ar' ? 'قيد المراجعة' : 'Pending'))
-                                        : (language === 'ar' ? 'غير مشترك' : 'Not Joined')
-                                    }
-                                </span>
-                            </div>
-                            
-                            <div className="mb-6 relative z-10">
-                                <div className="flex justify-between text-[11px] font-black text-gray-300 mb-2">
-                                    <span>{activeSubscription ? activeSubscription.sportName : (language === 'ar' ? '0 حصص متبقية' : '0 Sessions remaining')}</span>
-                                    <span className="text-amber-500">{activeSubscription ? '100%' : '0%'}</span>
-                                </div>
-                                <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden border border-white/5">
-                                    <motion.div 
-                                        initial={{ width: 0 }}
-                                        animate={{ width: activeSubscription ? '100%' : '0%' }}
-                                        transition={{ duration: 1, ease: "easeOut" }}
-                                        className="bg-gradient-to-r from-amber-600 to-amber-400 h-full rounded-full shadow-[0_0_15px_rgba(245,158,11,0.5)]"
-                                    ></motion.div>
-                                </div>
-                            </div>
-                            
-                            {!activeSubscription && !userData?.has_used_trial && (
-                                <motion.button 
-                                    initial={{ scale: 0.95 }}
-                                    animate={{ scale: [0.95, 1.02, 0.95] }}
-                                    transition={{ repeat: Infinity, duration: 2 }}
-                                    onClick={() => {
-                                        const pkg = { id: 'trial', name: language === 'ar' ? 'حصّة تجريبية' : 'Free Trial', price: 0 };
-                                        addToCart(pkg, { 
-                                            type: 'subscription', 
-                                            metadata: { 
-                                                packageId: 'trial',
-                                                isTrial: true
-                                            } 
-                                        });
-                                        setIsCartOpen(true);
-                                    }}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 shadow-xl shadow-emerald-500/20 mb-4 flex items-center justify-center gap-2"
-                                >
-                                    <Sparkles className="w-4 h-4" />
-                                    {language === 'ar' ? 'احجز حصة مجانية الآن' : 'Book Free Trial Now'}
-                                </motion.button>
-                            )}
 
-                            <button 
-                                onClick={() => router.push('/packages')}
-                                className="w-full bg-amber-500/10 hover:bg-amber-500 hover:text-black text-amber-500 border border-amber-500/20 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95"
-                            >
-                                {activeSubscription ? (language === 'ar' ? 'تعديل أو تجديد' : 'Edit or Renew') : (language === 'ar' ? 'اشترك الآن' : 'Subscribe Now')}
-                            </button>
-                        </motion.div>
                     </div>
 
                     {/* Right Column */}
@@ -630,43 +751,7 @@ export default function Profile() {
                             </div>
                         </div>
 
-                        {/* My Addresses Section - Premium Glass Card */}
-                        <div className="space-y-4 pb-4">
-                            <div className="flex items-center justify-between px-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
-                                    <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                        {language === 'ar' ? 'عناويني المسجلة' : 'My Saved Addresses'}
-                                    </h3>
-                                </div>
-                                <Link href="/profile/addresses" className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:underline">
-                                    {language === 'ar' ? 'إدارة العناوين' : 'Manage Addresses'}
-                                </Link>
-                            </div>
-                            
-                            <motion.div 
-                                onClick={() => router.push('/profile/addresses')}
-                                whileHover={{ scale: 1.01 }}
-                                className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-2xl p-4 border border-gray-100 dark:border-white/10 shadow-premium flex items-center justify-between group cursor-pointer"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
-                                        <MapPin className="w-5 h-5 text-emerald-500" />
-                                    </div>
-                                    <div className="text-start">
-                                        <h4 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
-                                            {language === 'ar' ? 'عناوين الشحن والتوصيل' : 'Shipping & Delivery'}
-                                        </h4>
-                                        <p className="text-[10px] font-bold text-gray-500 mt-0.5 leading-tight">
-                                            {language === 'ar' ? 'أضف مواقعك المفضلة لسرعة الطلب' : 'Add favorite locations for faster checkout'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                                    <Plus className="w-4 h-4" />
-                                </div>
-                            </motion.div>
-                        </div>
+                        {/* Address Section removed as per new layout */}
                     </div>
                 </div>
                 

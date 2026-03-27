@@ -5,7 +5,7 @@ import {
     Target, TrendingUp, Users, ShoppingBag,
     ArrowLeft, Star, ChevronRight, Gift,
     Bell, ChevronLeft, Search, Settings2,
-    Activity, Dumbbell, UserCheck, Flame, Sparkles, GraduationCap, PlaySquare, Heart, Clock, Check
+    Activity, Dumbbell, Flame, Sparkles, PlaySquare, Heart, Clock, Check
 } from 'lucide-react';
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,7 @@ import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { collection, getDocs, query, where, limit } from "firebase/firestore";
 import { trainersData } from "@/lib/trainersData";
+import { getSportImage } from "@/lib/sportsData";
 
 export default function Home() {
     const {
@@ -52,8 +53,23 @@ export default function Home() {
     const [currentPackage, setCurrentPackage] = useState(0);
     const [billingCycle, setBillingCycle] = useState('monthly');
 
+    const [latestVideos, setLatestVideos] = useState([]);
+
     useEffect(() => {
-        // Data is now handled globally in AppContext with real-time listeners
+        const fetchVideos = async () => {
+            try {
+                const q = query(
+                    collection(db, "library"), 
+                    where("status", "==", "active"),
+                    limit(6)
+                );
+                const querySnapshot = await getDocs(q);
+                setLatestVideos(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (error) {
+                console.error("Error fetching library videos:", error);
+            }
+        };
+        fetchVideos();
     }, []);
 
     // Using dynamic data from useApp() instead of static translation data
@@ -299,7 +315,7 @@ export default function Home() {
                                             className="group relative h-44 md:h-[220px] rounded-[1.5rem] overflow-hidden shadow-2xl border border-white/10 bg-black"
                                         >
                                             <img 
-                                                src={sport.image || "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400"} 
+                                                src={getSportImage(sport.id, sport.image || sport.heroBanner || sport.heroImg, language)} 
                                                 alt={displayName}
                                                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-80"
                                             />
@@ -460,7 +476,7 @@ export default function Home() {
                                 className={`flex-shrink-0 w-64 md:w-72 ${cardBg} rounded-[2rem] border shadow-sm overflow-hidden group snap-start cursor-pointer`}
                             >
                                 <div className="relative h-32 md:h-40">
-                                    <img src={gym.image} alt={gym.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                    <img src={gym.image} alt={getText(gym.name)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                                     <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
                                         <span className="text-[9px] text-white font-black uppercase tracking-tighter">{gym.type}</span>
@@ -468,7 +484,7 @@ export default function Home() {
                                 </div>
                                 <div className="p-4 text-start">
                                     <div className="flex justify-between items-start mb-2">
-                                        <h3 className={`text-xs md:text-sm font-black ${textClass}`}>{gym.name}</h3>
+                                        <h3 className={`text-xs md:text-sm font-black ${textClass}`}>{getText(gym.name)}</h3>
                                         <div className="flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-md text-primary">
                                             <Star className="w-2.5 h-2.5 fill-current" />
                                             <span className="text-[9px] font-black">{gym.rating}</span>
@@ -570,20 +586,10 @@ export default function Home() {
                                     {/* Bottom Section */}
                                     <div className={`flex items-center justify-between border-t pt-5 ${pkg.featured ? 'border-white/10' : 'border-gray-50 dark:border-white/5'}`}>
                                         <button 
-                                            onClick={() => {
-                                                addToCart(pkg, { 
-                                                    type: 'subscription', 
-                                                    metadata: { 
-                                                        packageId: pkg.id,
-                                                        isTrial: pkg.id === 'trial',
-                                                        billingCycle: billingCycle
-                                                    } 
-                                                });
-                                                setIsCartOpen(true);
-                                            }}
+                                            onClick={() => router.push(`/packages/${pkg.id}`)}
                                             className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all active:scale-95 shadow-sm ${pkg.featured ? 'bg-white text-[#7C3AED] hover:shadow-md' : 'bg-primary text-white hover:shadow-md'}`}
                                         >
-                                            {language === 'ar' ? 'أضف للسلة' : 'Add to Cart'}
+                                            {language === 'ar' ? 'عرض التفاصيل' : 'View Details'}
                                         </button>
 
                                         <div className="text-end">
@@ -642,17 +648,7 @@ export default function Home() {
                         
                         <div className="flex flex-col md:flex-row items-center gap-6">
                             <button 
-                                onClick={() => {
-                                    const pkg = packages.find(p => p.id === 'trial') || { id: 'trial', name: language === 'ar' ? 'حصّة تجريبية' : 'Free Trial' };
-                                    addToCart(pkg, { 
-                                        type: 'subscription', 
-                                        metadata: { 
-                                            packageId: 'trial',
-                                            isTrial: true
-                                        } 
-                                    });
-                                    setIsCartOpen(true);
-                                }}
+                                onClick={() => router.push('/booking?trial=true')}
                                 className="bg-white text-slate-900 px-12 py-5 rounded-[2rem] font-black text-xs md:text-sm uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-2xl flex items-center gap-4 whitespace-nowrap group"
                             >
                                 {language === 'ar' ? 'احجز حصتك الآن' : 'Book Your Session'}
@@ -664,40 +660,50 @@ export default function Home() {
                     </div>
                 </motion.div>
 
-                {/* Progress & Library (Side-by-side on desktop) */}
-                <div className="grid lg:grid-cols-2 gap-8">
-                    {/* Library Column */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between px-1">
-                            <h2 className={`text-base md:text-xl font-black ${textClass} tracking-tight`}>{language === 'ar' ? 'مكتبة كابتنا' : 'Captina Library'}</h2>
-                            <Link href="/library" className="w-10 h-10 bg-primary/10 text-primary rounded-2xl flex items-center justify-center font-black transition-all hover:bg-primary hover:text-white shadow-sm">
-                                <ChevronLeft className={`w-4 h-4 ${language === 'en' ? 'rotate-180' : ''}`} />
+                {/* Latest Videos Section */}
+                {latestVideos.length > 0 && (
+                    <section>
+                        <div className="flex items-center justify-between mb-2 px-1">
+                            <div className="text-start">
+                                <h2 className={`text-base md:text-xl font-black ${textClass} tracking-tight`}>
+                                    {language === 'ar' ? 'أحدث الفيديوهات' : 'Latest Videos'}
+                                </h2>
+                                <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+                                    {language === 'ar' ? 'شاهد أحدث المحتوى التدريبي' : 'Watch the latest training content'}
+                                </p>
+                            </div>
+                            <Link href="/library" className="text-primary font-black text-xs flex items-center gap-1 group">
+                                {t('viewAll')} 
+                                <ChevronLeft className={`w-4 h-4 transition-transform group-hover:-translate-x-1 ${language === 'en' ? 'rotate-180' : ''}`} />
                             </Link>
                         </div>
-                        <div className="space-y-4">
-                            {[
-                                { id: 'educational', title: language === 'ar' ? 'فيديوهات تعليمية لكل رياضة' : 'Educational Videos', icon: <GraduationCap className="w-5 h-5" />, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-                                { id: 'trainees', title: language === 'ar' ? 'فيديوهات المتدربين' : 'Trainee Videos', icon: <Users className="w-5 h-5" />, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                                { id: 'trainers', title: language === 'ar' ? 'فيديوهات المدربين' : 'Trainer Videos', icon: <UserCheck className="w-5 h-5" />, color: 'text-orange-500', bg: 'bg-orange-500/10' }
-                            ].map((cat, i) => (
-                                <Link key={i} href={`/library/${cat.id}`} className={`${cardBg} p-5 rounded-[2rem] border flex items-center gap-5 shadow-sm hover:shadow-md transition-shadow group block`}>
-                                    <div className={`w-14 h-14 ${cat.bg} ${cat.color} rounded-2xl flex items-center justify-center`}>
-                                        {cat.icon}
+                        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 snap-x snap-mandatory scroll-smooth">
+                            {latestVideos.map((vid) => (
+                                <button 
+                                    key={vid.id}
+                                    onClick={() => router.push(`/library/${vid.category}/${vid.id}`)}
+                                    className="flex-shrink-0 w-48 md:w-64 snap-start bg-white dark:bg-slate-800 rounded-3xl overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm group hover:shadow-md transition-all text-start"
+                                >
+                                    <div className="relative aspect-video w-full">
+                                        <img src={vid.thumbnailUrl || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=300'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                            <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all">
+                                                <PlaySquare className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                                            </div>
+                                        </div>
+                                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-md rounded text-[8px] font-black text-white">
+                                            {vid.duration}
+                                        </div>
                                     </div>
-                                    <div className="flex-1 text-start">
-                                        <h3 className={`font-black text-sm md:text-base ${textClass}`}>{cat.title}</h3>
-                                        <p className="text-[10px] md:text-xs font-bold text-gray-400 mt-1">{language === 'ar' ? 'تصفح المحتوى' : 'Browse Content'}</p>
+                                    <div className="p-3">
+                                        <h4 className={`text-[10px] font-black ${textClass} line-clamp-2 uppercase`}>{vid.title[language]}</h4>
+                                        <p className="text-[8px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{vid.category}</p>
                                     </div>
-                                    <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                                        <ChevronLeft className={`w-4 h-4 text-gray-400 group-hover:text-white ${language === 'en' ? 'rotate-180' : ''}`} />
-                                    </div>
-                                </Link>
+                                </button>
                             ))}
                         </div>
-                    </div>
-
-                    {/* Goals card moved to top */}
-                </div>
+                    </section>
+                )}
             </main>
         </div>
     );

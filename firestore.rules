@@ -14,6 +14,12 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isTrainer() {
+      return signedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer';
+    }
+
     function isOwner(data) {
       return signedIn() && (
         (data.userId != null && data.userId == request.auth.uid) || 
@@ -108,6 +114,12 @@ service cloud.firestore {
     match /contact_inquiries/{id} {
       allow create: if true;
       allow read, update, delete: if isAdmin();
+    }
+
+    match /attendance/{id} {
+      allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
+      allow create: if isAdmin() || isTrainer();
+      allow update, delete: if isAdmin();
     }
 
     // --- ADMIN SYSTEM FALLBACK ---
