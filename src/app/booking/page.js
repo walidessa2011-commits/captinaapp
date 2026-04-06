@@ -15,8 +15,8 @@ import {
     RecaptchaVerifier, signInWithPhoneNumber
 } from "firebase/auth";
 import {
-    collection, addDoc, serverTimestamp, getDocs,
-    query, where, updateDoc, doc
+    collection, addDoc, serverTimestamp, getDocs, getDoc,
+    query, where, doc
 } from "firebase/firestore";
 import Link from 'next/link';
 import HorizontalDatePicker from '@/components/HorizontalDatePicker';
@@ -174,14 +174,13 @@ function BookingContent() {
             if (!auth.currentUser) { setIsLoadingAddresses(false); return; }
             try {
                 const [trainersSnap, addressesSnap, userSnap, trialSnap] = await Promise.all([
-                    // Fetch all trainers; exclude only those explicitly set to inactive/blocked
                     getDocs(collection(db, "trainers")),
                     getDocs(query(collection(db, "addresses"), where("userId", "==", auth.currentUser.uid))),
-                    getDocs(query(collection(db, "users"), where("uid", "==", auth.currentUser.uid))),
-                    isTrial ? getDocs(query(collection(db, "bookings"), where("userId", "==", auth.currentUser.uid), where("isTrial", "==", true))) : null,
+                    // Use doc() by UID — users collection uses UID as document ID, not a field
+                    getDoc(doc(db, "users", auth.currentUser.uid)),
+                    isTrial ? getDocs(query(collection(db, "bookings"), where("userId", "==", auth.currentUser.uid), where("isTrial", "==", true))) : Promise.resolve(null),
                 ]);
                 const allTrainers = trainersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                // Exclude only explicitly disabled trainers; trainers without status are treated as active
                 setDbTrainers(allTrainers.filter(tr => !tr.status || tr.status === 'active'));
                 const addrs = addressesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setUserAddresses(addrs);
@@ -190,7 +189,7 @@ function BookingContent() {
                     setSelectedAddressId(def.id);
                     setBookingData(p => ({ ...p, address: { city: def.city || '', district: def.district || '', street: def.street || '', building: def.building || '', fullAddress: def.fullAddress || '' } }));
                 }
-                if (!userSnap.empty) setUserProfile(userSnap.docs[0].data());
+                if (userSnap.exists()) setUserProfile(userSnap.data());
                 if (trialSnap) setTrialBookedTrainers(trialSnap.docs.map(d => d.data().trainer?.id).filter(Boolean));
             } catch (e) { console.error(e); } finally { setIsLoadingAddresses(false); }
         };
@@ -227,13 +226,12 @@ function BookingContent() {
         }
         setIsSubmitting(true);
         try {
-            if (auth.currentUser) {
-                await updateDoc(doc(db, "users", auth.currentUser.uid), { fullName: userProfile?.fullName || '', phone: userProfile?.phone || '' });
-            }
+            const resolvedName = userProfile?.fullName || getText(userData?.fullName) || '';
+            const resolvedPhone = userProfile?.phone || userData?.phone || '';
             await addDoc(collection(db, "bookings"), {
                 ...bookingData,
-                userName: userProfile?.fullName || getText(userData?.fullName) || '',
-                userPhone: userProfile?.phone || userData?.phone || '',
+                userName: resolvedName,
+                userPhone: resolvedPhone,
                 userId: auth.currentUser?.uid,
                 userEmail: auth.currentUser?.email,
                 createdAt: serverTimestamp(),

@@ -69,28 +69,43 @@ export function AppProvider({ children }) {
 
     // AUTH LISTENER
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (u) => {
+        let userDocUnsub = null;
+
+        const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+            // Clean up previous user doc listener
+            if (userDocUnsub) { userDocUnsub(); userDocUnsub = null; }
+
             setUser(u);
             if (u) {
-                const userDoc = await getDoc(doc(db, "users", u.uid));
-                if (userDoc.exists()) {
-                    setUserData({ uid: u.uid, ...userDoc.data() });
-                } else {
-                    const newData = { 
-                        email: u.email, 
-                        displayName: u.displayName || 'User', 
-                        role: 'user', 
-                        createdAt: serverTimestamp() 
+                const userRef = doc(db, "users", u.uid);
+                // Check if doc exists; create if not
+                const snap = await getDoc(userRef);
+                if (!snap.exists()) {
+                    const newData = {
+                        email: u.email,
+                        displayName: u.displayName || 'User',
+                        role: 'user',
+                        createdAt: serverTimestamp()
                     };
-                    await setDoc(doc(db, "users", u.uid), newData);
-                    setUserData({ uid: u.uid, ...newData });
+                    await setDoc(userRef, newData);
                 }
+                // Real-time listener so userData always reflects latest Firestore state
+                userDocUnsub = onSnapshot(userRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setUserData({ uid: u.uid, ...docSnap.data() });
+                    }
+                    setLoadingAuth(false);
+                }, () => setLoadingAuth(false));
             } else {
                 setUserData(null);
+                setLoadingAuth(false);
             }
-            setLoadingAuth(false);
         });
-        return () => unsubscribe();
+
+        return () => {
+            unsubscribeAuth();
+            if (userDocUnsub) userDocUnsub();
+        };
     }, []);
 
     // FAVORITES HANDLERS
