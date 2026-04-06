@@ -169,6 +169,16 @@ function LayoutContent({ children }) {
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
                 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Inter:wght@400;700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet" />
+                {/* PWA */}
+                <link rel="manifest" href="/manifest.json" />
+                <meta name="theme-color" content="#E51B24" />
+                <meta name="mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+                <meta name="apple-mobile-web-app-title" content="Captina" />
+                <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+                <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
+                <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png" />
             </head>
             <body className="antialiased flex flex-col min-h-screen bg-background dark:bg-background transition-colors duration-300">
                 {(!isAuthPage && !isAdminPage && user) && (
