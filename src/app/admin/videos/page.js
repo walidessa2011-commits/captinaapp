@@ -43,7 +43,9 @@ export default function AdminVideosPage() {
     ];
 
     useEffect(() => {
-        fetchVideos();
+        if (typeof window !== 'undefined') {
+            fetchVideos();
+        }
     }, []);
 
     const fetchVideos = async () => {

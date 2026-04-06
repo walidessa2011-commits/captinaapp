@@ -1,23 +1,19 @@
 import SportProfile from './SportProfile';
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 
-export const generateStaticParams = async () => {
-    try {
-        const querySnapshot = await getDocs(collection(db, "sports"));
-        const params = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-        }));
-        
-        // Ensure at least one static param exists for build stability
-        return params.length > 0 ? params : [{ id: '1' }];
-    } catch (error) {
-        console.error("Error generating static params for sports:", error);
-        return [{ id: '1' }];
-    }
-};
+// All known sport IDs — covers initialData seeds + common Firestore slugs
+const SPORT_IDS = [
+    'taekwondo', 'boxing', 'karate', 'general',
+    'kick-boxing', 'kickboxing', 'bodybuilding', 'crossfit',
+    'judo', 'wrestling', 'muay-thai', 'muaythai', 'fitness',
+    'mma', 'self-defense', 'selfdefense', 'jiu-jitsu', 'jiujitsu',
+    'yoga', 'swimming', 'basketball', 'football', 'volleyball',
+    'tennis', 'padel', 'running', 'cycling', 'gymnastics',
+    // Arabic slugs
+    'تايكوندو', 'ملاكمة', 'كاراتيه', 'جودو', 'فيتنس', 'رياضة-عامة',
+    '1', '2', '3', '4', '5',
+];
 
-export const dynamicParams = false;
+export const generateStaticParams = () => SPORT_IDS.map(id => ({ id }));
 
 export default async function Page({ params }) {
     const resolvedParams = await params;

@@ -1,35 +1,27 @@
 import ChatContent from './ChatContent';
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import { trainersData } from "@/lib/trainersData";
 
-export const generateStaticParams = async () => {
-    // Start with static trainer IDs from our local data file
-    const staticParams = Object.keys(trainersData).map((id) => ({
-        id: id,
-    }));
-
-    try {
-        // Supplement with active trainers from Firestore
-        const q = query(collection(db, "trainers"), where("status", "==", "active"));
-        const querySnapshot = await getDocs(q);
-        const dbParams = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-        }));
-        
-        // Merge and ensure unique IDs
-        const allParams = [...staticParams, ...dbParams];
-        const uniqueIds = Array.from(new Set(allParams.map(p => p.id)));
-        
-        return uniqueIds.map(id => ({ id }));
-    } catch (error) {
-        console.error("Error generating static params for trainer chats:", error);
-        // Fallback to static data and at least '1'
-        return staticParams.length > 0 ? staticParams : [{ id: '1' }];
-    }
-};
-
 export const dynamicParams = false;
+
+export const generateStaticParams = () => {
+    // Known trainer IDs from Firestore to enable static export for chat pages
+    const firestoreIds = [
+        '4ustPtY0guoCpoRUVbSH',
+        'PiAZDpHyp4Gd5XBtNDrp',
+        'ahmed',
+        'khaled',
+        'mohamed',
+        'sara',
+        'walid-issa'
+    ];
+    
+    const staticIds = Object.keys(trainersData);
+    const allIds = Array.from(new Set([...staticIds, ...firestoreIds]));
+    
+    return allIds.map((id) => ({
+        id: String(id),
+    }));
+};
 
 export default async function Page({ params }) {
     const resolvedParams = await params;

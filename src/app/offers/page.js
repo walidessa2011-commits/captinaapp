@@ -58,15 +58,15 @@ export default function Offers() {
                             className="group cursor-pointer"
                             onClick={() => router.push(`/offers/${offer.id}`)}
                         >
-                            <div className="relative bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium transition-all duration-500 hover:shadow-active hover:-translate-y-2 flex flex-col h-full active:scale-[0.98]">
+                            <div className="relative bg-white/90 dark:bg-[#1a2235]/90 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium transition-all duration-500 hover:shadow-active hover:-translate-y-2 flex flex-col h-full active:scale-[0.98]">
                                 {/* Card Image Section */}
                                 <div className="relative w-full h-44 overflow-hidden shrink-0">
                                     <img 
                                         src={offer.image || "https://images.unsplash.com/photo-1541534741688-6078c64ec4a9?q=80&w=1000"} 
-                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 brightness-110" 
                                         alt={offer.title} 
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                                     
                                     {/* Action Badge */}
                                     <div className="absolute top-4 start-4">

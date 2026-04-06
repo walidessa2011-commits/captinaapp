@@ -1,21 +1,19 @@
 import OfferDetail from './OfferDetail';
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
-
-export const generateStaticParams = async () => {
-    try {
-        const querySnapshot = await getDocs(collection(db, "offers"));
-        const params = querySnapshot.docs.map((doc) => ({
-            offerId: doc.id,
-        }));
-        return params.length > 0 ? params : [{ offerId: '1' }];
-    } catch (error) {
-        console.error("Error generating static params for offers:", error);
-        return [{ offerId: '1' }];
-    }
-};
 
 export const dynamicParams = false;
+
+export const generateStaticParams = async () => {
+    // Synchronized with real Firestore IDs and stable seed IDs
+    return [
+        { offerId: 'offer-ramadan-2025' },
+        { offerId: 'offer-first-trial' },
+        { offerId: 'trial' },
+        { offerId: 'offer-trial-free' },
+        // Legacy IDs
+        { offerId: 'BqmbcNuyAYe5hJ9ICONg' },
+        { offerId: ' JiBzAKyPob7wRWAincXb' }
+    ];
+};
 
 export default async function Page({ params }) {
     const { offerId } = await params;

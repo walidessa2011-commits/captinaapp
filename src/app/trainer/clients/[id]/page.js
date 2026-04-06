@@ -1,21 +1,10 @@
 import ClientDetailsContent from './ClientDetailsContent';
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 
-export const generateStaticParams = async () => {
-    try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        const params = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-        }));
-        return params.length > 0 ? params : [{ id: '1' }];
-    } catch (error) {
-        console.error("Error generating static params for trainer clients:", error);
-        return [{ id: '1' }];
-    }
+export const generateStaticParams = () => {
+    // Placeholder ID for static export. Real client IDs
+    // from Firestore will be rendered client-side at runtime.
+    return [{ id: 'placeholder' }];
 };
-
-export const dynamicParams = false;
 
 export default async function Page({ params }) {
     const resolvedParams = await params;

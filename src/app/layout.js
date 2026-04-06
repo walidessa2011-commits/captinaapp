@@ -1,22 +1,25 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import MobileNav from "@/components/MobileNav";
 import Link from 'next/link';
 import { User, ShoppingBag, LayoutDashboard, Calendar, Search, Bell, Menu, MapPin, ChevronDown, X, Home, CreditCard, Users as TrainersIcon, Store, MousePointer2, LogOut, Lock, Settings, Shield, PlaySquare, Sparkles } from 'lucide-react';
 import { AppProvider, useApp } from "@/context/AppContext";
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { doc, getDoc, onSnapshot, collection, query, where } from "firebase/firestore";
 import { motion, AnimatePresence } from 'framer-motion';
 import GlobalModal from "@/components/GlobalModal";
 import CartDrawer from "@/components/CartDrawer";
+import PremiumLoader from "@/components/PremiumLoader";
 
 function LayoutContent({ children }) {
     const { t, language, darkMode, setAlert, user, userData, loadingAuth, cartCount, setIsCartOpen, getLoc } = useApp();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const isTrial = searchParams.get('trial') === 'true';
     const isAdminPage = pathname.startsWith('/admin');
     const isAdminLoginPage = pathname === '/admin/login';
     const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/intro' || pathname === '/forgot-password' || pathname.includes('/forgot-password');
@@ -29,6 +32,13 @@ function LayoutContent({ children }) {
     const menuRef = useRef(null);
     const profileRef = useRef(null);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isMinimumLoading, setIsMinimumLoading] = useState(true);
+
+    useEffect(() => {
+        // 250ms is enough to prevent FOUC without blocking navigation
+        const timer = setTimeout(() => setIsMinimumLoading(false), 250);
+        return () => clearTimeout(timer);
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -67,12 +77,24 @@ function LayoutContent({ children }) {
     useEffect(() => {
         if (!loadingAuth) {
             if (!user && !isAuthPage && !isAdminPage) {
+                // Force login — no anonymous browsing
                 router.push('/login');
             } else if (user && isAdminPage && !isAdminLoginPage && userData && userData.role !== 'admin') {
                 router.push('/');
+            } else if (user && userData && pathname !== '/profile') {
+                // Profile completion gate: fullName + phone required before booking/purchasing
+                const isProfileComplete = !!(
+                    (userData.fullName && (typeof userData.fullName === 'string' ? userData.fullName.trim() : (userData.fullName?.ar || userData.fullName?.en))) &&
+                    userData.phone
+                );
+                const profileGatedPaths = ['/booking', '/checkout', '/packages/', '/store/'];
+                const needsCompletion = !isProfileComplete && profileGatedPaths.some(p => pathname.startsWith(p));
+                if (needsCompletion) {
+                    router.push('/profile?complete=true');
+                }
             }
         }
-    }, [user, loadingAuth, isAuthPage, isAdminPage, userData, router]);
+    }, [user, loadingAuth, isAuthPage, isAdminPage, userData, router, pathname]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -146,7 +168,7 @@ function LayoutContent({ children }) {
             <head>
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+                <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Inter:wght@400;700;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet" />
             </head>
             <body className="antialiased flex flex-col min-h-screen bg-background dark:bg-background transition-colors duration-300">
                 {(!isAuthPage && !isAdminPage && user) && (
@@ -187,20 +209,22 @@ function LayoutContent({ children }) {
                                             >
                                                 {[
                                                     { name: t('home'), href: '/', icon: Home },
-                                                    { name: language === 'ar' ? 'حصة تجريبية' : 'Trial Session', href: '/booking?trial=true', icon: Sparkles },
+                                                    { name: t('nav.trialSession'), href: '/booking?trial=true', icon: Sparkles },
                                                     { name: t('packages'), href: '/packages', icon: CreditCard },
                                                     { name: t('trainers'), href: '/trainers', icon: TrainersIcon },
-                                                    { name: t('store'), href: '/store', icon: Store },
-                                                    { name: t('library'), href: '/library', icon: PlaySquare },
+                                                    { name: t('nav.store'), href: '/store', icon: Store },
+                                                    { name: t('nav.library'), href: '/library', icon: PlaySquare },
                                                 ].map((link, idx) => (
                                                     <Link
                                                         key={link.href}
                                                         href={link.href}
                                                         onClick={() => setIsMenuOpen(false)}
                                                         className={`flex items-center gap-3 py-2.5 px-3 rounded-xl transition-all ${
-                                                            link.href === '/' 
-                                                            ? pathname === '/' 
-                                                            : pathname.startsWith(link.href) 
+                                                            (() => {
+                                                                if (link.href === '/') return pathname === '/';
+                                                                if (link.href.includes('trial=true')) return pathname === '/booking' && isTrial;
+                                                                return pathname.startsWith(link.href.split('?')[0]);
+                                                            })() 
                                                             ? 'bg-primary/10 text-primary' 
                                                             : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
                                                         }`}
@@ -213,7 +237,7 @@ function LayoutContent({ children }) {
                                                 <div className="pt-1 mt-1 border-t border-gray-50 dark:border-white/5 space-y-1">
                                                     <Link href="/profile" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 py-2.5 px-3 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-sm font-bold">
                                                         <User className="w-4 h-4" />
-                                                        <span>{t('profile')}</span>
+                                                        <span>{t('profile.title')}</span>
                                                     </Link>
                                                     {userData?.role === 'admin' && (
                                                         <Link href="/admin/dashboard" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-3 py-2.5 px-3 rounded-xl text-primary bg-primary/5 hover:bg-primary/10 transition-all font-black text-sm border border-primary/10">
@@ -444,16 +468,20 @@ function LayoutContent({ children }) {
                 )}
 
                 <main className="flex-grow pb-28 lg:pb-0 dark:text-white">
-                    {loadingAuth ? (
-                        <div className={`min-h-[80vh] flex flex-col items-center justify-center transition-colors duration-500 ${darkMode ? 'bg-[#0A0E17]' : 'bg-slate-50'}`}>
-                            <div className="relative">
-                                <div className="w-20 h-20 rounded-3xl overflow-hidden border-2 border-primary/20 animate-pulse">
-                                    <img src="/logo_captina.jpg" alt="Loading" className="w-full h-full object-cover" />
-                                </div>
-                                <div className="absolute -inset-4 border-2 border-primary/10 rounded-[2rem] animate-ping opacity-20"></div>
-                            </div>
-                        </div>
-                    ) : (isAuthPage || isAdminPage || user) ? children : null}
+                    <AnimatePresence mode="wait">
+                        {(loadingAuth || isMinimumLoading) && (
+                            <motion.div
+                                key="loader"
+                                initial={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.25, ease: "easeOut" }}
+                            >
+                                <PremiumLoader darkMode={darkMode} language={language} minimal={true} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {(!loadingAuth && !isMinimumLoading) && (isAuthPage || isAdminPage || user) ? children : null}
                 </main>
 
                 {(!isAuthPage && !isAdminPage && user) && (
@@ -504,9 +532,11 @@ function LayoutContent({ children }) {
 export default function RootLayout({ children }) {
     return (
         <AppProvider>
-            <LayoutContent>
-                {children}
-            </LayoutContent>
+            <Suspense>
+                <LayoutContent>
+                    {children}
+                </LayoutContent>
+            </Suspense>
         </AppProvider>
     );
 }

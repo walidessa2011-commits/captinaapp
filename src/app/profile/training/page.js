@@ -12,6 +12,7 @@ import {
     addDoc, serverTimestamp, onSnapshot, orderBy, limit 
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getTotalSessions } from "@/utils/subscriptionUtils";
 
 export default function TrainingPage() {
     const { t, language, user, loadingAuth, setAlert } = useApp();
@@ -33,7 +34,25 @@ export default function TrainingPage() {
         loaded: false
     });
 
-    const translations = t('trainingPage');
+    const ar = language === 'ar';
+    const translations = {
+        tabs: {
+            classes: ar ? 'الحصص' : 'Classes',
+            programs: ar ? 'البرامج' : 'Programs',
+        },
+        generating: ar ? 'جاري توليد الجدول...' : 'Generating schedule...',
+        emptyClasses: ar ? 'لا توجد حصص مجدولة بعد' : 'No scheduled classes yet',
+        emptyPrograms: ar ? 'لا توجد برامج نشطة' : 'No active programs',
+        freeze: {
+            button: ar ? 'إيقاف مؤقت' : 'Freeze',
+            title: ar ? 'طلب إيقاف الاشتراك مؤقتاً' : 'Request Membership Freeze',
+            reason: ar ? 'سبب الإيقاف' : 'Reason for Freeze',
+            startDate: ar ? 'تاريخ البداية' : 'Start Date',
+            endDate: ar ? 'تاريخ النهاية' : 'End Date',
+            submit: ar ? 'إرسال الطلب' : 'Submit Request',
+            success: ar ? 'تم إرسال طلب الإيقاف بنجاح' : 'Freeze request submitted successfully',
+        },
+    };
 
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
@@ -96,9 +115,7 @@ export default function TrainingPage() {
                     
                     if (!subsSnap.empty) {
                         const sub = { id: subsSnap.docs[0].id, ...subsSnap.docs[0].data() };
-                        const months = sub.months || 1;
-                        const sessionsPerWeek = sub.sessionsPerWeek || 3;
-                        const totalSessions = sessionsPerWeek * months * 4;
+                        const totalSessions = getTotalSessions(sub);
                         const maxFreezes = Math.floor(totalSessions * 0.25);
 
                         // Count used freezes for this subscription

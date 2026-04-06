@@ -1,25 +1,19 @@
 import PackageDetail from './PackageDetail';
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-
-export const generateStaticParams = async () => {
-    try {
-        const q = query(collection(db, "packages"), orderBy("order", "asc"));
-        const snap = await getDocs(q);
-        const params = snap.docs.map((doc) => ({ id: doc.id }));
-        
-        if (params.length === 0) {
-            return [{ id: 'default' }];
-        }
-        
-        return params;
-    } catch (error) {
-        console.error("Error generating static params for packages:", error);
-        return [{ id: 'default' }];
-    }
-};
 
 export const dynamicParams = false;
+
+export const generateStaticParams = () => {
+    // Synchronized with real Firestore IDs and stable seed IDs
+    return [
+        { id: 'package-elite-tkd' },
+        { id: 'package-beginner-boxing' },
+        { id: 'package-trial-karate' },
+        { id: 'package-full-fitness' },
+        // Legacy/User-specific IDs
+        { id: 'GnWkEb9ZI3JRnz1cQwnq' },
+        { id: 'J18o8Yiwb4J7rcEEI9Ki' }
+    ];
+};
 
 export default async function Page({ params }) {
     const resolvedParams = await params;

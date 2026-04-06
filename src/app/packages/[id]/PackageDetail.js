@@ -1,7 +1,7 @@
 "use client";
-import React from 'react';
-import { motion } from "framer-motion";
-import { Check, Zap, Shield, Crown, ChevronLeft, ChevronRight, ShoppingCart, Star, Clock, Gift, Dumbbell, Sparkles, Calendar, Repeat } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, Zap, Shield, Crown, ChevronLeft, ChevronRight, ShoppingCart, Star, Clock, Gift, Dumbbell, Sparkles, Calendar, Repeat, Wrench, X, Lock } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -10,6 +10,8 @@ export default function PackageDetail({ params }) {
     const { t, language, darkMode, addToCart, setIsCartOpen } = useApp();
     const router = useRouter();
     const packageId = params.id;
+    const [devModal, setDevModal] = useState(false);
+    const isTrial = packageId === 'trial';
     
     const packagesList = t('packagesData') || [];
     const pkg = packagesList.find(p => p.id === packageId);
@@ -64,6 +66,7 @@ export default function PackageDetail({ params }) {
     const packageImage = pkg.image || getPackageImage(pkg.months);
 
     return (
+        <>
         <div className="min-h-screen bg-slate-50 dark:bg-[#0a0f1a] pb-20 transition-colors duration-500 relative overflow-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             {/* Background Decorative Blobs */}
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[150px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
@@ -167,7 +170,7 @@ export default function PackageDetail({ params }) {
                         <div className={`space-y-3 ${isMonthPackage ? 'pt-2' : 'pt-6'}`}>
                             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'ar' ? 'المزايا المتاحة' : 'Package Features'}</h3>
                             <div className={`grid grid-cols-1 ${isMonthPackage ? 'md:grid-cols-2 gap-2 text-xs' : 'gap-3 text-sm'} text-start`}>
-                                {(Array.isArray(pkg.features) ? pkg.features : []).map((feature, idx) => (
+                                {(Array.isArray(pkg.features) ? pkg.features : typeof pkg.features === 'string' ? pkg.features.split(',').map(s => s.trim()) : []).map((feature, idx) => (
                                     <div key={idx} className="flex items-center gap-2 group">
                                         <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                                             <Check className="w-3 h-3" />
@@ -179,24 +182,30 @@ export default function PackageDetail({ params }) {
                         </div>
 
                         <div className="pt-6 flex flex-col sm:flex-row gap-3">
-                            <button 
-                                onClick={() => {
-                                    addToCart({ ...pkg, image: packageImage });
-                                    setIsCartOpen(true);
-                                }}
-                                className={`flex-1 py-4 bg-primary text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2`}
-                            >
-                                <ShoppingCart className="w-4 h-4" />
-                                {t('subscribeNow')}
-                            </button>
-                            
-                            {pkg.id === 'trial' && (
-                                <button 
-                                    onClick={() => router.push('/booking?trial=true')}
-                                    className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-black dark:hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                            {isTrial ? (
+                                <>
+                                    <button
+                                        onClick={() => router.push('/booking?trial=true')}
+                                        className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Calendar className="w-4 h-4" />
+                                        {language === 'ar' ? 'احجز الحصة التجريبية' : 'Book Trial Session'}
+                                    </button>
+                                    <button
+                                        onClick={() => { addToCart({ ...pkg, image: packageImage }); setIsCartOpen(true); }}
+                                        className="flex-1 py-4 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-slate-200 dark:hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <ShoppingCart className="w-4 h-4" />
+                                        {language === 'ar' ? 'أضف للسلة' : 'Add to Cart'}
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => setDevModal(true)}
+                                    className="flex-1 py-4 bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-gray-300 dark:hover:bg-white/20 transition-all flex items-center justify-center gap-2"
                                 >
-                                    <Clock className="w-4 h-4" />
-                                    {language === 'ar' ? 'حجز الموعد' : 'Schedule Now'}
+                                    <Lock className="w-4 h-4" />
+                                    {language === 'ar' ? 'قريباً - تحت التطوير' : 'Coming Soon'}
                                 </button>
                             )}
                         </div>
@@ -204,5 +213,84 @@ export default function PackageDetail({ params }) {
                 </div>
             </div>
         </div>
+
+        {/* Under Development Modal */}
+        <AnimatePresence>
+            {devModal && (
+                <>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setDevModal(false)}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.85, y: 30 }}
+                        transition={{ type: "spring", damping: 20, stiffness: 200 }}
+                        className="fixed inset-x-4 bottom-8 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[420px] bg-white dark:bg-[#1a2235] rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-white/10 p-8 z-[201]"
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
+                    >
+                        <button
+                            onClick={() => setDevModal(false)}
+                            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                        <div className="flex flex-col items-center text-center gap-5">
+                            <div className="relative">
+                                <div className="w-20 h-20 rounded-[1.5rem] bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                                    <Wrench className="w-10 h-10 text-white" />
+                                </div>
+                                <motion.div
+                                    animate={{ rotate: 360 }}
+                                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                    className="absolute -inset-2 rounded-[2rem] border border-amber-400/30 border-dashed"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                    {language === 'ar' ? 'قريباً!' : 'Coming Soon!'}
+                                </h3>
+                                <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed max-w-xs">
+                                    {language === 'ar'
+                                        ? `باقة "${pkg.name}" تحت التطوير حالياً. سيتم إطلاقها قريباً مع تجربة اشتراك متكاملة.`
+                                        : `"${pkg.name}" package is currently under development and will launch soon.`
+                                    }
+                                </p>
+                            </div>
+                            <div className="w-full bg-gray-100 dark:bg-white/5 rounded-full h-2 overflow-hidden">
+                                <motion.div
+                                    initial={{ width: "0%" }}
+                                    animate={{ width: "75%" }}
+                                    transition={{ duration: 1, delay: 0.3 }}
+                                    className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+                                />
+                            </div>
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest -mt-3">
+                                75% {language === 'ar' ? 'مكتمل' : 'Complete'}
+                            </p>
+                            <div className="w-full space-y-3">
+                                <button
+                                    onClick={() => { setDevModal(false); router.push('/booking?trial=true'); }}
+                                    className="w-full py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/30 hover:bg-primary/90 active:scale-95 transition-all"
+                                >
+                                    {language === 'ar' ? 'جرّب الحصة التجريبية' : 'Try FREE Trial Instead'}
+                                </button>
+                                <button
+                                    onClick={() => setDevModal(false)}
+                                    className="w-full py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all"
+                                >
+                                    {language === 'ar' ? 'إغلاق' : 'Close'}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
+        </>
     );
 }

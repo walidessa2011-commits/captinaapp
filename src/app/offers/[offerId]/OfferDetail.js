@@ -91,10 +91,10 @@ export default function OfferDetail({ offerId }) {
                         >
                             <img 
                                 src={offer.image || "https://images.unsplash.com/photo-1541534741688-6078c64ec4a9?q=80&w=1000"} 
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s]" 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s] brightness-110 contrast-105" 
                                 alt={offer.title} 
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
                             
                             <div className="absolute bottom-8 start-8 end-8">
                                 <motion.div 

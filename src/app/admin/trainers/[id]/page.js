@@ -1,28 +1,28 @@
 import EditTrainerContent from "./EditTrainerContent";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import { trainersData } from "@/lib/trainersData";
 
-export const generateStaticParams = async () => {
-    // Start with static IDs and special 'new' id
-    const staticIds = Object.keys(trainersData);
-    const params = [...staticIds, 'new'].map(id => ({ id }));
-
-    try {
-        // Supplement with active trainers from Firestore
-        const trainersSnap = await getDocs(collection(db, "trainers"));
-        const dbIds = trainersSnap.docs.map(doc => doc.id);
-        
-        // Merge and unique
-        const allIds = Array.from(new Set([...staticIds, ...dbIds, 'new']));
-        return allIds.map(id => ({ id }));
-    } catch (error) {
-        console.error("Error generating static params for admin trainers:", error);
-        return params;
-    }
-};
-
 export const dynamicParams = false;
+
+export const generateStaticParams = () => {
+    // Current trainer IDs in Firestore to satisfy 'output: export' requirements.
+    const firestoreIds = [
+        '4ustPtY0guoCpoRUVbSH',
+        'PiAZDpHyp4Gd5XBtNDrp',
+        'ahmed',
+        'khaled',
+        'mohamed',
+        'sara',
+        'walid-issa'
+    ];
+    
+    // Merge with static data keys + 'new' route
+    const staticIds = Object.keys(trainersData);
+    const allIds = Array.from(new Set(['new', ...staticIds, ...firestoreIds]));
+    
+    return allIds.map((id) => ({
+        id: String(id),
+    }));
+};
 
 export default async function Page({ params }) {
   const resolvedParams = await params;

@@ -1,726 +1,650 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
-import { 
-    ChevronLeft, CreditCard, Box, Truck, 
-    ShieldCheck, ArrowRight, ShoppingBag,
-    MapPin, Phone, User, CheckCircle2,
-    Package, ArrowLeft, Sparkles, AlertCircle,
-    Calendar, Clock, Home, Dumbbell
+import {
+    ChevronLeft, ChevronRight, CreditCard, Box, Truck,
+    ShieldCheck, ArrowRight, ShoppingBag, MapPin, Phone,
+    User, CheckCircle2, Package, ArrowLeft, Sparkles,
+    Calendar, Clock, Home, Dumbbell, Tag, Lock, Loader2,
+    Wallet, Star, Building2, AlertCircle, X, Plus, Minus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from "@/context/AppContext";
 import Link from 'next/link';
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { buildSubscriptionData } from "@/utils/subscriptionUtils";
 import { useRouter } from 'next/navigation';
 
+const SAUDI_CITIES = [
+    { en: 'Riyadh', ar: 'الرياض' }, { en: 'Jeddah', ar: 'جدة' },
+    { en: 'Dammam', ar: 'الدمام' }, { en: 'Mecca', ar: 'مكة المكرمة' },
+    { en: 'Medina', ar: 'المدينة المنورة' }, { en: 'Khobar', ar: 'الخبر' },
+    { en: 'Abha', ar: 'أبها' }, { en: 'Tabuk', ar: 'تبوك' },
+    { en: 'Buraidah', ar: 'بريدة' }, { en: 'Taif', ar: 'الطائف' },
+    { en: 'Hail', ar: 'حائل' }, { en: 'Jizan', ar: 'جازان' },
+];
+
+const PROMO_CODES = { 'CAPTINA10': 10, 'WELCOME20': 20, 'FIGHT15': 15, 'CHAMP25': 25 };
+
 export default function CheckoutPage() {
-    const { darkMode, language, cart, cartTotal, user, userData, products, removeFromCart, gyms, updateCartItemMetadata, setAlert } = useApp();
+    const { darkMode, language, cart, cartTotal, user, userData, products, removeFromCart, gyms, setAlert } = useApp();
     const router = useRouter();
-    
-    const [step, setStep] = useState(1); // 1: Info, 2: Confirmation, 3: Success
+
+    const [step, setStep] = useState(1); // 1: Info, 2: Review+Payment, 3: Success
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('credit_card');
-    const saudiCities = [
-        { en: 'Riyadh', ar: 'الرياض' },
-        { en: 'Jeddah', ar: 'جدة' },
-        { en: 'Dammam', ar: 'الدمام' },
-        { en: 'Mecca', ar: 'مكة المكرمة' },
-        { en: 'Medina', ar: 'المدينة المنورة' },
-        { en: 'Khobar', ar: 'الخبر' },
-        { en: 'Abha', ar: 'أبها' },
-        { en: 'Tabuk', ar: 'تبوك' },
-        { en: 'Buraidah', ar: 'بريدة' },
-        { en: 'Dhofar', ar: 'ظفار' },
-        { en: 'Taif', ar: 'الطائف' },
-        { en: 'Hail', ar: 'حائل' },
-    ];
+    const [promoCode, setPromoCode] = useState('');
+    const [promoApplied, setPromoApplied] = useState(null); // { code, discount }
+    const [promoInput, setPromoInput] = useState('');
 
     const [formData, setFormData] = useState({
-        fullName: '',
-        phone: '',
-        city: '',
-        address: ''
+        fullName: '', phone: '', city: '', address: '', notes: ''
     });
 
-    const isTrialItem = (item) => 
-        item.metadata?.isTrial || 
-        item.id === 'trial' || 
-        item.metadata?.packageId === 'trial' ||
-        item.id === 'offer-trial-free' ||
-        item.name?.toLowerCase()?.includes('trial') ||
-        item.name?.includes('تجريبية');
+    const ar = language === 'ar';
+    const bg = darkMode ? 'bg-[#0a0f1a]' : 'bg-slate-50';
+    const card = darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-100';
+    const textC = darkMode ? 'text-white' : 'text-slate-900';
+    const muted = darkMode ? 'text-gray-400' : 'text-gray-500';
+    const inp = darkMode
+        ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-600 focus:border-primary/50 focus:bg-white/8'
+        : 'bg-slate-50 border-gray-200 text-slate-900 placeholder:text-gray-400 focus:border-primary/40 focus:bg-white';
+
+    const getText = (f) => !f ? '' : typeof f === 'object' ? f[language] || f.ar || f.en || '' : f;
+
+    const isTrialItem = (item) =>
+        item.metadata?.isTrial || item.id === 'trial' ||
+        item.name?.toLowerCase()?.includes('trial') || item.name?.includes('تجريبية');
 
     const trialItems = useMemo(() => cart.filter(isTrialItem), [cart]);
     const hasTrial = trialItems.length > 0;
+    const storeItems = useMemo(() => cart.filter(i => !isTrialItem(i) && i.type !== 'subscription'), [cart]);
+    const subItems = useMemo(() => cart.filter(i => i.type === 'subscription' && !isTrialItem(i)), [cart]);
 
+    const discountAmount = promoApplied ? Math.round(cartTotal * promoApplied.discount / 100) : 0;
+    const finalTotal = cartTotal - discountAmount;
 
-
-    const detectLocation = () => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const { latitude, longitude } = position.coords;
-                // For a more premium experience, we could use reverse geocoding here
-                // For now, let's just show an alert or pre-fill with coordinate-based info
-                setAlert({
-                    title: language === 'ar' ? 'تم تحديد الموقع' : 'Location Detected',
-                    message: language === 'ar' ? `تم تحديد موقعك بدقة (${latitude.toFixed(2)}, ${longitude.toFixed(2)})` : `Detected at (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`,
-                    type: 'success'
-                });
-                setFormData(prev => ({ ...prev, address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` }));
-            }, (error) => {
-                setAlert({
-                    title: language === 'ar' ? 'عذراً' : 'Error',
-                    message: language === 'ar' ? 'لم نتمكن من الوصول لموقعك. يرجى تفعيل الموقع.' : 'Could not access location. Please enable location services.',
-                    type: 'error'
-                });
-            });
-        }
-    };
+    const similarProducts = useMemo(() => {
+        if (!products.length) return [];
+        const cartIds = cart.map(i => i.productId);
+        return products.filter(p => !cartIds.includes(p.id)).slice(0, 4);
+    }, [products, cart]);
 
     useEffect(() => {
         if (userData) {
             setFormData(prev => ({
                 ...prev,
-                fullName: prev.fullName || userData.fullName || '',
+                fullName: prev.fullName || getText(userData.fullName) || userData.displayName || '',
                 phone: prev.phone || userData.phone || '',
                 city: prev.city || userData.city || '',
-                address: prev.address || userData.address || ''
+                address: prev.address || userData.address || '',
             }));
         }
     }, [userData]);
 
-    // Sync trial items from cart
-    useEffect(() => {
-        if (hasTrial && trialItems.length > 0) {
-            const item = trialItems[0];
-            const meta = item.metadata || {};
-            
-            // Just for summary display, we can read meta directly
-            if (!meta.bookedDate || !meta.bookedTime || !meta.location) {
-                // If somehow they got here without data, send them back
-                router.push('/cart');
-            }
+    const handleApplyPromo = () => {
+        const disc = PROMO_CODES[promoInput.toUpperCase().trim()];
+        if (disc) {
+            setPromoApplied({ code: promoInput.toUpperCase().trim(), discount: disc });
+            setAlert({ title: ar ? '🎉 تم تطبيق الكود!' : '🎉 Code Applied!', message: ar ? `خصم ${disc}% على طلبك` : `${disc}% discount applied`, type: 'success' });
+        } else {
+            setAlert({ title: ar ? 'كود غير صحيح' : 'Invalid Code', message: ar ? 'تحقق من الكود وحاول مجدداً' : 'Check the code and try again', type: 'error' });
         }
-    }, [hasTrial, trialItems, router]);
+    };
 
-    const [similarProducts, setSimilarProducts] = useState([]);
-
-    useEffect(() => {
-        if (products.length > 0 && cart.length > 0) {
-            // Get categories of items in cart
-            const cartProductIds = cart.map(item => item.productId);
-            const cartCategories = Array.from(new Set(cart.map(item => {
-                const p = products.find(prod => prod.id === item.productId);
-                return p?.category_en;
-            }).filter(Boolean)));
-
-            const filtered = products
-                .filter(p => !cartProductIds.includes(p.id))
-                .filter(p => cartCategories.length === 0 || cartCategories.includes(p.category_en))
-                .slice(0, 4);
-            
-            let finalProducts = [];
-            if (filtered.length < 4) {
-                const alreadyIncluded = filtered.map(f => f.id);
-                const extras = products
-                    .filter(p => !cartProductIds.includes(p.id) && !alreadyIncluded.includes(p.id))
-                    .slice(0, 4 - filtered.length);
-                finalProducts = [...filtered, ...extras];
-            } else {
-                finalProducts = filtered;
-            }
-
-            // Only update if the IDs changed to avoid infinite loops
-            const currentIds = similarProducts.map(p => p.id).join(',');
-            const newIds = finalProducts.map(p => p.id).join(',');
-            if (currentIds !== newIds) {
-                setSimilarProducts(finalProducts);
-            }
-        } else if (products.length > 0 && similarProducts.length === 0) {
-            setSimilarProducts(products.slice(0, 4));
+    const detectLocation = () => {
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setFormData(p => ({ ...p, address: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}` }));
+                    setAlert({ title: ar ? 'تم تحديد الموقع' : 'Location Detected', message: ar ? 'تم تحديد موقعك بنجاح' : 'Location captured successfully', type: 'success' });
+                },
+                () => setAlert({ title: ar ? 'خطأ' : 'Error', message: ar ? 'يرجى تفعيل الموقع' : 'Please enable location services', type: 'error' })
+            );
         }
-    }, [products, cart, similarProducts]);
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSubmitOrder = async () => {
-        if (!user) {
-            alert(language === 'ar' ? 'يرجى تسجيل الدخول أولاً' : 'Please login first');
+        if (!user) { router.push('/login'); return; }
+        if (!formData.fullName || !formData.phone || !formData.city || !formData.address) {
+            setAlert({ title: ar ? 'بيانات ناقصة' : 'Missing Info', message: ar ? 'يرجى إكمال جميع الحقول المطلوبة' : 'Please fill all required fields', type: 'info' });
             return;
         }
-
         setIsSubmitting(true);
         try {
-            const storeItems = cart.filter(item => item.type !== 'subscription');
-            const subscriptionItems = cart.filter(item => item.type === 'subscription');
-            const storeTotal = storeItems.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0);
-            
-            let orderIdStr = `req_${Date.now()}`;
+            const baseOrder = {
+                userId: user.uid, userEmail: user.email || '',
+                userName: formData.fullName, userPhone: formData.phone,
+                deliveryInfo: { address: formData.address, city: formData.city, notes: formData.notes },
+                paymentMethod, promoCode: promoApplied?.code || null,
+                discountAmount, subtotal: cartTotal, totalAmount: finalTotal,
+                status: 'processing', createdAt: serverTimestamp()
+            };
+
+            let orderId = `order_${Date.now()}`;
 
             if (storeItems.length > 0) {
-                const orderData = {
-                    userId: user.uid,
-                    userEmail: user.email || '',
-                    userName: formData.fullName || '',
-                    userPhone: formData.phone || '',
-                    deliveryInfo: {
-                        address: formData.address || '',
-                        city: formData.city || ''
-                    },
-                    paymentMethod: paymentMethod || 'credit_card',
-                    items: storeItems.map(item => ({
-                        id: item.productId || item.id || '',
-                        cartId: item.cartId || '',
-                        name: item.name_en || item.name || '',
-                        name_en: item.name_en || item.name || '',
-                        name_ar: item.name_ar || '',
-                        image: item.image || '',
-                        price: item.price || 0,
-                        quantity: item.quantity || 1,
-                        size: item.size || 'N/A',
-                        color: item.color || 'N/A',
-                        type: item.type || 'product',
-                        metadata: item.metadata || {}
+                const ref = await addDoc(collection(db, 'orders'), {
+                    ...baseOrder,
+                    items: storeItems.map(i => ({
+                        id: i.productId || i.id, cartId: i.cartId,
+                        name: getText(i.name), image: i.image || '',
+                        price: i.price, quantity: i.quantity,
+                        size: i.size || null, color: i.color?.code || null,
                     })),
-                    itemsNames: storeItems.map(item => item.name_en || item.name || ''),
-                    totalAmount: storeTotal,
-                    totalPrice: storeTotal, // for MyOrders compatibility
-                    status: 'processing',
-                    statusText: language === 'ar' ? 'قيد المعالجة' : 'Processing',
-                    createdAt: serverTimestamp()
-                };
-
-                const orderRef = await addDoc(collection(db, "orders"), orderData);
-                orderIdStr = orderRef.id;
+                    itemsCount: storeItems.reduce((a, b) => a + b.quantity, 0),
+                });
+                orderId = ref.id;
             }
 
-            // SPECIAL CASE: Handle Subscriptions and Bookings from Cart items
-            for (const item of subscriptionItems) {
+            // Handle subscriptions
+            for (const item of [...subItems, ...trialItems]) {
                 if (item.metadata) {
+                    // Compute session counts from the package data stored in metadata
+                    const pkgData = item.metadata.packageData || item.metadata;
+                    const sessionFields = buildSubscriptionData(pkgData, new Date().toISOString().slice(0, 10));
                     const subData = {
                         ...item.metadata,
-                        orderId: orderIdStr,
+                        ...sessionFields,
+                        orderId,
                         userId: user.uid,
                         status: 'pending',
                         paymentStatus: 'pending',
-                        createdAt: serverTimestamp()
+                        createdAt: serverTimestamp(),
                     };
-
-                    // Clean undefined values
-                    Object.keys(subData).forEach(key => {
-                        if (subData[key] === undefined) subData[key] = null;
-                    });
-
-                    await addDoc(collection(db, "subscriptions"), subData);
+                    Object.keys(subData).forEach(k => { if (subData[k] === undefined) subData[k] = null; });
+                    await addDoc(collection(db, 'subscriptions'), subData);
 
                     if (item.metadata.isTrial) {
-                        // Mark trial as used
-                        await updateDoc(doc(db, "users", user.uid), {
-                            has_used_trial: true
-                        });
-
-                        // Create booking record for trial
-                        await addDoc(collection(db, "bookings"), {
-                            userId: user.uid,
-                            orderId: orderIdStr,
-                            trainer: {
-                                id: item.metadata.trainerId || '',
-                                name: item.metadata.trainerName || ''
-                            },
+                        await updateDoc(doc(db, 'users', user.uid), { has_used_trial: true });
+                        await addDoc(collection(db, 'bookings'), {
+                            userId: user.uid, orderId,
+                            trainer: { id: item.metadata.trainerId || '', name: getText(item.metadata.trainerName) || '' },
                             date: item.metadata.bookedDate || item.metadata.startDate || '',
                             time: item.metadata.bookedTime || item.metadata.preferredTime || '',
-                            clientName: formData.fullName || user.displayName || '',
-                            phone: formData.phone || '',
+                            clientName: formData.fullName, phone: formData.phone,
                             trainingLocation: {
                                 type: item.metadata.location || 'home',
-                                address: item.metadata.location === 'home' ? (formData.address || '') : (item.metadata.preSelectedGymId || ''),
-                                gymName: item.metadata.location === 'gym' ? (item.metadata.preSelectedGymName || '') : ''
+                                address: item.metadata.location === 'home' ? formData.address : (item.metadata.preSelectedGymId || ''),
+                                gymName: item.metadata.location === 'gym' ? (getText(item.metadata.preSelectedGymName) || '') : ''
                             },
-                            status: 'confirmed',
-                            type: 'trial',
-                            sport: {
-                                id: item.metadata.sportId || '',
-                                name: item.metadata.sportName || ''
-                            },
+                            status: 'confirmed', type: 'trial',
+                            sport: { id: item.metadata.sportId || '', name: getText(item.metadata.sportName) || '' },
                             createdAt: serverTimestamp()
                         });
                     }
                 }
             }
-            
-            // Clear cart
+
             cart.forEach(item => removeFromCart(item.cartId));
-            
             setStep(3);
-        } catch (error) {
-            console.error("Error creating order:", error);
-            alert(language === 'ar' ? 'حدث خطأ أثناء إتمام الطلب' : 'Error completing order');
+        } catch (err) {
+            console.error(err);
+            setAlert({ title: ar ? 'خطأ' : 'Error', message: ar ? 'حدث خطأ أثناء الطلب، حاول مجدداً' : 'Order failed, please try again', type: 'error' });
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    // ─── SUCCESS SCREEN ───────────────────────────────────────────────────────
     if (step === 3) {
         return (
-            <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} flex items-center justify-center p-6`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            <div className={`min-h-screen ${bg} flex items-center justify-center p-6`} dir={ar ? 'rtl' : 'ltr'}>
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.85, y: 30 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ type: 'spring', damping: 20 }}
-                    className="max-w-md w-full bg-white dark:bg-white/5 backdrop-blur-3xl p-10 rounded-[3.5rem] border border-gray-100 dark:border-white/10 shadow-premium text-center relative overflow-hidden"
+                    transition={{ type: 'spring', damping: 18 }}
+                    className="max-w-md w-full relative"
                 >
-                    <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-500 via-primary to-blue-500" />
-                    
-                    <motion.div 
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.2, type: 'spring' }}
-                        className="w-24 h-24 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 relative"
-                    >
-                        <CheckCircle2 className="w-12 h-12" />
-                        <motion.div 
-                            animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            className="absolute inset-0 bg-emerald-500/20 rounded-full"
-                        />
-                    </motion.div>
+                    {/* Card */}
+                    <div className={`${card} border rounded-[3rem] p-10 text-center relative overflow-hidden shadow-2xl`}>
+                        {/* Top accent line */}
+                        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-400 via-primary to-amber-400 rounded-t-[3rem]" />
 
-                    <h2 className={`text-3xl font-black mb-4 ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tighter uppercase italic`}>
-                        {language === 'ar' ? 'تهانينا! تم استلام طلبك' : 'Congrats! Order Placed'}
-                    </h2>
-                    <p className="text-xs font-bold text-gray-400 mb-10 leading-relaxed uppercase tracking-widest px-4">
-                        {language === 'ar' ? 'نحن نجهز معداتك الآن. يمكنك تتبع حالة الطلب من ملفك الشخصي.' : "We're preparing your gear. You can track your order status in your profile."}
-                    </p>
+                        {/* Glow */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
 
-                    <div className="space-y-4">
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Link href="/profile/orders" className="block w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-black transition-all">
-                                {language === 'ar' ? 'عرض طلباتي' : 'View My Orders'}
-                            </Link>
+                        <motion.div
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                            className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 relative"
+                        >
+                            <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                            <motion.div
+                                animate={{ scale: [1, 1.8, 1], opacity: [0.4, 0, 0.4] }}
+                                transition={{ repeat: Infinity, duration: 2.5 }}
+                                className="absolute inset-0 bg-emerald-500/20 rounded-full"
+                            />
                         </motion.div>
-                        <Link href="/store" className="block w-full py-4 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-primary transition-all flex items-center justify-center gap-2 group">
-                            {language === 'ar' ? 'العودة للمتجر' : 'Continue Shopping'}
-                            <ArrowRight className={`w-4 h-4 group-hover:translate-x-1 transition-transform ${language === 'ar' ? 'rotate-180' : ''}`} />
-                        </Link>
+
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                            <h2 className={`text-2xl font-black ${textC} mb-2 tracking-tight`}>
+                                {ar ? '🎉 تم استلام طلبك!' : '🎉 Order Confirmed!'}
+                            </h2>
+                            <p className={`text-sm font-bold ${muted} mb-8 leading-relaxed`}>
+                                {ar
+                                    ? 'شكراً لك! سيتواصل معك فريقنا خلال 24 ساعة لتأكيد الطلب وترتيب التوصيل.'
+                                    : "Thank you! Our team will contact you within 24 hours to confirm and arrange delivery."}
+                            </p>
+
+                            <div className={`${darkMode ? 'bg-white/5' : 'bg-slate-50'} rounded-2xl p-4 mb-8 flex items-center gap-4 text-start`}>
+                                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                                    <Package className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                    <p className={`text-[10px] font-black uppercase tracking-widest ${muted}`}>{ar ? 'إجمالي الطلب' : 'Order Total'}</p>
+                                    <p className={`text-lg font-black text-primary`}>{finalTotal} {ar ? 'ر.س' : 'SAR'}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Link href="/profile/orders" className="block w-full bg-primary text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-primary/20 hover:opacity-90 active:scale-[0.98] transition-all">
+                                    {ar ? 'تتبع طلبي' : 'Track My Order'}
+                                </Link>
+                                <Link href="/store" className={`block w-full py-4 rounded-2xl font-black text-sm ${darkMode ? 'bg-white/5 text-gray-300' : 'bg-white border border-gray-200 text-gray-600'} hover:opacity-80 active:scale-[0.98] transition-all`}>
+                                    {ar ? 'متابعة التسوق' : 'Continue Shopping'}
+                                </Link>
+                            </div>
+                        </motion.div>
                     </div>
                 </motion.div>
             </div>
         );
     }
 
+    // ─── EMPTY CART ────────────────────────────────────────────────────────────
+    if (!cart?.length) {
+        return (
+            <div className={`min-h-screen ${bg} flex flex-col items-center justify-center gap-6 px-4`} dir={ar ? 'rtl' : 'ltr'}>
+                <div className={`w-24 h-24 ${darkMode ? 'bg-white/5' : 'bg-gray-100'} rounded-full flex items-center justify-center`}>
+                    <ShoppingBag className="w-12 h-12 text-gray-400" />
+                </div>
+                <h2 className={`text-2xl font-black ${textC}`}>{ar ? 'السلة فارغة' : 'Cart is Empty'}</h2>
+                <p className={`text-sm font-bold ${muted}`}>{ar ? 'أضف منتجات للمتابعة' : 'Add items to continue'}</p>
+                <Link href="/store" className="px-8 py-4 bg-primary text-white rounded-full font-black shadow-xl shadow-primary/20">
+                    {ar ? 'تسوق الآن' : 'Shop Now'}
+                </Link>
+            </div>
+        );
+    }
+
+    // ─── MAIN CHECKOUT ─────────────────────────────────────────────────────────
     return (
-        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-20 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="max-w-6xl mx-auto px-4 pt-8">
-                <header className="flex items-center justify-between mb-8">
-                    <Link href="/store" className="flex items-center gap-2 text-gray-400 hover:text-primary transition-colors">
-                        <ChevronLeft className={`w-4 h-4 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'العودة للمتجر' : 'Back to Store'}</span>
-                    </Link>
-                    <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
-                        {language === 'ar' ? 'إتمام الطلب' : 'Secure Checkout'}
-                    </h1>
-                </header>
+        <div className={`min-h-screen ${bg} pb-24 transition-colors duration-500`} dir={ar ? 'rtl' : 'ltr'}>
+            {/* Background blobs */}
+            <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-primary/8 rounded-full blur-[140px] pointer-events-none translate-x-1/3 -translate-y-1/3" />
+            <div className="fixed bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none -translate-x-1/3 translate-y-1/3" />
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                    {/* Left Column: Form / Confirmation */}
-                    <div className="lg:col-span-2 space-y-6 lg:space-y-8 order-1">
+            <div className="max-w-6xl mx-auto px-4 pt-6 relative z-10">
+                {/* ── Header ── */}
+                <div className="flex items-center gap-4 mb-8">
+                    <button
+                        onClick={() => step > 1 ? setStep(s => s - 1) : router.back()}
+                        className={`w-11 h-11 ${card} border rounded-2xl flex items-center justify-center transition-all active:scale-95 hover:border-primary/30`}
+                    >
+                        {ar ? <ChevronRight className={`w-5 h-5 ${textC}`} /> : <ChevronLeft className={`w-5 h-5 ${textC}`} />}
+                    </button>
+                    <div>
+                        <h1 className={`text-xl font-black ${textC} tracking-tight`}>
+                            {ar ? 'إتمام الطلب' : 'Checkout'}
+                        </h1>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${muted}`}>
+                            {ar ? `${cart.length} منتج في السلة` : `${cart.length} item(s)`}
+                        </p>
+                    </div>
+
+                    {/* Step indicator */}
+                    <div className="flex items-center gap-2 ms-auto">
+                        {[
+                            { n: 1, label: ar ? 'البيانات' : 'Info' },
+                            { n: 2, label: ar ? 'الدفع' : 'Payment' },
+                        ].map((s, i) => (
+                            <div key={s.n} className="flex items-center gap-2">
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black transition-all ${step >= s.n ? 'bg-primary text-white' : darkMode ? 'bg-white/5 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
+                                    {step > s.n ? <CheckCircle2 className="w-3 h-3" /> : <span>{s.n}</span>}
+                                    <span className="hidden sm:inline">{s.label}</span>
+                                </div>
+                                {i === 0 && <div className={`w-6 h-0.5 rounded-full ${step > 1 ? 'bg-primary' : darkMode ? 'bg-white/10' : 'bg-gray-200'}`} />}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* ── Body ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* LEFT: Forms */}
+                    <div className="lg:col-span-2">
                         <AnimatePresence mode="wait">
-                        {step === 1 ? (
-                            <motion.div 
-                                key="step1"
-                                initial={{ opacity: 0, x: -20 }} 
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-8 text-start"
-                            >
-                                <section className="bg-white/80 dark:bg-white/5 backdrop-blur-xl p-5 lg:p-6 rounded-[2rem] border border-gray-100 dark:border-white/10 shadow-premium">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-8 h-8 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                                            <User className="w-4 h-4" />
-                                        </div>
-                                        <h3 className="text-xs font-black dark:text-white uppercase tracking-widest leading-none">{language === 'ar' ? 'البيانات الشخصية' : 'Personal Information'}</h3>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 text-start">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2">{language === 'ar' ? 'الاسم' : 'Name'}</label>
-                                            <input 
-                                                type="text" 
-                                                name="fullName"
-                                                value={formData.fullName}
-                                                onChange={handleInputChange}
-                                                placeholder={language === 'ar' ? 'الاسم' : 'Full Name'} 
-                                                className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-xl p-3.5 text-[11px] font-bold dark:text-white outline-none focus:ring-2 ring-primary/20 transition-all text-start" 
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2">{language === 'ar' ? 'الهاتف' : 'Phone'}</label>
-                                            <input 
-                                                type="text" 
-                                                name="phone"
-                                                value={formData.phone}
-                                                onChange={handleInputChange}
-                                                placeholder={language === 'ar' ? 'الرقم' : 'Phone'} 
-                                                className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-xl p-3.5 text-[11px] font-bold dark:text-white outline-none focus:ring-2 ring-primary/20 transition-all text-start" 
-                                            />
-                                        </div>
-                                    </div>
-                                </section>
 
-                                <section className="bg-white/80 dark:bg-white/5 backdrop-blur-xl p-5 lg:p-6 rounded-[2rem] border border-gray-100 dark:border-white/10 shadow-premium">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-8 h-8 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                                            <MapPin className="w-4 h-4" />
-                                        </div>
-                                        <h3 className="text-xs font-black dark:text-white uppercase tracking-widest leading-none">{language === 'ar' ? 'عنوان التوصيل' : 'Delivery Address'}</h3>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3 text-start">
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between px-2 min-h-[14px]">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'ar' ? 'المدينة' : 'City'}</label>
+                            {/* ── STEP 1: INFO ── */}
+                            {step === 1 && (
+                                <motion.div key="info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-5">
+
+                                    {/* Personal Info */}
+                                    <div className={`${card} border rounded-[2rem] p-6`}>
+                                        <div className="flex items-center gap-3 mb-5">
+                                            <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                                                <User className="w-4 h-4 text-primary" />
                                             </div>
-                                            <select 
-                                                name="city"
-                                                value={formData.city}
-                                                onChange={handleInputChange}
-                                                className={`w-full bg-slate-100 dark:bg-white/5 border-none rounded-xl p-3.5 text-[11px] font-bold dark:text-white outline-none focus:ring-2 ring-primary/20 transition-all ${!formData.city ? 'ring-2 ring-amber-500/30' : ''}`} 
-                                            >
-                                                <option value="">{language === 'ar' ? 'اختر' : 'City'}</option>
-                                                {saudiCities.map(city => (
-                                                    <option key={city.en} value={city.en}>
-                                                        {language === 'ar' ? city.ar : city.en}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            <h3 className={`text-sm font-black ${textC} uppercase tracking-wider`}>{ar ? 'البيانات الشخصية' : 'Personal Info'}</h3>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between px-2 min-h-[14px]">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'ar' ? 'الحي/الشارع' : 'District'}</label>
-                                                <button 
-                                                    onClick={detectLocation}
-                                                    className="text-[8px] font-black text-primary uppercase tracking-widest flex items-center gap-1 hover:opacity-70"
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {[
+                                                { key: 'fullName', label: ar ? 'الاسم الكامل *' : 'Full Name *', type: 'text', icon: User },
+                                                { key: 'phone', label: ar ? 'رقم الجوال *' : 'Phone Number *', type: 'tel', icon: Phone },
+                                            ].map(({ key, label, type, icon: Icon }) => (
+                                                <div key={key} className="relative">
+                                                    <Icon className={`absolute ${ar ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-4 h-4 ${muted}`} />
+                                                    <input
+                                                        type={type} placeholder={label} value={formData[key]}
+                                                        onChange={e => setFormData(p => ({ ...p, [key]: e.target.value }))}
+                                                        className={`w-full border rounded-xl py-3 text-sm font-bold outline-none transition-all ${inp} ${ar ? 'pr-10 pl-3' : 'pl-10 pr-3'} ${!formData[key] ? 'border-amber-500/30' : ''}`}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Delivery Address */}
+                                    <div className={`${card} border rounded-[2rem] p-6`}>
+                                        <div className="flex items-center justify-between mb-5">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                                                    <MapPin className="w-4 h-4 text-primary" />
+                                                </div>
+                                                <h3 className={`text-sm font-black ${textC} uppercase tracking-wider`}>{ar ? 'عنوان التوصيل' : 'Delivery Address'}</h3>
+                                            </div>
+                                            <button onClick={detectLocation} className="text-[10px] font-black text-primary flex items-center gap-1 hover:opacity-70 transition-opacity">
+                                                <MapPin className="w-3 h-3" />
+                                                {ar ? 'تحديد الموقع' : 'Detect'}
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <select
+                                                value={formData.city}
+                                                onChange={e => setFormData(p => ({ ...p, city: e.target.value }))}
+                                                className={`w-full border rounded-xl py-3 px-4 text-sm font-bold outline-none transition-all ${inp} ${!formData.city ? 'border-amber-500/30' : ''}`}
+                                            >
+                                                <option value="">{ar ? 'اختر المدينة *' : 'Select City *'}</option>
+                                                {SAUDI_CITIES.map(c => <option key={c.en} value={c.en}>{ar ? c.ar : c.en}</option>)}
+                                            </select>
+                                            <input
+                                                type="text" placeholder={ar ? 'الحي / اسم الشارع *' : 'District / Street *'}
+                                                value={formData.address}
+                                                onChange={e => setFormData(p => ({ ...p, address: e.target.value }))}
+                                                className={`w-full border rounded-xl py-3 px-4 text-sm font-bold outline-none transition-all ${inp} ${!formData.address ? 'border-amber-500/30' : ''}`}
+                                            />
+                                            <input
+                                                type="text" placeholder={ar ? 'ملاحظات للتوصيل (اختياري)' : 'Delivery notes (optional)'}
+                                                value={formData.notes}
+                                                onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
+                                                className={`w-full border rounded-xl py-3 px-4 text-sm font-bold outline-none transition-all ${inp}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Trial Session Summary */}
+                                    {hasTrial && trialItems[0]?.metadata?.bookedDate && (
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.97 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            className="border border-primary/30 rounded-[2rem] p-6 bg-primary/5 space-y-4"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 bg-primary text-white rounded-xl flex items-center justify-center">
+                                                        <Calendar className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className={`text-sm font-black ${textC}`}>{ar ? 'موعد الحصة التجريبية' : 'Trial Session'}</h3>
+                                                        <p className={`text-[10px] font-bold ${muted} uppercase tracking-wider`}>{ar ? 'تم تأكيد الحجز' : 'Booking confirmed'}</p>
+                                                    </div>
+                                                </div>
+                                                <Link href="/cart" className="text-[10px] font-black text-primary bg-primary/10 px-3 py-1.5 rounded-xl">
+                                                    {ar ? 'تعديل' : 'Edit'}
+                                                </Link>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {[
+                                                    { icon: Calendar, label: ar ? 'اليوم' : 'Date', val: trialItems[0].metadata.bookedDate },
+                                                    { icon: Clock, label: ar ? 'الوقت' : 'Time', val: trialItems[0].metadata.bookedTime },
+                                                    {
+                                                        icon: trialItems[0].metadata.location === 'gym' ? Building2 : Home,
+                                                        label: ar ? 'المكان' : 'Location',
+                                                        val: trialItems[0].metadata.location === 'gym'
+                                                            ? (getText(trialItems[0].metadata.preSelectedGymName) || (ar ? 'النادي' : 'Gym'))
+                                                            : (ar ? 'المنزل' : 'Home')
+                                                    },
+                                                ].map(({ icon: Icon, label, val }) => (
+                                                    <div key={label} className={`${darkMode ? 'bg-white/5' : 'bg-white'} rounded-2xl p-3 text-center`}>
+                                                        <Icon className="w-4 h-4 text-primary mx-auto mb-1" />
+                                                        <p className={`text-[9px] font-bold ${muted} uppercase`}>{label}</p>
+                                                        <p className={`text-[10px] font-black ${textC} mt-0.5`}>{val}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    <button
+                                        onClick={() => setStep(2)}
+                                        disabled={!formData.fullName || !formData.phone || !formData.city || !formData.address}
+                                        className="w-full py-4 bg-primary text-white rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-primary/25 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        {ar ? 'متابعة لاختيار الدفع' : 'Continue to Payment'}
+                                        {ar ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                                    </button>
+                                </motion.div>
+                            )}
+
+                            {/* ── STEP 2: PAYMENT ── */}
+                            {step === 2 && (
+                                <motion.div key="pay" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-5">
+
+                                    {/* Delivery Review */}
+                                    <div className="border border-emerald-500/30 rounded-[2rem] p-5 bg-emerald-500/5">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="flex items-center gap-2 text-sm font-black text-emerald-600 dark:text-emerald-400">
+                                                <CheckCircle2 className="w-4 h-4" />
+                                                {ar ? 'بيانات التوصيل' : 'Delivery Info'}
+                                            </span>
+                                            <button onClick={() => setStep(1)} className={`text-[10px] font-black text-primary underline`}>{ar ? 'تعديل' : 'Edit'}</button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-start">
+                                            <div>
+                                                <p className={`text-[9px] font-bold ${muted} uppercase mb-0.5`}>{ar ? 'الاسم' : 'Name'}</p>
+                                                <p className={`text-xs font-black ${textC}`}>{formData.fullName}</p>
+                                            </div>
+                                            <div>
+                                                <p className={`text-[9px] font-bold ${muted} uppercase mb-0.5`}>{ar ? 'الجوال' : 'Phone'}</p>
+                                                <p className={`text-xs font-black ${textC}`}>{formData.phone}</p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <p className={`text-[9px] font-bold ${muted} uppercase mb-0.5`}>{ar ? 'العنوان' : 'Address'}</p>
+                                                <p className={`text-xs font-black ${textC}`}>{formData.city} — {formData.address}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Payment Method */}
+                                    <div className={`${card} border rounded-[2rem] p-6`}>
+                                        <div className="flex items-center gap-3 mb-5">
+                                            <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                                                <CreditCard className="w-4 h-4 text-primary" />
+                                            </div>
+                                            <h3 className={`text-sm font-black ${textC} uppercase tracking-wider`}>{ar ? 'طريقة الدفع' : 'Payment Method'}</h3>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {[
+                                                { v: 'credit_card', label: ar ? 'بطاقة ائتمانية / مدى' : 'Credit / Debit Card', icon: CreditCard, sub: ar ? 'فيزا، ماستركارد، مدى' : 'Visa, Mastercard, Mada' },
+                                                { v: 'wallet', label: ar ? 'محفظة إلكترونية' : 'Digital Wallet', icon: Wallet, sub: ar ? 'Apple Pay، STC Pay، Tamara' : 'Apple Pay, STC Pay, Tamara' },
+                                                { v: 'cod', label: ar ? 'الدفع عند الاستلام' : 'Cash on Delivery', icon: Package, sub: ar ? 'ادفع عند وصول طلبك' : 'Pay when order arrives' },
+                                            ].map(({ v, label, icon: Icon, sub }) => (
+                                                <button
+                                                    key={v} onClick={() => setPaymentMethod(v)}
+                                                    className={`w-full p-4 rounded-2xl border flex items-center gap-4 transition-all ${paymentMethod === v ? 'border-primary bg-primary/8' : darkMode ? 'border-white/8 bg-white/3 hover:border-white/15' : 'border-gray-100 bg-slate-50 hover:border-gray-200'}`}
                                                 >
-                                                    <MapPin className="w-2.5 h-2.5" />
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === v ? 'bg-primary text-white' : darkMode ? 'bg-white/10 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                                                        <Icon className="w-5 h-5" />
+                                                    </div>
+                                                    <div className="flex-1 text-start">
+                                                        <p className={`text-sm font-black ${paymentMethod === v ? 'text-primary' : textC}`}>{label}</p>
+                                                        <p className={`text-[10px] font-bold ${muted}`}>{sub}</p>
+                                                    </div>
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${paymentMethod === v ? 'border-primary' : darkMode ? 'border-white/20' : 'border-gray-300'}`}>
+                                                        {paymentMethod === v && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Promo Code */}
+                                    <div className={`${card} border rounded-[2rem] p-6`}>
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-9 h-9 bg-amber-500/10 rounded-xl flex items-center justify-center">
+                                                <Tag className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <h3 className={`text-sm font-black ${textC} uppercase tracking-wider`}>{ar ? 'كود الخصم' : 'Promo Code'}</h3>
+                                        </div>
+
+                                        {promoApplied ? (
+                                            <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                    <div>
+                                                        <p className="text-sm font-black text-emerald-500">{promoApplied.code}</p>
+                                                        <p className={`text-[10px] font-bold ${muted}`}>{ar ? `خصم ${promoApplied.discount}%` : `${promoApplied.discount}% off`} — {ar ? 'وفّرت' : 'Saved'} {discountAmount} {ar ? 'ر.س' : 'SAR'}</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => setPromoApplied(null)} className={`${muted} hover:text-rose-500 transition-colors`}>
+                                                    <X className="w-4 h-4" />
                                                 </button>
                                             </div>
-                                            <input 
-                                                type="text" 
-                                                name="address"
-                                                value={formData.address}
-                                                onChange={handleInputChange}
-                                                placeholder={language === 'ar' ? 'الحي' : 'District'} 
-                                                className="w-full bg-slate-100 dark:bg-white/5 border-none rounded-xl p-3.5 text-[11px] font-bold dark:text-white outline-none focus:ring-2 ring-primary/20 transition-all text-start" 
-                                            />
-                                        </div>
-                                    </div>
-                                </section>
-
-                                {hasTrial && trialItems[0]?.metadata?.bookedDate && (
-                                    <motion.section 
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-primary/5 dark:bg-primary/5 backdrop-blur-xl p-6 rounded-[2rem] border border-primary/20 shadow-premium space-y-4 overflow-hidden relative"
-                                    >
-                                        <div className="flex items-center justify-between relative text-start">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-                                                    <Calendar className="w-5 h-5" />
-                                                </div>
-                                                <div className="text-start">
-                                                    <h3 className="text-sm font-black dark:text-white uppercase tracking-widest leading-none">
-                                                        {language === 'ar' ? 'موعد الحصة التجريبية' : 'Trial Session Booking'}
-                                                    </h3>
-                                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-1">
-                                                        {language === 'ar' ? 'تم تأكيد الموعد' : 'Booking confirmed'}
-                                                    </p>
-                                                </div>
+                                        ) : (
+                                            <div className="flex gap-2">
+                                                <input
+                                                    value={promoInput}
+                                                    onChange={e => setPromoInput(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                                                    placeholder={ar ? 'أدخل الكود...' : 'Enter promo code...'}
+                                                    className={`flex-1 border rounded-xl py-3 px-4 text-sm font-bold outline-none transition-all uppercase ${inp}`}
+                                                />
+                                                <button
+                                                    onClick={handleApplyPromo}
+                                                    disabled={!promoInput.trim()}
+                                                    className="px-5 py-3 bg-amber-500 text-white rounded-xl text-xs font-black disabled:opacity-40 active:scale-95 transition-all shadow-lg shadow-amber-500/20"
+                                                >
+                                                    {ar ? 'تطبيق' : 'Apply'}
+                                                </button>
                                             </div>
-                                            <Link href="/cart" className="text-[10px] font-black text-primary uppercase bg-primary/10 px-3 py-1.5 rounded-xl hover:bg-primary/20 transition-all">
-                                                {language === 'ar' ? 'تعديل' : 'Edit'}
-                                            </Link>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3 mt-4">
-                                            <div className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 flex flex-col items-center text-center gap-1">
-                                                <Calendar className="w-4 h-4 text-primary mb-1" />
-                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{language === 'ar' ? 'اليوم' : 'Day'}</span>
-                                                <span className="text-xs font-black dark:text-white">{trialItems[0].metadata.bookedDate}</span>
-                                            </div>
-                                            <div className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 flex flex-col items-center text-center gap-1">
-                                                <Clock className="w-4 h-4 text-primary mb-1" />
-                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{language === 'ar' ? 'الوقت' : 'Time'}</span>
-                                                <span className="text-xs font-black dark:text-white">{trialItems[0].metadata.bookedTime}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-4 bg-white dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                                                {trialItems[0].metadata.location === 'gym' ? <Dumbbell className="w-5 h-5" /> : <Home className="w-5 h-5" />}
-                                            </div>
-                                            <div className="text-start">
-                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{language === 'ar' ? 'مكان الحصة' : 'Location'}</span>
-                                                <h4 className="text-xs font-black dark:text-white uppercase tracking-tight">
-                                                    {trialItems[0].metadata.location === 'gym' ? (trialItems[0].metadata.preSelectedGymName || (language === 'ar' ? 'في النادي' : 'At Gym')) : (language === 'ar' ? 'في المنزل' : 'At Home')}
-                                                </h4>
-                                            </div>
-                                        </div>
-                                    </motion.section>
-                                )}
-
-                                <button 
-                                    onClick={() => setStep(2)}
-                                    disabled={
-                                        !formData.fullName || 
-                                        !formData.phone || 
-                                        !formData.address || 
-                                        !formData.city ||
-                                        (hasTrial && (
-                                            !trialItems[0]?.metadata?.bookedDate || 
-                                            !trialItems[0]?.metadata?.bookedTime || 
-                                            (trialItems[0]?.metadata?.location === 'gym' && !trialItems[0]?.metadata?.preSelectedGymId)
-                                        ))
-                                    }
-                                    className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-2xl font-black uppercase tracking-widest shadow-2xl hover:opacity-90 transition-all flex items-center justify-center gap-3 group text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {language === 'ar' ? 'تأكيد البيانات واختيار الدفع' : 'Confirm Information & Payment'}
-                                    <ArrowRight className={`w-4 h-4 group-hover:translate-x-1 transition-transform ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                </button>
-                            </motion.div>
-                        ) : (
-                            <motion.div 
-                                key="step2"
-                                initial={{ opacity: 0, x: 20 }} 
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                transition={{ duration: 0.3 }}
-                                className="space-y-6 text-start"
-                            >
-                                {/* Review Section */}
-                                <div className="bg-emerald-50 dark:bg-emerald-500/5 backdrop-blur-xl p-6 rounded-[2rem] border border-emerald-500/20 shadow-premium space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-sm font-black dark:text-white uppercase tracking-widest flex items-center gap-2">
-                                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                            {language === 'ar' ? 'مراجعة بيانات التوصيل' : 'Review Delivery Info'}
-                                        </h3>
-                                        <button onClick={() => setStep(1)} className="text-[10px] font-black text-primary uppercase underline tracking-widest">
-                                            {language === 'ar' ? 'تعديل' : 'Edit'}
-                                        </button>
+                                        )}
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 bg-white/50 dark:bg-white/10 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                                                <User className="w-4 h-4 text-emerald-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black text-gray-400 uppercase mb-0.5 tracking-tighter">{language === 'ar' ? 'المستلم' : 'Receiver'}</p>
-                                                <p className="text-sm font-black dark:text-white uppercase tracking-tighter">{formData.fullName}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 bg-white/50 dark:bg-white/10 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                                                <Phone className="w-4 h-4 text-emerald-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black text-gray-400 uppercase mb-0.5 tracking-tighter">{language === 'ar' ? 'رقم التواصل' : 'Contact No.'}</p>
-                                                <p className="text-sm font-black dark:text-white">{formData.phone}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-4 md:col-span-2">
-                                            <div className="w-10 h-10 bg-white/50 dark:bg-white/10 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                                                <MapPin className="w-4 h-4 text-emerald-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black text-gray-400 uppercase mb-0.5 tracking-tighter">{language === 'ar' ? 'عنوان التوصيل' : 'Delivery Destination'}</p>
-                                                <p className="text-sm font-black dark:text-white uppercase tracking-tighter">{formData.city}, {formData.address}</p>
-                                            </div>
-                                        </div>
+                                    {/* Security note */}
+                                    <div className={`flex items-center gap-2 justify-center ${muted} py-1`}>
+                                        <Lock className="w-3.5 h-3.5" />
+                                        <span className="text-[10px] font-bold">{ar ? 'جميع المعاملات مشفّرة بتقنية SSL 256-bit' : 'All transactions encrypted with SSL 256-bit'}</span>
                                     </div>
-                                </div>
 
-                                {/* Payment Selection Section */}
-                                <section className="bg-white/80 dark:bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-gray-100 dark:border-white/10 shadow-premium">
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-8 h-8 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                                            <CreditCard className="w-4 h-4" />
-                                        </div>
-                                        <h3 className="text-xs font-black dark:text-white uppercase tracking-widest">{language === 'ar' ? 'اختر طريقة الدفع' : 'Choose Payment Method'}</h3>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button 
-                                            onClick={() => setPaymentMethod('credit_card')}
-                                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 group transition-all ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5' : 'border-transparent bg-slate-100 dark:bg-white/5 hover:border-black/10'}`}
-                                        >
-                                            <CreditCard className={`w-5 h-5 ${paymentMethod === 'credit_card' ? 'text-primary' : 'text-gray-400'}`} />
-                                            <span className={`text-[9px] font-black uppercase ${paymentMethod === 'credit_card' ? 'text-primary' : 'text-gray-500'}`}>{language === 'ar' ? 'بطاقة' : 'Card'}</span>
-                                        </button>
-                                        <button 
-                                            onClick={() => setPaymentMethod('cod')}
-                                            className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 group transition-all ${paymentMethod === 'cod' ? 'border-primary bg-primary/5' : 'border-transparent bg-slate-100 dark:bg-white/5 hover:border-black/10'}`}
-                                        >
-                                            <ShoppingBag className={`w-5 h-5 ${paymentMethod === 'cod' ? 'text-primary' : 'text-gray-400'}`} />
-                                            <span className={`text-[9px] font-black uppercase ${paymentMethod === 'cod' ? 'text-primary' : 'text-gray-500'}`}>{language === 'ar' ? 'كاش' : 'Cash'}</span>
-                                        </button>
-                                    </div>
-                                </section>
-                                
-                                <div className="pt-4">
-                                    <button 
+                                    <button
                                         onClick={handleSubmitOrder}
                                         disabled={isSubmitting}
-                                        className="w-full bg-emerald-600 text-white py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 group text-xs disabled:opacity-50"
+                                        className="w-full py-5 bg-primary text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-primary/25 active:scale-[0.98] transition-all disabled:opacity-60 text-sm"
                                     >
-                                        {isSubmitting ? (
-                                            <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
-                                        ) : (
-                                            <>
-                                                {language === 'ar' ? 'إرسال الطلب الآن' : 'Send Order Now'}
-                                                <ArrowRight className={`w-4 h-4 group-hover:translate-x-1 transition-transform ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                            </>
-                                        )}
+                                        {isSubmitting
+                                            ? <><Loader2 className="w-5 h-5 animate-spin" /> {ar ? 'جاري إرسال الطلب...' : 'Placing Order...'}</>
+                                            : <><ShieldCheck className="w-5 h-5" /> {ar ? `تأكيد الطلب — ${finalTotal} ر.س` : `Confirm Order — ${finalTotal} SAR`}</>
+                                        }
                                     </button>
-                                    <button 
-                                        onClick={() => setStep(1)}
-                                        className="w-full mt-6 py-2 text-[9px] font-black text-gray-400 uppercase tracking-widest hover:text-rose-500 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <ArrowLeft className={`w-3 h-3 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                        {language === 'ar' ? 'العودة لتعديل البيانات' : 'Back to Edit Details'}
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
+                                </motion.div>
+                            )}
                         </AnimatePresence>
                     </div>
 
-                    <div className="space-y-6 order-2 lg:sticky lg:top-8 h-fit">
-                        <section className="bg-slate-900 border border-white/5 p-5 lg:p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden text-start">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-[40px] -translate-y-1/2 translate-x-1/2"></div>
-                            
-                            <h3 className="text-white text-[10px] lg:text-xs font-black uppercase tracking-widest mb-6 lg:mb-8 flex items-center gap-3">
+                    {/* RIGHT: Order Summary */}
+                    <div className="lg:sticky lg:top-6 h-fit space-y-4">
+                        <div className="bg-slate-900 rounded-[2rem] p-6 border border-white/5 relative overflow-hidden shadow-2xl">
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-primary/15 rounded-full blur-[60px] pointer-events-none" />
+
+                            <h3 className="text-white text-xs font-black uppercase tracking-widest mb-5 flex items-center gap-2">
                                 <Box className="w-4 h-4 text-primary" />
-                                {language === 'ar' ? 'ملخص الطلب' : 'Order Summary'}
+                                {ar ? 'ملخص الطلب' : 'Order Summary'}
                             </h3>
-                            
-                            <div className="space-y-3 mb-8 max-h-[400px] overflow-y-auto custom-scrollbar pe-2">
-                                {cart.map((item) => (
-                                    <motion.div 
-                                        key={item.cartId} 
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="flex gap-3 p-3 bg-white/5 rounded-3xl border border-white/5 group hover:border-primary/30 transition-all text-start relative overflow-hidden"
-                                    >
-                                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br from-primary/5 to-transparent transition-opacity pointer-events-none" />
-                                        
-                                        <div className="w-14 h-14 rounded-2xl overflow-hidden border border-white/5 shrink-0 shadow-sm relative z-10">
-                                            <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-                                        </div>
 
-                                        <div className="flex-1 flex flex-col justify-center min-w-0 relative z-10">
-                                            <div className="flex justify-between items-start gap-2">
-                                                <h4 className="text-[11px] font-black text-white truncate uppercase tracking-tighter">{item.name}</h4>
-                                                <span className="text-[11px] font-black text-primary shrink-0 tracking-tighter">
-                                                    {item.price * item.quantity} <small className="text-[7px] opacity-40 uppercase">SAR</small>
-                                                </span>
-                                            </div>
-
-                                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                {item.type === 'subscription' ? (
-                                                    <span className="text-[8px] font-bold text-primary/80 uppercase tracking-widest">
-                                                        {item.metadata?.trainerName ? `${language === 'ar' ? 'مع ' : 'With '} ${item.metadata.trainerName}` : (language === 'ar' ? 'بدون مدرب' : 'Self-training')}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">
-                                                        {item.quantity}x {item.size !== 'N/A' && item.size ? item.size : ''} {item.color && item.color !== 'N/A' ? `/ ${item.color?.name_en || item.color}` : ''}
-                                                    </span>
-                                                )}
-                                                
-                                                {isTrialItem(item) && item.metadata?.bookedDate && (
-                                                    <div className="flex items-center gap-2 border-l border-white/10 pl-2">
-                                                        <span className="text-[8px] font-bold text-white/50 flex items-center gap-1 uppercase">
-                                                            <Calendar className="w-2.5 h-2.5 text-primary/60" />
-                                                            {item.metadata.bookedDate}
-                                                        </span>
-                                                        <span className="text-[8px] font-bold text-white/50 flex items-center gap-1 uppercase">
-                                                            <MapPin className="w-2.5 h-2.5 text-primary/60" />
-                                                            {item.metadata.location === 'gym' ? (item.metadata.preSelectedGymName || (language === 'ar' ? 'النادي' : 'Club')) : (language === 'ar' ? 'المنزل' : 'Home')}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
+                            <div className="space-y-2 mb-5 max-h-72 overflow-y-auto">
+                                {cart.map(item => (
+                                    <div key={item.cartId} className="flex items-center gap-3 p-2.5 bg-white/5 rounded-2xl border border-white/5">
+                                        <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-white/10">
+                                            <img src={item.image} alt="" className="w-full h-full object-cover" onError={e => e.target.style.display = 'none'} />
                                         </div>
-                                    </motion.div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-black text-white truncate">{getText(item.name)}</p>
+                                            <p className="text-[9px] font-bold text-white/40">
+                                                {item.type === 'subscription'
+                                                    ? (ar ? 'اشتراك' : 'Subscription')
+                                                    : `${item.quantity}x ${item.size || ''}`
+                                                }
+                                            </p>
+                                        </div>
+                                        <span className="text-[11px] font-black text-primary whitespace-nowrap">
+                                            {(item.price * item.quantity).toFixed(0)} {ar ? 'ر.س' : 'SAR'}
+                                        </span>
+                                    </div>
                                 ))}
                             </div>
 
-                            <div className="pt-6 border-t border-white/10 space-y-3">
-                                <div className="flex justify-between text-[10px] font-bold text-white/30 uppercase tracking-widest">
-                                    <span>{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</span>
-                                    <span className="text-white/70">{cartTotal} SAR</span>
+                            <div className="space-y-2.5 pt-4 border-t border-white/10">
+                                <div className="flex justify-between text-[10px] font-bold text-white/40 uppercase">
+                                    <span>{ar ? 'المجموع الفرعي' : 'Subtotal'}</span>
+                                    <span className="text-white/60">{cartTotal} {ar ? 'ر.س' : 'SAR'}</span>
                                 </div>
-                                <div className="flex justify-between text-[10px] font-bold text-white/30 uppercase tracking-widest">
-                                    <span>{language === 'ar' ? 'التوصيل' : 'Delivery Fee'}</span>
-                                    <span className="text-emerald-500">{language === 'ar' ? 'مجاناً' : 'FREE'}</span>
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between text-[10px] font-bold uppercase">
+                                        <span className="text-emerald-400">{ar ? 'خصم' : 'Discount'} ({promoApplied?.discount}%)</span>
+                                        <span className="text-emerald-400">-{discountAmount} {ar ? 'ر.س' : 'SAR'}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between text-[10px] font-bold text-white/40 uppercase">
+                                    <span>{ar ? 'التوصيل' : 'Shipping'}</span>
+                                    <span className="text-emerald-400">{ar ? 'مجاناً' : 'FREE'}</span>
                                 </div>
-                                <div className="flex justify-between pt-6 border-t border-white/10">
-                                    <span className="text-sm font-black text-white uppercase tracking-widest">{language === 'ar' ? 'الإجمالي الكلي' : 'Grand Total'}</span>
-                                    <span className="text-2xl font-black text-primary tracking-tighter">{cartTotal} <small className="text-[10px] opacity-50">SAR</small></span>
+                                <div className="flex justify-between pt-3 border-t border-white/10">
+                                    <span className="text-sm font-black text-white uppercase">{ar ? 'الإجمالي' : 'Total'}</span>
+                                    <span className="text-2xl font-black text-primary">{finalTotal} <small className="text-[10px] opacity-50">{ar ? 'ر.س' : 'SAR'}</small></span>
                                 </div>
                             </div>
 
-                            <div className="mt-8 pt-8 border-t border-white/5 flex items-center gap-2 opacity-30 justify-center">
-                                <ShieldCheck className="w-4 h-4 text-white" />
-                                <span className="text-[8px] font-black text-white uppercase tracking-widest">Secure encrypted checkout</span>
+                            <div className="mt-5 pt-4 border-t border-white/5 flex items-center gap-2 opacity-30 justify-center">
+                                <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                                <span className="text-[8px] font-black text-white uppercase tracking-widest">Secure Checkout</span>
                             </div>
-                        </section>
-                    </div>
+                        </div>
 
-                    {/* Similar Products Section */}
-                    <div className="lg:col-span-2 mt-4 lg:mt-12 space-y-6 lg:space-y-8 order-3">
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="p-2.5 bg-amber-500/10 rounded-2xl">
-                                <Sparkles className="w-5 h-5 text-amber-500" />
+                        {/* Suggested Products */}
+                        {similarProducts.length > 0 && (
+                            <div className={`${card} border rounded-[2rem] p-5`}>
+                                <h4 className={`text-xs font-black ${textC} uppercase tracking-widest mb-4 flex items-center gap-2`}>
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                    {ar ? 'قد يعجبك أيضاً' : 'You May Also Like'}
+                                </h4>
+                                <div className="space-y-2">
+                                    {similarProducts.slice(0, 3).map(p => (
+                                        <Link key={p.id} href={`/store/${p.id}`} className={`flex items-center gap-3 p-2 rounded-xl hover:bg-primary/5 transition-all group`}>
+                                            <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-gray-100 dark:bg-white/10">
+                                                <img src={p.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={e => e.target.style.display = 'none'} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-[11px] font-black ${textC} truncate`}>{getText(p.name)}</p>
+                                                <p className="text-[10px] font-black text-primary">{p.price} {ar ? 'ر.س' : 'SAR'}</p>
+                                            </div>
+                                            <Plus className={`w-3.5 h-3.5 ${muted} group-hover:text-primary transition-colors shrink-0`} />
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
-                            <h3 className="text-lg lg:text-xl font-black dark:text-white uppercase tracking-tighter italic">
-                                {language === 'ar' ? 'منتجات قد تنال إعجابك' : 'Suggested for You'}
-                            </h3>
-                            <p className="text-[9px] lg:text-[10px] font-black text-gray-400 uppercase tracking-widest">{language === 'ar' ? 'أكمل مجموعتك الرياضية' : 'Complete your training gear'}</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                            {similarProducts.map((p) => (
-                                <motion.div
-                                    key={p.id}
-                                    whileHover={{ y: -10 }}
-                                    className="group relative bg-white dark:bg-[#1e293b]/50 rounded-[2.5rem] p-4 border border-gray-100 dark:border-white/5 hover:border-primary/30 transition-all text-start"
-                                >
-                                    <Link href={`/store/${p.id}`}>
-                                        <div className="aspect-[4/5] rounded-[2rem] overflow-hidden mb-5 bg-gray-50 dark:bg-white/5 relative">
-                                            <img 
-                                                src={p.image} 
-                                                alt={p.name} 
-                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
-                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">{language === 'ar' ? 'عرض المنتج' : 'View Product'}</span>
-                                            </div>
-                                        </div>
-                                        <div className="px-2">
-                                            <h4 className="text-[11px] font-black dark:text-white uppercase tracking-tight truncate mb-1">{p.name}</h4>
-                                            <div className="flex justify-between items-center">
-                                                <p className="text-xs font-black text-primary">{p.price} <small className="text-[8px] uppercase">SAR</small></p>
-                                                <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <ArrowRight className={`w-3 h-3 text-gray-400 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </motion.div>
-                            ))}
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -72,11 +72,7 @@ service cloud.firestore {
     match /bookings/{id} {
       allow read, update, delete: if signedIn() && (isOwner(resource.data) || isAdmin());
       allow create: if signedIn() && 
-        (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid) &&
-        (
-          !request.resource.data.isTrial || 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.has_used_trial != true
-        );
+        (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
     }
 
     match /subscriptions/{id} {
@@ -120,6 +116,16 @@ service cloud.firestore {
       allow read: if signedIn() && (isOwner(resource.data) || isAdmin());
       allow create: if isAdmin() || isTrainer();
       allow update, delete: if isAdmin();
+    }
+
+    // --- CHAT SYSTEM ---
+    
+    match /chats/{chatId} {
+      allow read, write: if signedIn() && (chatId.matches('.*' + request.auth.uid + '.*') || isAdmin());
+      
+      match /messages/{messageId} {
+        allow read, write: if signedIn() && (chatId.matches('.*' + request.auth.uid + '.*') || isAdmin());
+      }
     }
 
     // --- ADMIN SYSTEM FALLBACK ---

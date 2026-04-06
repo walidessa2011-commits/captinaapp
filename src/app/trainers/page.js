@@ -1,153 +1,201 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { 
-    Search, ChevronLeft, ChevronRight, 
-    Activity, Target, Users
-} from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Users, Star, Heart, X, Shield, Loader2 } from 'lucide-react';
 import { useApp } from "@/context/AppContext";
 import { matchesSport } from "@/lib/utils";
 import Link from 'next/link';
-import TrainerCard from '@/components/TrainerCard';
 import { useRouter } from 'next/navigation';
+import { trainersData } from '@/lib/trainersData';
 
 export default function Trainers() {
-    const { t, language, darkMode, getText } = useApp();
+    const { t, language, darkMode, getText, favoriteTrainers, toggleFavoriteTrainer } = useApp();
     const router = useRouter();
-    const [searchQuery, setSearchQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("all");
+    const ar = language === 'ar';
+
+    const [search, setSearch] = useState('');
+    const [activeCategory, setActiveCategory] = useState('all');
     const [trainers, setTrainers] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [onlyFav, setOnlyFav] = useState(false);
+
+    const bg = darkMode ? "bg-[#0a0f1a]" : "bg-slate-50";
+    const card = darkMode ? "bg-white/5 border-white/8" : "bg-white border-gray-100 shadow-sm";
+    const textC = darkMode ? "text-white" : "text-slate-900";
+    const muted = darkMode ? "text-gray-400" : "text-gray-500";
+    const inp = darkMode ? "bg-white/5 border-white/8 text-white placeholder:text-gray-600" : "bg-white border-gray-200 text-slate-900 placeholder:text-gray-400 shadow-sm";
 
     useEffect(() => {
-        const fetchTrainers = async () => {
-            try {
-                const q = query(collection(db, "trainers"), where("status", "==", "active"));
-                const trainersSnap = await getDocs(q);
-                setTrainers(trainersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            } catch (error) {
-                console.error("Error fetching trainers:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchTrainers();
+        getDocs(query(collection(db, "trainers"), where("status", "==", "active")))
+            .then(snap => setTrainers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+            .catch(() => {})
+            .finally(() => setLoading(false));
     }, []);
 
     const sports = t('pageSportsData') || [];
-
-    const sportsList = [
-        { id: 'all', name: language === 'ar' ? 'الكل' : 'All', icon: <Activity className="w-4 h-4" /> },
-        ...sports.map(s => ({ 
-            id: s.id, 
-            name: getText(s.name), 
-            icon: <Target className="w-4 h-4" /> 
-        }))
+    const cats = [
+        { id: 'all', name: ar ? 'الكل' : 'All' },
+        ...sports.map(s => ({ id: s.id, name: getText(s.name) }))
     ];
 
-    const filteredTrainers = trainers.filter(trainer => {
-        const name = getText(trainer.name);
-        const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        if (activeCategory === "all") return matchesSearch;
+    const filtered = useMemo(() => {
+        return trainers.filter(tr => {
+            const name = getText(tr.name) || '';
+            const matchSearch = !search.trim() || name.toLowerCase().includes(search.toLowerCase());
+            const matchCat = activeCategory === 'all' || (() => {
+                const sport = sports.find(s => s.id === activeCategory);
+                return sport ? matchesSport(tr, sport) : false;
+            })();
+            const matchFav = !onlyFav || (favoriteTrainers || []).includes(tr.id);
+            return matchSearch && matchCat && matchFav;
+        });
+    }, [trainers, search, activeCategory, onlyFav, favoriteTrainers, language]);
 
-        const selectedSport = sports.find(s => s.id === activeCategory);
-        const matchesSportFilter = selectedSport ? matchesSport(trainer, selectedSport) : false;
-        
-        return matchesSearch && matchesSportFilter;
-    });
+    const getImg = (tr) => {
+        if (tr.image) return tr.image;
+        const staticData = trainersData[tr.id] || Object.values(trainersData).find(t => {
+            const norm = s => (s || '').replace(/كابتن|captain/gi, '').trim();
+            const trName = typeof tr.name === 'object' ? tr.name : { ar: tr.name, en: tr.name };
+            return norm(t.name?.ar)?.includes(norm(trName.ar)) || norm(t.name?.en)?.toLowerCase().includes(norm(trName.en)?.toLowerCase());
+        });
+        return staticData?.profileImage || '/trainers/default_trainer.png';
+    };
 
     return (
-        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} relative overflow-hidden pb-40 transition-colors duration-500`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-            {/* Background Decorations */}
-            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[160px] -z-0 translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[140px] -z-0 -translate-x-1/2 translate-y-1/2"></div>
-            {/* Minimal Spacer */}
-            <div className="h-2 md:h-4"></div>
-
-            <div className="max-w-7xl mx-auto px-6 relative z-10">
-                {/* Top Action Bar - Title & Back */}
-                <div className="mb-2 p-1 rounded-[2rem] bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between shadow-premium transition-all gap-2 sm:gap-0">
-                    <div className="flex items-center gap-1">
-                        <button 
-                            onClick={() => router.back()}
-                            className="w-10 h-10 flex items-center justify-center text-slate-900 dark:text-white hover:text-primary transition-colors active:scale-95"
-                        >
-                            {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                        </button>
-                        
-                        <div className="flex items-center gap-3 px-2 py-2 text-slate-900 dark:text-white">
-                            <Users className="w-4 h-4 text-primary" />
-                            <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] whitespace-nowrap">
-                                {language === 'ar' ? 'المدربين' : 'Trainers'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center px-3 sm:px-4 pb-2 sm:pb-0 w-full sm:w-auto">
-                        <div className="relative group w-full sm:w-auto">
-                            <Search className={`absolute ${language === 'en' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-primary transition-colors`} />
-                            <input 
-                                type="text"
-                                placeholder={language === 'ar' ? 'ابحث...' : 'Search...'}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-full py-2 h-9 px-9 text-[10px] font-black outline-none focus:border-primary transition-all placeholder:opacity-40 w-full sm:w-40 lg:w-60 text-slate-900 dark:text-white"
-                            />
-                        </div>
-                    </div>
-                </div>
+        <div className={`min-h-screen ${bg} pb-32 relative transition-colors duration-300`} dir={ar ? 'rtl' : 'ltr'}>
+            {/* BG */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
+                <div className={`absolute top-0 end-0 w-[700px] h-[700px] rounded-full blur-[160px] translate-x-1/2 -translate-y-1/3 ${darkMode ? 'bg-primary/12' : 'bg-primary/6'} animate-pulse`} />
+                <div className={`absolute bottom-0 start-0 w-[500px] h-[500px] rounded-full blur-[120px] ${darkMode ? 'bg-blue-500/6' : 'bg-blue-500/3'}`} />
             </div>
 
-            {/* Specialty Tabs */}
-            <div className="relative z-20 px-6 mt-2">
-                <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto no-scrollbar py-2 w-full">
-                    {sportsList.map((sport) => (
-                        <button
-                            key={sport.id}
-                            onClick={() => setActiveCategory(sport.id)}
-                            className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap active:scale-95 ${
-                                activeCategory === sport.id 
-                                ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-105' 
-                                : 'bg-white dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-transparent dark:border-white/5 hover:border-primary/30'
-                            }`}
-                        >
-                            <span className={`${activeCategory === sport.id ? 'text-white' : 'text-primary'}`}>{sport.icon}</span>
-                            {sport.name}
+            {/* ── Header ── */}
+            <div className="relative z-10 px-4 pt-5 pb-3 max-w-7xl mx-auto">
+                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 mb-4">
+                    <button onClick={() => router.back()}
+                        className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${darkMode ? 'bg-white/5 border-white/8 text-white' : 'bg-white border-gray-200 text-slate-900 shadow-sm'}`}>
+                        {ar ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                    </button>
+
+                    {/* Search */}
+                    <div className={`flex-1 flex items-center gap-2.5 border rounded-2xl px-4 py-3 ${inp} border`}>
+                        <Search className={`w-4 h-4 shrink-0 ${muted}`} />
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder={ar ? 'ابحث عن مدرب...' : 'Search a trainer...'}
+                            className="flex-1 bg-transparent text-sm font-bold outline-none" />
+                        {search && <button onClick={() => setSearch('')}><X className={`w-3.5 h-3.5 ${muted}`} /></button>}
+                    </div>
+
+                    {/* Fav toggle */}
+                    <button onClick={() => setOnlyFav(s => !s)}
+                        className={`w-11 h-11 rounded-2xl border flex items-center justify-center transition-all active:scale-95 ${onlyFav ? 'bg-rose-500 border-rose-500 text-white' : darkMode ? 'bg-white/5 border-white/8 text-gray-400' : 'bg-white border-gray-200 text-gray-500 shadow-sm'}`}>
+                        <Heart className={`w-4 h-4 ${onlyFav ? 'fill-current' : ''}`} />
+                    </button>
+                </motion.div>
+
+                {/* Page title + count */}
+                <div className="flex items-center justify-between px-1 mb-4">
+                    <div>
+                        <h1 className={`text-xl font-black ${textC} tracking-tight`}>{ar ? 'نخبة المدربين' : 'Elite Trainers'}</h1>
+                        <p className={`text-[9px] font-bold uppercase tracking-[0.2em] ${muted}`}>{ar ? 'مدربون معتمدون ومحترفون' : 'Certified professional coaches'}</p>
+                    </div>
+                    <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black ${darkMode ? 'bg-white/5 text-gray-400' : 'bg-white text-gray-500 shadow-sm border border-gray-100'}`}>
+                        {filtered.length} {ar ? 'مدرب' : 'trainers'}
+                    </div>
+                </div>
+
+                {/* Sport filter tabs */}
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar" style={{ scrollbarWidth: 'none' }}>
+                    {cats.map(cat => (
+                        <button key={cat.id} onClick={() => setActiveCategory(cat.id)}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl whitespace-nowrap border text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 shrink-0 ${activeCategory === cat.id ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : darkMode ? 'bg-white/5 border-white/8 text-gray-400 hover:border-white/15' : 'bg-white border-gray-200 text-gray-500 shadow-sm hover:border-gray-300'}`}>
+                            {cat.name}
                         </button>
                     ))}
                 </div>
             </div>
 
-            <main className="max-w-7xl mx-auto px-6 mt-4 relative z-10">
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            {/* ── Grid ── */}
+            <main className="max-w-7xl mx-auto px-4 relative z-10">
+                {loading ? (
+                    <div className="flex justify-center items-center py-24">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    </div>
+                ) : filtered.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                        <AnimatePresence mode="popLayout">
+                            {filtered.map((trainer, idx) => {
+                                const name = getText(trainer.name);
+                                const spec = getText(trainer.specialty) || getText(trainer.expertise?.[0]) || (ar ? 'مدرب محترف' : 'Pro Trainer');
+                                const img = getImg(trainer);
+                                const isFav = (favoriteTrainers || []).includes(trainer.id);
+
+                                return (
+                                    <motion.div key={trainer.id} layout
+                                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9 }} transition={{ delay: Math.min(idx * 0.04, 0.3) }}>
+                                        <Link href={`/trainers/${trainer.id}`}>
+                                            <div className={`group relative ${card} border rounded-[1.8rem] overflow-hidden hover:-translate-y-1.5 hover:shadow-2xl transition-all duration-300 cursor-pointer`}>
+
+                                                {/* Photo */}
+                                                <div className="relative aspect-square overflow-hidden">
+                                                    <img src={img} alt={name} referrerPolicy="no-referrer"
+                                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+
+                                                    {/* Verified badge */}
+                                                    <div className="absolute top-2.5 start-2.5">
+                                                        <div className="w-7 h-7 bg-primary rounded-xl flex items-center justify-center shadow-lg">
+                                                            <Shield className="w-3.5 h-3.5 text-white" />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Fav btn */}
+                                                    <button onClick={e => { e.preventDefault(); e.stopPropagation(); toggleFavoriteTrainer?.(trainer.id); }}
+                                                        className={`absolute top-2.5 end-2.5 w-8 h-8 rounded-xl backdrop-blur-md flex items-center justify-center border transition-all active:scale-90 ${isFav ? 'bg-rose-500 border-rose-500 text-white shadow-lg' : 'bg-black/20 border-white/20 text-white hover:bg-black/40'}`}>
+                                                        <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
+                                                    </button>
+
+                                                    {/* Rating bottom */}
+                                                    <div className="absolute bottom-2.5 start-2.5 flex items-center gap-1 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+                                                        <Star className="w-2.5 h-2.5 text-amber-400 fill-current" />
+                                                        <span className="text-[9px] font-black text-white">{trainer.rating || '5.0'}</span>
+                                                    </div>
+
+                                                    {/* Students */}
+                                                    {trainer.students && (
+                                                        <div className="absolute bottom-2.5 end-2.5 flex items-center gap-1 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+                                                            <Users className="w-2.5 h-2.5 text-white/70" />
+                                                            <span className="text-[8px] font-black text-white">{trainer.students}+</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="px-3 py-3 text-start">
+                                                    <p className={`text-xs font-black ${textC} truncate group-hover:text-primary transition-colors`}>{name}</p>
+                                                    <p className={`text-[9px] font-bold ${muted} truncate mt-0.5 uppercase tracking-wide`}>{spec}</p>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-                        <AnimatePresence mode="popLayout">
-                            {filteredTrainers.map((trainer, idx) => (
-                                <TrainerCard key={trainer.id} trainer={trainer} idx={idx} />
-                            ))}
-                        </AnimatePresence>
+                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                        <div className={`w-20 h-20 ${darkMode ? 'bg-white/5' : 'bg-gray-100'} rounded-2xl flex items-center justify-center mb-4`}>
+                            <Users className={`w-10 h-10 ${muted} opacity-30`} />
+                        </div>
+                        <p className={`text-sm font-black ${textC} mb-2`}>{ar ? 'لا يوجد مدربون' : 'No Trainers Found'}</p>
+                        <button onClick={() => { setSearch(''); setActiveCategory('all'); setOnlyFav(false); }}
+                            className="text-xs font-black text-primary hover:underline">{ar ? 'عرض الكل' : 'Show All'}</button>
                     </div>
                 )}
             </main>
-
-            {/* Empty State */}
-            {!isLoading && filteredTrainers.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-40 opacity-50">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
-                        <Search className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic text-center">
-                        {language === 'ar' ? 'لم يتم العثور على مدربين بهذا القسم' : 'No coaches found in this section'}
-                    </p>
-                </div>
-            )}
         </div>
     );
 }

@@ -1,937 +1,622 @@
 "use client";
-import { motion } from "framer-motion";
-import { 
+import { motion, AnimatePresence } from "framer-motion";
+import {
     User, Settings, Package, Calendar, LogOut, ChevronLeft, ChevronRight,
     TrendingUp, Target, MapPin, ShoppingBag, Trophy, Clock, Camera,
     Star, MessageCircle, CreditCard, ShieldCheck, Heart, Dumbbell,
-    Phone, Mail, Cake, Map, Navigation2, Plus, Trash2, MapPinOff, Users, QrCode, Sparkles
+    Phone, Mail, QrCode, Sparkles, Users, Edit3, Bell,
+    CheckCircle2, AlertCircle, Flame, Award, BookOpen, ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from "@/context/AppContext";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { signOut, updateProfile } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { updateDoc, doc, getDoc, collection, query, where, getDocs, limit, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+    updateDoc, doc, collection, query, where,
+    getDocs, limit, orderBy, onSnapshot, addDoc, serverTimestamp
+} from "firebase/firestore";
 import { storage, auth, db } from "@/lib/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function Profile() {
-    const { 
-        t, language, darkMode, setAlert, 
+    const {
+        t, language, darkMode, setAlert,
         favorites, products, toggleFavorite,
         favoriteTrainers, toggleFavoriteTrainer, trainers,
         favoriteSports, toggleFavoriteSport, sports,
-        appContent,
         user, userData, loadingAuth,
         addToCart, setIsCartOpen,
-        getSubscriptionDetails
     } = useApp();
 
-    const getText = (field) => {
-        if (!field) return '';
-        if (typeof field === 'object') {
-            return field[language] || field['ar'] || field['en'] || '';
-        }
-        return field;
-    };
+    const ar = language === 'ar';
     const router = useRouter();
-    const [loadingSub, setLoadingSub] = useState(true);
-    const content = t('profileSections');
-
-    const [uploading, setUploading] = useState({ profile: false, cover: false });
+    const searchParams = useSearchParams();
+    const needsCompletion = searchParams.get('complete') === 'true';
     const profileInputRef = useRef(null);
     const coverInputRef = useRef(null);
 
     const [activeSubscription, setActiveSubscription] = useState(null);
     const [upcomingSchedules, setUpcomingSchedules] = useState([]);
+    const [trainingStats, setTrainingStats] = useState({ sessions: 0, activeSports: 0, streak: 0 });
+    const [loadingSub, setLoadingSub] = useState(true);
     const [loadingSchedules, setLoadingSchedules] = useState(true);
-    const [trainingStats, setTraingStats] = useState({ sessions: 0, activeSports: 0, streak: 0 });
-    const subDetails = useMemo(() => getSubscriptionDetails(activeSubscription), [activeSubscription, getSubscriptionDetails]);
-
-    const [isRenewDropdownOpen, setIsRenewDropdownOpen] = useState(false);
+    const [uploading, setUploading] = useState({ profile: false, cover: false });
     const [requestLoading, setRequestLoading] = useState(false);
+    const [showSubOptions, setShowSubOptions] = useState(false);
+    const [activeSection, setActiveSection] = useState(() =>
+        typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('complete') === 'true'
+            ? 'settings'
+            : 'overview'
+    ); // overview | training | favorites | settings
 
-    const handleSubscriptionRequest = async (type) => {
+    const bg = darkMode ? 'bg-[#0a0f1a]' : 'bg-slate-50';
+    const card = darkMode ? 'bg-white/5 border-white/10' : 'bg-white border-gray-100';
+    const textC = darkMode ? 'text-white' : 'text-slate-900';
+    const muted = darkMode ? 'text-gray-400' : 'text-gray-500';
+
+    const getText = (f) => !f ? '' : typeof f === 'object' ? f[language] || f.ar || f.en || '' : f;
+
+    // ── Data Fetching ──────────────────────────────────────────────
+    useEffect(() => {
+        if (!loadingAuth && !user) { router.push('/login'); return; }
+        if (!user) return;
+
+        // Subscription listener
+        const subQ = query(collection(db, "subscriptions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(1));
+        const unsubSub = onSnapshot(subQ, snap => {
+            setActiveSubscription(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+            setLoadingSub(false);
+        }, () => setLoadingSub(false));
+
+        // Schedules listener
+        const schedQ = query(collection(db, "training_schedules"), where("userId", "==", user.uid));
+        const unsubSched = onSnapshot(schedQ, async snap => {
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const now = new Date();
+            const curDay = now.getDay();
+            const curMins = now.getHours() * 60 + now.getMinutes();
+            const toMins = (t) => {
+                if (!t) return 0;
+                const [time, period] = t.includes(' ') ? t.split(' ') : [t, 'AM'];
+                let [h, m] = time.split(':').map(Number);
+                if (period === 'PM' && h !== 12) h += 12;
+                if (period === 'AM' && h === 12) h = 0;
+                return h * 60 + (m || 0);
+            };
+            const sorted = list.map(s => {
+                const sm = toMins(s.time);
+                let d = (s.dayIdx - curDay + 7) % 7;
+                if (d === 0 && sm <= curMins) d = 7;
+                return { ...s, daysUntil: d, _sort: d * 1440 + sm };
+            }).sort((a, b) => a._sort - b._sort);
+            setUpcomingSchedules(sorted);
+
+            // Stats
+            try {
+                const completedSnap = await getDocs(query(collection(db, "bookings"), where("userId", "==", user.uid), where("status", "==", "completed")));
+                setTrainingStats({
+                    sessions: completedSnap.size,
+                    activeSports: new Set(list.map(s => s.name_en || s.name_ar)).size,
+                    streak: userData?.streak || 0,
+                });
+            } catch (e) { /* ignore */ }
+            setLoadingSchedules(false);
+        }, () => setLoadingSchedules(false));
+
+        return () => { unsubSub(); unsubSched(); };
+    }, [user, loadingAuth, router]);
+
+    // ── Image Upload ───────────────────────────────────────────────
+    const handleImageUpload = async (file, type) => {
+        if (!file || !user) return;
+        setUploading(p => ({ ...p, [type]: true }));
+        try {
+            const fileRef = ref(storage, `users/${user.uid}/${type}_${Date.now()}`);
+            await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(fileRef);
+            await updateDoc(doc(db, "users", user.uid), { [type === 'profile' ? 'photoURL' : 'coverURL']: url });
+            if (type === 'profile') await updateProfile(user, { photoURL: url });
+            setAlert({ title: ar ? 'تم التحديث' : 'Updated', message: ar ? 'تم تحديث الصورة بنجاح' : 'Image updated successfully', type: 'success' });
+        } catch {
+            setAlert({ title: ar ? 'خطأ' : 'Error', message: ar ? 'فشل رفع الصورة' : 'Upload failed', type: 'error' });
+        } finally { setUploading(p => ({ ...p, [type]: false })); }
+    };
+
+    // ── Subscription Request ───────────────────────────────────────
+    const handleSubRequest = async (type) => {
         if (!user || !activeSubscription) return;
         setRequestLoading(true);
         try {
             await addDoc(collection(db, "subscription_requests"), {
-                userId: user.uid,
-                currentSubscriptionId: activeSubscription.id,
-                type: type, // 'renew', 'upgrade', 'change_sport'
-                status: 'pending',
-                createdAt: serverTimestamp()
+                userId: user.uid, currentSubscriptionId: activeSubscription.id,
+                type, status: 'pending', createdAt: serverTimestamp()
             });
-            setAlert({
-                title: language === 'ar' ? 'تم إرسال الطلب' : 'Request Sent',
-                message: language === 'ar' ? 'تم إرسال طلبك بنجاح. سيتواصل معك فريق الدعم قريباً.' : 'Your request has been sent successfully. Support team will contact you soon.',
-                type: 'success'
-            });
-            setIsRenewDropdownOpen(false);
-        } catch (error) {
-            console.error("Error sending request:", error);
-            setAlert({
-                title: language === 'ar' ? 'خطأ' : 'Error',
-                message: language === 'ar' ? 'حدث خطأ أثناء إرسال الطلب، الرجاء المحاولة مرة أخرى.' : 'Error sending request, please try again.',
-                type: 'error'
-            });
-        } finally {
-            setRequestLoading(false);
-        }
-    };
- 
-     useEffect(() => {
-         if (!loadingAuth && !user) {
-             router.push('/login');
-             return;
-         }
- 
-         const fetchProfile = () => {
-             if (user) {
-                 // Listen to latest subscription
-                 const subsRef = collection(db, "subscriptions");
-                 const q = query(
-                     subsRef, 
-                     where("userId", "==", user.uid),
-                     orderBy("createdAt", "desc"),
-                     limit(1)
-                 );
-                 
-                 const unsubSub = onSnapshot(q, (snapshot) => {
-                     if (!snapshot.empty) {
-                         setActiveSubscription({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
-                     }
-                     setLoadingSub(false);
-                 }, (err) => {
-                     console.error("Error listening to subscription:", err);
-                     setLoadingSub(false);
-                 });
-
-                 // Listen to Training Schedules
-                 const schedulesRef = collection(db, "training_schedules");
-                 const sq = query(
-                     schedulesRef,
-                     where("userId", "==", user.uid)
-                 );
-                 
-                 const unsubSchedules = onSnapshot(sq, async (snapshot) => {
-                     const schedulesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                     
-                     // Logic for "Upcoming Sessions" based on current weekly cycle
-                     const now = new Date();
-                     const currentDayIdx = now.getDay(); // 0-6
-                     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-                     const timeToMinutes = (timeStr) => {
-                         if (!timeStr) return 0;
-                         const cleanTime = timeStr.includes(' ') ? timeStr : timeStr + ' AM'; // fallback
-                         const [time, period] = cleanTime.split(' ');
-                         let [hours, minutes] = time.split(':').map(Number);
-                         if (period === 'PM' && hours !== 12) hours += 12;
-                         if (period === 'AM' && hours === 12) hours = 0;
-                         return hours * 60 + (minutes || 0);
-                     };
-
-                     const sortedUpcoming = schedulesList.map(session => {
-                         const sessionMinutes = timeToMinutes(session.time);
-                         let daysUntil = (session.dayIdx - currentDayIdx + 7) % 7;
-                         
-                         // If session is today but already passed, move to next week
-                         if (daysUntil === 0 && sessionMinutes <= currentMinutes) {
-                             daysUntil = 7;
-                         }
-
-                         return { ...session, daysUntil, absoluteMinutes: daysUntil * 1440 + sessionMinutes };
-                     }).sort((a, b) => a.absoluteMinutes - b.absoluteMinutes);
-
-                     setUpcomingSchedules(sortedUpcoming);
-                     
-                     // Fetch Dynamic Stats: Completed Sessions (staying as getDocs for stats usually ok, but can be onSnapshot too)
-                     const bookingsRef = collection(db, "bookings");
-                     const completedQuery = query(
-                         bookingsRef,
-                         where("userId", "==", user.uid),
-                         where("status", "==", "completed")
-                     );
-                     const completedSnap = await getDocs(completedQuery);
-                     
-                     setTraingStats({
-                         sessions: completedSnap.size,
-                         activeSports: new Set(schedulesList.map(s => s.name_en || s.name_ar)).size,
-                         streak: userData?.streak || 0 
-                     });
-                     
-                     setLoadingSchedules(false);
-                 }, (err) => {
-                     console.error("Error listening to schedules:", err);
-                     setLoadingSchedules(false);
-                 });
-
-                 return () => {
-                     unsubSub();
-                     unsubSchedules();
-                 };
-             }
-         };
-
-         const unsubs = fetchProfile();
-         return () => {
-             if (unsubs) unsubs();
-         };
-     }, [user, loadingAuth, router]);
-
-    const handleImageUpload = async (file, type) => {
-        if (!file || !user) return;
-        
-        setUploading(prev => ({ ...prev, [type]: true }));
-        try {
-            const fileRef = ref(storage, `users/${user.uid}/${type}_${Date.now()}`);
-            await uploadBytes(fileRef, file);
-            const downloadURL = await getDownloadURL(fileRef);
-
-            // Update Firestore - This will trigger onSnapshot globally in AppContext
-            const userDocRef = doc(db, "users", user.uid);
-            await updateDoc(userDocRef, {
-                [type === 'profile' ? 'photoURL' : 'coverURL']: downloadURL
-            });
-
-            // Update Auth Profile for additional consistency
-            if (type === 'profile') {
-                await updateProfile(user, { photoURL: downloadURL });
-            }
-
-            setAlert({
-                title: language === 'ar' ? 'تم التحديث' : 'Updated',
-                message: language === 'ar' ? 'تم تحديث الصورة بنمساح' : 'Image updated successfully',
-                type: 'success'
-            });
-
-        } catch (error) {
-            console.error(`Error uploading ${type} image:`, error);
-            setAlert({
-                title: language === 'ar' ? 'خطأ' : 'Error',
-                message: language === 'ar' ? 'حدث خطأ أثناء رفع الصورة' : 'Error uploading image',
-                type: 'error'
-            });
-        } finally {
-            setUploading(prev => ({ ...prev, [type]: false }));
-        }
+            setAlert({ title: ar ? 'تم إرسال الطلب' : 'Request Sent', message: ar ? 'سيتواصل معك فريق الدعم قريباً' : 'Support team will contact you soon', type: 'success' });
+            setShowSubOptions(false);
+        } catch {
+            setAlert({ title: ar ? 'خطأ' : 'Error', message: ar ? 'حدث خطأ، حاول مجدداً' : 'Error, try again', type: 'error' });
+        } finally { setRequestLoading(false); }
     };
 
     const handleLogout = () => {
         setAlert({
-            title: language === 'ar' ? 'تسجيل الخروج' : 'Logout',
-            message: language === 'ar' ? 'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟' : 'Are you sure you want to log out from your account?',
+            title: ar ? 'تسجيل الخروج' : 'Logout',
+            message: ar ? 'هل أنت متأكد من الخروج؟' : 'Are you sure you want to logout?',
             type: 'confirm',
-            onConfirm: async () => {
-                await signOut(auth);
-                router.push('/login');
-            }
+            onConfirm: async () => { await signOut(auth); router.push('/login'); }
         });
     };
 
-    if (loadingAuth || (user && loadingSub)) {
-        return (
-            <div className="min-h-screen bg-[#001f3f] flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-        );
-    }
+    if (loadingAuth || (user && loadingSub)) return (
+        <div className={`min-h-screen ${bg} flex items-center justify-center`}>
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+    );
 
-    const trainee = {
-        name: getText(userData?.fullName) || user?.displayName || (language === 'ar' ? "مستخدم جديد" : "New User"),
-        email: user?.email || "No email",
-        phone: userData?.phone || (language === 'ar' ? "لا يوجد رقم" : "No phone"),
-        goal: userData?.goal || (language === 'ar' ? "لم يتم تحديد هدف بعد" : "No goal set yet"),
-        package: userData?.package || (language === 'ar' ? "باقة تجريبية" : "Trial Package"),
-        expiry: userData?.expiry || "---",
-        image: userData?.photoURL || user?.photoURL || appContent?.profile_defaults?.defaultAvatar || "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=200",
-        cover: userData?.coverURL || appContent?.profile_defaults?.defaultCover || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200",
-        address: userData?.address || (language === 'ar' ? "لم يتم إضافة عنوان" : "No address added"),
-        city: userData?.city || (language === 'ar' ? "الرياض، السعودية" : "Riyadh, KSA"),
-        birthday: userData?.birthday || (language === 'ar' ? "15 مارس 1995" : "March 15, 1995"),
-        sessionsCompleted: trainingStats.sessions,
-        activeSports: trainingStats.activeSports,
-        streak: trainingStats.streak,
-        ordersCount: userData?.ordersCount || 0,
-        achievementsCount: userData?.achievementsCount || 0,
-        bookingsCount: userData?.bookingsCount || 0
-    };
+    const name = getText(userData?.fullName) || user?.displayName || (ar ? 'مستخدم' : 'User');
+    const photo = userData?.photoURL || user?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ff0000&color=fff&size=128`;
+    const cover = userData?.coverURL || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1200';
 
-    const textClass = darkMode ? "text-white" : "text-slate-900";
+    const subStatus = activeSubscription?.status;
+    const subStatusColor = subStatus === 'active' || subStatus === 'confirmed' ? 'text-emerald-500 bg-emerald-100 dark:bg-emerald-500/15' :
+        subStatus === 'paused' ? 'text-amber-500 bg-amber-100 dark:bg-amber-500/15' :
+        subStatus === 'pending' ? 'text-blue-500 bg-blue-100 dark:bg-blue-500/15' :
+        'text-gray-500 bg-gray-100 dark:bg-gray-500/15';
+    const subStatusLabel = subStatus === 'active' || subStatus === 'confirmed' ? (ar ? 'نشط' : 'Active') :
+        subStatus === 'paused' ? (ar ? 'موقوف' : 'Paused') :
+        subStatus === 'pending' ? (ar ? 'قيد المراجعة' : 'Pending') :
+        subStatus === 'expired' ? (ar ? 'منتهي' : 'Expired') : (ar ? 'غير مشترك' : 'No Plan');
+
+    const totalSessions = activeSubscription?.totalSessions || 0;
+    const consumedSessions = activeSubscription?.consumedSessions || 0;
+    const remainingSessions = Math.max(0, totalSessions - consumedSessions);
+    const sessionsProgress = totalSessions > 0 ? (remainingSessions / totalSessions) * 100 : 0;
+
+    const DAY_NAMES_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const DAY_NAMES_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const sections = [
+        { k: 'overview', label: ar ? 'نظرة عامة' : 'Overview', icon: User },
+        { k: 'training', label: ar ? 'التدريب' : 'Training', icon: Dumbbell },
+        { k: 'favorites', label: ar ? 'المفضلة' : 'Favorites', icon: Heart },
+        { k: 'settings', label: ar ? 'الإعدادات' : 'Settings', icon: Settings },
+    ];
 
     return (
-        <div className={`min-h-screen ${darkMode ? "bg-[#0a0f1a]" : "bg-slate-50"} pb-24 transition-colors duration-300 relative overflow-hidden`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-            {/* Background Decorations */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
-                <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse"></div>
-                <div className="absolute top-1/2 -right-24 w-72 h-72 bg-blue-500/5 rounded-full blur-[80px]"></div>
-            </div>
+        <div className={`min-h-screen ${bg} pb-32 transition-colors duration-300 relative overflow-hidden`} dir={ar ? 'rtl' : 'ltr'}>
+            {/* BG */}
+            <div className="fixed top-0 left-0 w-96 h-96 bg-primary/8 rounded-full blur-[120px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+            <div className="fixed bottom-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />
 
+            {/* ── Profile Completion Banner ── */}
+            {needsCompletion && (
+                <div className="relative z-10 mx-4 mt-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-black text-amber-800 dark:text-amber-300 text-sm">
+                            {ar ? 'أكمل بياناتك الشخصية أولاً' : 'Complete Your Profile First'}
+                        </p>
+                        <p className="text-amber-600 dark:text-amber-400 text-xs font-bold mt-0.5">
+                            {ar ? 'يجب إدخال الاسم ورقم الهاتف قبل الحجز أو الاشتراك أو الشراء' : 'Name and phone number are required before booking, subscribing, or purchasing'}
+                        </p>
+                    </div>
+                </div>
+            )}
 
-
-            {/* Header / Cover Image - Minimized Premium Version */}
-            <div className="relative mx-4 md:mx-auto max-w-2xl overflow-hidden rounded-[1.5rem] border border-gray-100 dark:border-white/10 shadow-premium group">
-                <div className="relative h-20 md:h-24">
-                    <img 
-                        src={trainee.cover} 
-                        alt="Cover" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
+            {/* ── Cover + Avatar ── */}
+            <div className="relative">
+                <div className="h-36 md:h-48 relative overflow-hidden">
+                    <img src={cover} alt="" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60" />
+                    <button onClick={() => coverInputRef.current?.click()}
+                        className="absolute top-4 end-4 w-9 h-9 bg-black/30 backdrop-blur-md text-white rounded-xl border border-white/20 flex items-center justify-center hover:bg-black/50 transition-all active:scale-95">
+                        <Camera className="w-4 h-4" />
+                        <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files[0], 'cover')} />
+                    </button>
                 </div>
 
-                {/* Cover Action */}
-                <button 
-                    onClick={() => coverInputRef.current?.click()}
-                    className="absolute top-3 right-3 bg-white/10 backdrop-blur-xl p-2 rounded-lg text-white border border-white/20 hover:bg-white/20 transition-all active:scale-95 shadow-lg"
-                >
-                    <Camera className="w-3.5 h-3.5" />
-                    <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], 'cover')} />
-                </button>
+                {/* Avatar */}
+                <div className="absolute -bottom-12 start-6">
+                    <div className="relative">
+                        <img src={photo} alt={name} className="w-24 h-24 rounded-2xl border-4 border-white dark:border-[#0a0f1a] object-cover shadow-xl" />
+                        <button onClick={() => profileInputRef.current?.click()}
+                            className="absolute -bottom-1 -end-1 w-7 h-7 bg-primary text-white rounded-lg flex items-center justify-center shadow-lg border-2 border-white dark:border-[#0a0f1a] active:scale-90 transition-all">
+                            <Camera className="w-3 h-3" />
+                            <input type="file" ref={profileInputRef} className="hidden" accept="image/*" onChange={e => handleImageUpload(e.target.files[0], 'profile')} />
+                        </button>
+                        {uploading.profile && <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center"><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
+                    </div>
+                </div>
             </div>
 
-            <div className="container mx-auto px-6 -mt-10 relative z-20 max-w-2xl">
-                {/* Profile Header Card - Even More Compact */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white/80 dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[1.8rem] p-3 md:p-4 border border-gray-100 dark:border-white/10 mb-6 shadow-premium"
-                >
-                    <div className="flex flex-col md:flex-row items-center gap-4 mb-4">
-                        <div className="relative shrink-0">
-                            <div className="absolute inset-0 bg-primary/20 rounded-xl blur-lg"></div>
-                            <img
-                                src={trainee.image}
-                                alt={trainee.name}
-                                className="w-14 h-14 md:w-16 md:h-16 object-cover rounded-xl border-2 border-white dark:border-[#1a2235] shadow-xl relative z-10"
-                            />
-                            <button 
-                                onClick={() => profileInputRef.current?.click()}
-                                className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-lg shadow-lg border border-white dark:border-[#1a2235] z-20 hover:scale-110 transition-all active:scale-90"
-                            >
-                                <Camera className="w-3 h-3" />
-                                <input type="file" ref={profileInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], 'profile')} />
-                            </button>
-                        </div>
-                        
-                        <div className="flex-1 text-center md:text-start">
-                             <div className="flex flex-col md:flex-row md:items-center gap-2 mb-1">
-                                <h2 className="text-base md:text-lg font-black text-slate-900 dark:text-white leading-tight tracking-tight">{trainee.name}</h2>
-                                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[6px] font-black uppercase tracking-widest border border-primary/20 w-fit mx-auto md:mx-0">
-                                    {language === 'ar' ? 'عضو ذهبي' : 'Gold Member'}
-                                </span>
-                             </div>
-
-                            {/* Contact Info Row */}
-                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2 text-[7px] font-bold text-gray-400">
-                                <div className="flex items-center gap-1 bg-gray-50 dark:bg-white/5 py-0.5 px-2 rounded-lg border border-gray-100 dark:border-white/5 shadow-sm">
-                                    <Mail className="w-2.5 h-2.5 text-primary" />
-                                    <span className="opacity-80 lowercase">{trainee.email}</span>
-                                </div>
-                                <div className="flex items-center gap-1 bg-gray-50 dark:bg-white/5 py-0.5 px-2 rounded-lg border border-gray-100 dark:border-white/5 shadow-sm">
-                                    <Phone className="w-2.5 h-2.5 text-emerald-500" />
-                                    <span className="opacity-80">{trainee.phone}</span>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col md:flex-row md:items-center gap-3">
-                                <div className="flex items-center gap-1 text-gray-400 font-bold text-[8px] uppercase tracking-wider">
-                                    <Trophy className="w-2.5 h-2.5 text-amber-500" />
-                                    <span>{language === 'ar' ? 'المستوى' : 'Level'} {Math.floor(trainee.sessionsCompleted / 5) + 1}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-16 h-1 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                        <motion.div 
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${(trainee.sessionsCompleted % 5) / 5 * 100}%` }}
-                                            className="h-full bg-gradient-to-r from-primary to-blue-500 rounded-full"
-                                        ></motion.div>
-                                    </div>
-                                    <p className="text-[7px] font-black text-primary/60 uppercase">
-                                        {5 - (trainee.sessionsCompleted % 5)} {language === 'ar' ? 'حصص للمستوى القادم' : 'to Level Up'}
-                                    </p>
-                                </div>
-                            </div>
+            {/* ── Name + Info ── */}
+            <div className="pt-16 px-6 max-w-2xl mx-auto">
+                <div className="flex items-start justify-between mb-1">
+                    <div>
+                        <h1 className={`text-xl font-black ${textC} tracking-tight`}>{name}</h1>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            {user?.email && <span className={`text-[10px] font-bold ${muted} flex items-center gap-1`}><Mail className="w-3 h-3" />{user.email}</span>}
+                            {userData?.phone && <span className={`text-[10px] font-bold ${muted} flex items-center gap-1`}><Phone className="w-3 h-3" />{userData.phone}</span>}
                         </div>
                     </div>
-
-                    {/* Quick Stats Grid - Even More Compact */}
-                    <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100 dark:border-white/5">
-                        <div className="flex flex-col items-center">
-                            <div className="p-1.5 bg-blue-500/10 rounded-lg mb-1">
-                                <Dumbbell className="w-3.5 h-3.5 text-blue-500" />
-                            </div>
-                            <div className="text-base font-black text-slate-900 dark:text-white leading-none">{trainee.sessionsCompleted}</div>
-                            <div className="text-[8px] font-black text-gray-500 uppercase mt-1 tracking-wider">{content.sessionsCompleted}</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <div className="p-1.5 bg-indigo-500/10 rounded-lg mb-1">
-                                <Target className="w-3.5 h-3.5 text-indigo-500" />
-                            </div>
-                            <div className="text-base font-black text-slate-900 dark:text-white leading-none">{trainee.activeSports}</div>
-                            <div className="text-[8px] font-black text-gray-500 uppercase mt-1 tracking-wider">{content.activeSports}</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <div className="p-1.5 bg-rose-500/10 rounded-lg mb-1">
-                                <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
-                            </div>
-                            <div className="text-base font-black text-slate-900 dark:text-white leading-none">{trainee.streak}</div>
-                            <div className="text-[8px] font-black text-gray-500 uppercase mt-1 tracking-wider">{content.streakDays}</div>
-                        </div>
+                    <div className="flex items-center gap-2 mt-1">
+                        <Link href="/profile/edit" className={`p-2.5 ${card} border rounded-xl hover:border-primary/30 transition-all active:scale-95`}>
+                            <Edit3 className={`w-4 h-4 ${muted}`} />
+                        </Link>
+                        <Link href="/notifications" className={`p-2.5 ${card} border rounded-xl hover:border-primary/30 transition-all active:scale-95`}>
+                            <Bell className={`w-4 h-4 ${muted}`} />
+                        </Link>
                     </div>
-                </motion.div>
+                </div>
 
-                {/* Quick Actions Grid - Premium Buttons */}
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                        {/* Package Info Section */}
-                        <div className="col-span-2 space-y-4">
-                            <div className="flex items-center gap-2 px-2">
-                                <div className={`w-1.5 h-4 ${subDetails?.barColor || 'bg-gray-400'} rounded-full`}></div>
-                                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">{content.currentPackage}</h3>
-                            </div>
-                            <motion.div 
-                                className={`bg-gradient-to-br ${subDetails ? subDetails.statusColor.replace('bg-', 'bg-opacity-10 from-') + ' to-slate-900 border-' + subDetails.statusColor.replace('bg-', '') + '/20' : 'from-gray-500/10 to-slate-900 border-white/5'} rounded-[2rem] p-6 border relative overflow-visible shadow-premium`}
-                            >
-                                {/* Special Post-Trial Offer Badge */}
-                                {!activeSubscription && userData?.has_used_trial && (
-                                    <div className="absolute top-0 left-0 right-0 bg-amber-500 py-1 text-center z-20 rounded-t-[2rem]">
-                                        <span className="text-[9px] font-black text-black uppercase tracking-[0.2em] animate-pulse">
-                                            {language === 'ar' ? 'عرض خاص: خصم 20% على باقتك الأولى!' : 'SPECIAL OFFER: 20% OFF YOUR FIRST PACKAGE!'}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className={`absolute top-0 right-0 w-32 h-32 ${subDetails?.statusColor?.replace('bg-', 'bg-opacity-10 bg-') || 'bg-gray-500/10'} blur-3xl rounded-full`}></div>
-                                
-                                <div className="flex justify-between items-start mb-6 relative z-10 p-1">
-                                    <div className="text-start">
-                                        <div className="flex items-center gap-2 mb-1.5">
-                                            <Package className={`w-4 h-4 ${subDetails?.statusColor?.replace('bg-', 'text-') || 'text-gray-400'}`} />
-                                            <h4 className={`text-xs font-black uppercase tracking-wider ${subDetails?.statusColor?.replace('bg-', 'text-') || 'text-gray-400'}`}>
-                                                {activeSubscription ? getText(activeSubscription.planLabel) : (language === 'ar' ? 'لا يوجد اشتراك نشط' : 'No Active Subscription')}
-                                            </h4>
-                                        </div>
-                                        <p className="text-[11px] font-bold text-gray-400">
-                                            {activeSubscription 
-                                                ? (language === 'ar' ? `بدءاً من ${activeSubscription.startDate}` : `Starting ${activeSubscription.startDate}`)
-                                                : (language === 'ar' ? 'اشترك الآن للحصول على باقة تدريب' : 'Subscribe now to get a training package')
-                                            }
-                                        </p>
-                                    </div>
-                                    <span className={`${subDetails?.statusColor || 'bg-gray-500'} ${subDetails?.textColor || 'text-white'} px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none shadow-lg mt-1`}>
-                                        {activeSubscription 
-                                            ? subDetails?.statusLabel
-                                            : (language === 'ar' ? 'غير مشترك' : 'Not Joined')
-                                        }
-                                    </span>
-                                </div>
-                                
-                                {activeSubscription && subDetails && (
-                                    (() => {
-                                        const totalSess = subDetails.totalSessions;
-                                        const consumedSess = subDetails.consumedSessions;
-                                        const remainingSess = subDetails.remainingSessions;
-                                        const progressPercent = totalSess > 0 ? (remainingSess / totalSess) * 100 : (subDetails.isPending ? 100 : 0);
-                                        
-                                        let progressColor = 'from-emerald-400 to-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
-                                        let textColor = 'text-emerald-500';
-                                        if (progressPercent <= 25) {
-                                            progressColor = 'from-rose-400 to-rose-600 shadow-[0_0_15px_rgba(244,63,94,0.5)]';
-                                            textColor = 'text-rose-500';
-                                        } else if (progressPercent <= 50) {
-                                            progressColor = 'from-amber-400 to-amber-600 shadow-[0_0_15px_rgba(245,158,11,0.5)]';
-                                            textColor = 'text-amber-500';
-                                        }
-
-                                        return (
-                                            <div className="mb-6 relative z-10 p-1">
-                                                <div className="flex justify-between text-[11px] font-black text-gray-300 mb-2">
-                                                    <span>{getText(activeSubscription.sportName) || (language === 'ar' ? 'رياضة' : 'Sport')}</span>
-                                                    <span className={textColor}>{remainingSess} {language === 'ar' ? 'حصص متبقية' : 'Sessions left'}</span>
-                                                </div>
-                                                <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden border border-white/5">
-                                                    <motion.div 
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: `${progressPercent}%` }}
-                                                        transition={{ duration: 1, ease: "easeOut" }}
-                                                        className={`bg-gradient-to-r ${progressColor} h-full rounded-full`}
-                                                    ></motion.div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()
-                                )}
-
-                                {!activeSubscription && !userData?.has_used_trial && (
-                                    <motion.button 
-                                        initial={{ scale: 0.95 }}
-                                        animate={{ scale: [0.95, 1.02, 0.95] }}
-                                        transition={{ repeat: Infinity, duration: 2 }}
-                                        onClick={() => {
-                                            const pkg = { id: 'trial', name: language === 'ar' ? 'حصّة تجريبية' : 'Free Trial', price: 0 };
-                                            addToCart(pkg, { 
-                                                type: 'subscription', 
-                                                metadata: { 
-                                                    packageId: 'trial',
-                                                    isTrial: true
-                                                } 
-                                            });
-                                            setIsCartOpen(true);
-                                        }}
-                                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 shadow-xl shadow-emerald-500/20 mb-4 flex items-center justify-center gap-2"
-                                    >
-                                        <Sparkles className="w-4 h-4" />
-                                        {language === 'ar' ? 'احجز حصة مجانية الآن' : 'Book Free Trial Now'}
-                                    </motion.button>
-                                )}
-
-                                <div className="relative z-20">
-                                    {(activeSubscription && subDetails?.isActive) ? (
-                                        <>
-                                            <button 
-                                                onClick={() => setIsRenewDropdownOpen(!isRenewDropdownOpen)}
-                                                className="w-full bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-500 border-emerald-500/20 border py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 flex items-center justify-center gap-2"
-                                            >
-                                                {language === 'ar' ? 'خيارات الاشتراك' : 'Subscription Options'}
-                                                <ChevronRight className={`w-4 h-4 transition-transform ${isRenewDropdownOpen ? 'rotate-90' : ''}`} />
-                                            </button>
-
-                                            {/* Renew Dropdown */}
-                                            {isRenewDropdownOpen && (
-                                                <motion.div 
-                                                    initial={{ opacity: 0, y: -10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#1a2235] rounded-2xl border border-gray-100 dark:border-white/10 shadow-2xl overflow-hidden z-50 p-2 space-y-1"
-                                                >
-                                                    <button 
-                                                        disabled={requestLoading}
-                                                        onClick={() => handleSubscriptionRequest('renew')}
-                                                        className="w-full text-start px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-xs font-bold flex items-center justify-between group disabled:opacity-50"
-                                                    >
-                                                        <span>{language === 'ar' ? 'طلب تجديد الاشتراك' : 'Request Renewal'}</span>
-                                                        <TrendingUp className="w-4 h-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    </button>
-                                                    <button 
-                                                        disabled={requestLoading}
-                                                        onClick={() => handleSubscriptionRequest('upgrade')}
-                                                        className="w-full text-start px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-xs font-bold flex items-center justify-between group disabled:opacity-50"
-                                                    >
-                                                        <span>{language === 'ar' ? 'طلب ترقية الباقة (مدة أعلى)' : 'Request Upgrade (Longer Duration)'}</span>
-                                                        <Sparkles className="w-4 h-4 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    </button>
-                                                    <button 
-                                                        disabled={requestLoading}
-                                                        onClick={() => handleSubscriptionRequest('change_sport')}
-                                                        className="w-full text-start px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors text-xs font-bold flex items-center justify-between group disabled:opacity-50"
-                                                    >
-                                                        <span>{language === 'ar' ? 'طلب تغيير الرياضة' : 'Request Sport Change'}</span>
-                                                        <Target className="w-4 h-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    </button>
-                                                </motion.div>
-                                            )}
-                                        </>
-                                    ) : (!activeSubscription || activeSubscription.status === 'expired' || activeSubscription.status === 'rejected') ? (
-                                        <button 
-                                            onClick={() => router.push('/packages')}
-                                            className="w-full bg-orange-500 hover:bg-orange-600 text-white border-transparent shadow-orange-500/20 shadow-xl border py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-300 active:scale-95 flex items-center justify-center gap-2"
-                                        >
-                                            {language === 'ar' ? 'اشترك الآن' : 'Subscribe Now'}
-                                        </button>
-                                    ) : null}
-                                </div>
-                            </motion.div>
-                        </div>
-
-                    {activeSubscription && (
-                        <>
-                            <button 
-                                onClick={() => router.push('/profile/training?tab=classes')}
-                                className="bg-primary text-white rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:scale-[1.02] transition-all active:scale-95 group"
-                            >
-                                <div className="p-2 bg-white/20 rounded-xl group-hover:bg-white/30 transition-colors">
-                                    <Dumbbell className="w-5 h-5" />
-                                </div>
-                                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">
-                                    {t('trainingPage.tabs.classes')}
-                                </span>
-                            </button>
-                            <button 
-                                onClick={() => router.push('/profile/training?tab=programs')}
-                                className="bg-white dark:bg-white/5 text-slate-900 dark:text-white border border-gray-100 dark:border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-[1.02] transition-all active:scale-95 outline-none group"
-                            >
-                                <div className="p-2 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors text-primary">
-                                    <Calendar className="w-5 h-5" />
-                                </div>
-                                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">
-                                    {t('trainingPage.tabs.programs')}
-                                </span>
-                            </button>
-                        </>
+                {/* Membership badge */}
+                <div className="flex items-center gap-2 mt-2 mb-5">
+                    <span className="text-[9px] font-black text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                        <Award className="w-2.5 h-2.5" />{ar ? 'عضو ذهبي' : 'Gold Member'}
+                    </span>
+                    {userData?.has_used_trial && (
+                        <span className={`text-[9px] font-black ${muted} bg-gray-100 dark:bg-white/5 px-3 py-1 rounded-full uppercase tracking-widest`}>
+                            {ar ? 'جرّب التجربة' : 'Trial Used'}
+                        </span>
                     )}
-                    
-                    <button 
-                        onClick={() => router.push('/profile/orders')}
-                        className={`bg-white dark:bg-white/5 text-slate-900 dark:text-white border border-gray-100 dark:border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-[1.02] transition-all active:scale-95 outline-none group`}
-                    >
-                        <div className="p-2 bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl group-hover:bg-emerald-500/20 dark:group-hover:bg-emerald-500/10 transition-colors text-emerald-500">
-                            <ShoppingBag className="w-5 h-5" />
-                        </div>
-                        <span className="text-sm font-black uppercase tracking-wider">{language === 'ar' ? 'طلباتي' : 'My Orders'}</span>
-                    </button>
-                    
-                    <button 
-                        onClick={() => router.push('/profile/card')}
-                        className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:scale-[1.02] transition-all active:scale-95 outline-none group"
-                    >
-                        <div className="p-2 bg-primary/20 rounded-xl group-hover:bg-primary/30 transition-colors text-primary">
-                            <QrCode className="w-5 h-5" />
-                        </div>
-                        <span className="text-sm font-black uppercase tracking-wider">{language === 'ar' ? 'بطاقتي' : 'My Card'}</span>
-                    </button>
-
-                    <button 
-                        onClick={() => router.push('/profile/addresses')}
-                        className="bg-white dark:bg-white/5 text-slate-900 dark:text-white border border-gray-100 dark:border-white/10 rounded-[1.5rem] p-5 flex items-center justify-center gap-3 shadow-premium hover:bg-gray-50 dark:hover:bg-white/10 hover:scale-[1.02] transition-all active:scale-95 outline-none group col-span-2"
-                    >
-                        <div className="p-2 bg-rose-500/10 dark:bg-rose-500/5 rounded-xl group-hover:bg-rose-500/20 dark:group-hover:bg-rose-500/10 transition-colors text-rose-500">
-                            <MapPin className="w-5 h-5" />
-                        </div>
-                        <span className="text-sm font-black uppercase tracking-wider">{language === 'ar' ? 'عناويني' : 'My Addresses'}</span>
-                    </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Left Column */}
-                    <div className="space-y-4">
-                        {/* Upcoming Sessions - Dynamic Data */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between px-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-4 bg-primary rounded-full"></div>
-                                    <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">{content.upcomingSessions}</h3>
-                                </div>
-                                <Link href="/profile/training" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">{t('viewAll')}</Link>
+                {/* ── Stats Row ── */}
+                <div className={`grid grid-cols-3 gap-3 mb-6 p-4 ${card} border rounded-[1.5rem]`}>
+                    {[
+                        { icon: Dumbbell, val: trainingStats.sessions, label: ar ? 'حصص مكتملة' : 'Sessions', color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' },
+                        { icon: Target, val: trainingStats.activeSports, label: ar ? 'رياضات نشطة' : 'Sports', color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10' },
+                        { icon: Flame, val: trainingStats.streak, label: ar ? 'أيام متواصلة' : 'Day Streak', color: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10' },
+                    ].map(({ icon: Icon, val, label, color }, i) => (
+                        <div key={i} className="flex flex-col items-center text-center">
+                            <div className={`w-9 h-9 ${color} rounded-xl flex items-center justify-center mb-2`}>
+                                <Icon className="w-4 h-4" />
                             </div>
-                            
-                            {loadingSchedules ? (
-                                <div className="p-8 text-center bg-white dark:bg-white/5 rounded-3xl border border-dashed border-gray-200 dark:border-white/10">
-                                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto opacity-40"></div>
-                                </div>
-                            ) : upcomingSchedules.length > 0 ? (
-                                <div className="space-y-3">
-                                    {upcomingSchedules.slice(0, 2).map((session, idx) => (
-                                        <motion.div 
-                                            key={session.id}
-                                            whileHover={{ scale: 1.02 }}
-                                            onClick={() => router.push('/profile/training')}
-                                            className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-3xl overflow-hidden border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer"
-                                        >
-                                            <div className="px-5 py-2.5 bg-primary/5 dark:bg-primary/10 flex items-center justify-between border-b border-primary/5">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="p-1.5 bg-primary/20 rounded-lg">
-                                                        <Dumbbell className="w-3.5 h-3.5 text-primary" />
-                                                    </div>
-                                                    <span className="text-[9px] font-black text-primary uppercase tracking-widest">
-                                                        {language === 'ar' ? session.name_ar : session.name_en}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                                                    <span className="text-[9px] font-black text-primary uppercase tracking-widest">
-                                                        {language === 'ar' ? 'مجدولة' : 'Scheduled'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="p-4 flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-                                                    <Dumbbell className="w-6 h-6 text-primary/40" />
-                                                </div>
-                                                <div className="flex-1 text-start">
-                                                    <h4 className="text-xs font-black text-slate-900 dark:text-white leading-tight">
-                                                        {language === 'ar' ? ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][session.dayIdx] : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][session.dayIdx]}
-                                                    </h4>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <Clock className="w-3 h-3 text-primary" />
-                                                        <p className="text-[10px] font-bold text-gray-500 tracking-tight">{session.time}</p>
-                                                    </div>
-                                                </div>
-                                                <ChevronRight className={`w-4 h-4 text-gray-300 ${language === 'ar' ? 'rotate-180' : ''}`} />
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="p-10 text-center bg-white dark:bg-white/5 rounded-3xl border border-dashed border-gray-200 dark:border-white/10">
-                                    <Clock className="w-8 h-8 text-gray-200 dark:text-white/10 mx-auto mb-3" />
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                        {language === 'ar' ? 'لا توجد حصص قادمة' : 'No upcoming classes'}
-                                    </p>
-                                </div>
-                            )}
+                            <span className={`text-xl font-black ${textC}`}>{val}</span>
+                            <span className={`text-[8px] font-bold uppercase tracking-wider ${muted} mt-0.5`}>{label}</span>
                         </div>
+                    ))}
+                </div>
 
+                {/* ── Section Tabs ── */}
+                <div className={`flex gap-1 p-1 ${darkMode ? 'bg-white/5' : 'bg-gray-100'} rounded-2xl mb-6`}>
+                    {sections.map(({ k, label, icon: Icon }) => (
+                        <button key={k} onClick={() => setActiveSection(k)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeSection === k ? 'bg-white dark:bg-white/10 text-primary shadow-sm' : `${muted} hover:text-primary`}`}>
+                            <Icon className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{label}</span>
+                        </button>
+                    ))}
+                </div>
 
-                    </div>
+                <AnimatePresence mode="wait">
 
-                    {/* Right Column */}
-                    <div className="space-y-4">
-                        {/* Achievements - Real Progress Logic */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between px-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
-                                    <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">{content.myAchievements}</h3>
+                    {/* ── OVERVIEW ── */}
+                    {activeSection === 'overview' && (
+                        <motion.div key="ov" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+
+                            {/* Subscription Card */}
+                            <div className={`${card} border rounded-[1.5rem] overflow-hidden`}>
+                                <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/5' : 'border-gray-50'} flex items-center justify-between`}>
+                                    <div className="flex items-center gap-2">
+                                        <Package className="w-4 h-4 text-primary" />
+                                        <span className={`text-xs font-black ${textC} uppercase tracking-wider`}>{ar ? 'اشتراكي الحالي' : 'My Subscription'}</span>
+                                    </div>
+                                    {activeSubscription && (
+                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-full ${subStatusColor}`}>{subStatusLabel}</span>
+                                    )}
                                 </div>
-                                <button 
-                                    onClick={() => setAlert({
-                                        title: language === 'ar' ? 'إنجازاتك' : 'Your Achievements',
-                                        message: language === 'ar' ? 'أكمل المزيد من الحصص والتمارين لفتح أوسمة جديدة!' : 'Complete more sessions and workouts to unlock new badges!',
-                                        type: 'info'
-                                    })}
-                                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                                >
-                                    {t('viewAll')}
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-4 gap-4">
-                                {[
-                                    { 
-                                        icon: TrendingUp, 
-                                        label: `${trainee.streak}d`, 
-                                        name: language === 'ar' ? 'المثابر' : 'Consistent',
-                                        desc: language === 'ar' ? 'وصلت لـ 89 يوماً متواصلة' : 'Reached 89 days streak',
-                                        color: 'bg-blue-500', text: 'text-blue-500', 
-                                        unlocked: trainee.streak >= 30 
-                                    },
-                                    { 
-                                        icon: Trophy, 
-                                        label: `${trainee.sessionsCompleted}s`, 
-                                        name: language === 'ar' ? 'الوحش' : 'The Beast',
-                                        desc: language === 'ar' ? 'أتممت 24 حصة تدريبية' : 'Completed 24 sessions',
-                                        color: 'bg-amber-500', text: 'text-amber-500', 
-                                        unlocked: trainee.sessionsCompleted >= 20 
-                                    },
-                                    { 
-                                        icon: Star, 
-                                        label: `Pro`, 
-                                        name: language === 'ar' ? 'نجم صاعد' : 'Rising Star',
-                                        desc: language === 'ar' ? 'عضوية ذهبية نشطة' : 'Active Gold Membership',
-                                        color: 'bg-purple-500', text: 'text-purple-500', 
-                                        unlocked: true 
-                                    },
-                                    { 
-                                        icon: Dumbbell, 
-                                        label: `${trainee.activeSports}`, 
-                                        name: language === 'ar' ? 'متعدد المهارات' : 'Multi-Skilled',
-                                        desc: language === 'ar' ? 'تمارس 3 رياضات مختلفة' : 'Practice 3 different sports',
-                                        color: 'bg-orange-500', text: 'text-orange-500', 
-                                        unlocked: trainee.activeSports >= 2 
-                                    },
-                                ].map((badge, i) => (
-                                    <motion.div 
-                                        key={i} 
-                                        whileHover={{ scale: 1.1, rotate: 5 }}
-                                        onClick={() => setAlert({
-                                            title: badge.name,
-                                            message: badge.desc,
-                                            type: 'success'
-                                        })}
-                                        className={`bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-2xl p-4 flex flex-col items-center justify-center border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer ${!badge.unlocked ? 'opacity-40 grayscale' : ''}`}
-                                    >
-                                        <div className={`w-10 h-10 rounded-xl ${badge.color}/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform relative`}>
-                                            <badge.icon className={`w-5 h-5 ${badge.text}`} />
-                                            {badge.unlocked && (
-                                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1a2235]"></div>
+
+                                <div className="p-5">
+                                    {activeSubscription ? (
+                                        <div className="space-y-4">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <p className={`text-sm font-black ${textC}`}>{getText(activeSubscription.planLabel) || getText(activeSubscription.sportName) || (ar ? 'اشتراك نشط' : 'Active Plan')}</p>
+                                                    <p className={`text-[10px] font-bold ${muted} mt-0.5`}>
+                                                        {activeSubscription.startDate && `${ar ? 'من' : 'From'} ${activeSubscription.startDate}`}
+                                                        {activeSubscription.endDate && ` ${ar ? 'حتى' : 'to'} ${activeSubscription.endDate}`}
+                                                    </p>
+                                                </div>
+                                                <Link href="/profile/card" className={`p-2 ${darkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl transition-all`}>
+                                                    <QrCode className={`w-4 h-4 ${muted}`} />
+                                                </Link>
+                                            </div>
+
+                                            {totalSessions > 0 && (
+                                                <div>
+                                                    <div className="flex justify-between text-[10px] font-bold mb-1.5">
+                                                        <span className={muted}>{ar ? 'الحصص المتبقية' : 'Sessions Left'}</span>
+                                                        <span className={`font-black ${sessionsProgress <= 25 ? 'text-rose-500' : sessionsProgress <= 50 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                                            {remainingSessions}/{totalSessions}
+                                                        </span>
+                                                    </div>
+                                                    <div className={`h-2 ${darkMode ? 'bg-white/10' : 'bg-gray-100'} rounded-full overflow-hidden`}>
+                                                        <motion.div initial={{ width: 0 }} animate={{ width: `${sessionsProgress}%` }} transition={{ duration: 1 }}
+                                                            className={`h-full rounded-full ${sessionsProgress <= 25 ? 'bg-rose-500' : sessionsProgress <= 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Sub Options */}
+                                            <div className="relative">
+                                                <button onClick={() => setShowSubOptions(s => !s)}
+                                                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black border ${darkMode ? 'border-white/10 text-gray-300 hover:bg-white/5' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} transition-all`}>
+                                                    {ar ? 'خيارات الاشتراك' : 'Subscription Options'}
+                                                    <ChevronDown className={`w-4 h-4 transition-transform ${showSubOptions ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                <AnimatePresence>
+                                                    {showSubOptions && (
+                                                        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                                                            className={`absolute top-full inset-x-0 mt-1.5 ${darkMode ? 'bg-[#1a2235]' : 'bg-white'} border ${darkMode ? 'border-white/10' : 'border-gray-100'} rounded-2xl shadow-xl p-1.5 z-10 space-y-0.5`}>
+                                                            {[
+                                                                { k: 'renew', label: ar ? 'طلب تجديد الاشتراك' : 'Request Renewal', icon: TrendingUp },
+                                                                { k: 'upgrade', label: ar ? 'طلب ترقية الباقة' : 'Request Upgrade', icon: Sparkles },
+                                                                { k: 'change_sport', label: ar ? 'طلب تغيير الرياضة' : 'Request Sport Change', icon: Target },
+                                                            ].map(({ k, label, icon: Icon }) => (
+                                                                <button key={k} disabled={requestLoading} onClick={() => handleSubRequest(k)}
+                                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold ${darkMode ? 'text-gray-300 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-50'} transition-all disabled:opacity-50 text-start`}>
+                                                                    <Icon className="w-4 h-4 text-primary" />
+                                                                    {label}
+                                                                </button>
+                                                            ))}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center space-y-4 py-2">
+                                            <div className={`w-14 h-14 ${darkMode ? 'bg-white/5' : 'bg-gray-50'} rounded-full flex items-center justify-center mx-auto`}>
+                                                <Package className="w-7 h-7 text-gray-300" />
+                                            </div>
+                                            <div>
+                                                <p className={`text-sm font-black ${textC} mb-1`}>{ar ? 'لا يوجد اشتراك نشط' : 'No Active Subscription'}</p>
+                                                <p className={`text-xs font-bold ${muted}`}>{ar ? 'اشترك الآن للبدء في رحلتك التدريبية' : 'Subscribe now to start your training journey'}</p>
+                                            </div>
+                                            {!userData?.has_used_trial ? (
+                                                <button onClick={() => router.push('/booking?trial=true')}
+                                                    className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all">
+                                                    <Sparkles className="w-4 h-4" />
+                                                    {ar ? 'احجز حصة مجانية' : 'Book Free Trial'}
+                                                </button>
+                                            ) : (
+                                                <button onClick={() => router.push('/packages')}
+                                                    className="w-full py-3 bg-primary text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
+                                                    {ar ? 'اشترك الآن' : 'Subscribe Now'}
+                                                    {ar ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                </button>
                                             )}
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase mt-1">{badge.label}</span>
-                                    </motion.div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Quick Links Grid */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { href: '/profile/orders', icon: ShoppingBag, label: ar ? 'طلباتي' : 'My Orders', color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' },
+                                    { href: '/profile/card', icon: QrCode, label: ar ? 'بطاقتي' : 'My Card', color: 'text-slate-500 bg-slate-100 dark:bg-slate-500/10', dark: true },
+                                    { href: '/profile/bookings', icon: Calendar, label: ar ? 'حجوزاتي' : 'Bookings', color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' },
+                                    { href: '/profile/achievements', icon: Trophy, label: ar ? 'إنجازاتي' : 'Achievements', color: 'text-amber-500 bg-amber-50 dark:bg-amber-500/10' },
+                                    { href: '/profile/training', icon: Dumbbell, label: ar ? 'جدول التدريب' : 'Schedule', color: 'text-primary bg-primary/10' },
+                                    { href: '/profile/addresses', icon: MapPin, label: ar ? 'عناويني' : 'Addresses', color: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10' },
+                                ].map(({ href, icon: Icon, label, color, dark }) => (
+                                    <Link key={href} href={href}
+                                        className={`${dark ? 'bg-slate-900 border-white/10 text-white' : `${card} border ${textC}`} rounded-2xl p-4 flex items-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm`}>
+                                        <div className={`w-10 h-10 ${dark ? 'bg-white/10' : color} rounded-xl flex items-center justify-center shrink-0`}>
+                                            <Icon className={`w-5 h-5 ${dark ? 'text-white' : color.split(' ')[0]}`} />
+                                        </div>
+                                        <span className="text-xs font-black">{label}</span>
+                                        {ar ? <ChevronLeft className="w-4 h-4 ms-auto opacity-30" /> : <ChevronRight className="w-4 h-4 ms-auto opacity-30" />}
+                                    </Link>
                                 ))}
                             </div>
-                        </div>
-
-                        {/* Address Section removed as per new layout */}
-                    </div>
-                </div>
-                
-                {/* Favorite Trainers Section */}
-                <div className="mt-8 space-y-4">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-4 bg-primary rounded-full"></div>
-                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                {language === 'ar' ? 'المدربون المفضلون' : 'Favorite Trainers'}
-                            </h3>
-                        </div>
-                        <Link href="/trainers" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">
-                            {language === 'ar' ? 'اكتشف المزيد' : 'Discover More'}
-                        </Link>
-                    </div>
-
-                    {favoriteTrainers.length > 0 ? (
-                        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-                            {trainers.filter(tr => favoriteTrainers.includes(tr.id)).map((trainer) => (
-                                <motion.div 
-                                    key={trainer.id}
-                                    whileHover={{ y: -5 }}
-                                    onClick={() => router.push(`/trainers/${trainer.id}`)}
-                                    className="flex-shrink-0 w-40 md:w-56 snap-start bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2rem] p-4 border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer"
-                                >
-                                    <div className="relative mb-3">
-                                        <div className="aspect-square rounded-2xl overflow-hidden">
-                                            <img src={trainer.image || trainer.profileImage || "/trainers/default_trainer.png"} alt={getText(trainer.name)} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                        </div>
-                                        <button 
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                toggleFavoriteTrainer(trainer.id);
-                                            }}
-                                            className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center shadow-lg"
-                                        >
-                                            <Heart className="w-3.5 h-3.5 fill-current" />
-                                        </button>
-                                    </div>
-                                    <div className="text-start">
-                                        <h4 className="text-[11px] md:text-xs font-black text-slate-900 dark:text-white truncate">
-                                            {getText(trainer.name)}
-                                        </h4>
-                                        <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider truncate mb-2">
-                                            {getText(trainer.specialty)}
-                                        </p>
-                                        <div className="flex items-center gap-1">
-                                            <Star className="w-2.5 h-2.5 text-amber-500 fill-current" />
-                                            <span className="text-[10px] font-black text-primary">{trainer.rating || "5.0"}</span>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2rem] p-8 border border-gray-100 dark:border-white/10 text-center shadow-premium">
-                            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Users className="w-6 h-6 text-primary opacity-30" />
-                            </div>
-                            <p className="text-[10px] font-bold text-gray-500">
-                                {language === 'ar' ? 'لم تضف أي مدربين للمفضلة بعد' : 'No favorite trainers yet'}
-                            </p>
-                        </div>
+                        </motion.div>
                     )}
-                </div>
 
-                {/* Favorite Sports Section */}
-                <div className="mt-8 space-y-4">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
-                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                {language === 'ar' ? 'الرياضات المفضلة' : 'Favorite Sports'}
-                            </h3>
-                        </div>
-                        <Link href="/sports" className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:underline">
-                            {language === 'ar' ? 'كل الرياضات' : 'All Sports'}
-                        </Link>
-                    </div>
-
-                    {favoriteSports.length > 0 ? (
-                        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
-                            {sports.filter(s => favoriteSports.includes(s.id)).map((sport) => (
-                                <motion.div 
-                                    key={sport.id}
-                                    whileHover={{ y: -5 }}
-                                    onClick={() => router.push(`/sports/${sport.slug || sport.id}`)}
-                                    className="flex-shrink-0 w-48 md:w-64 snap-start relative h-32 md:h-40 rounded-[2rem] overflow-hidden shadow-premium group cursor-pointer border border-white/10"
-                                >
-                                    <img src={sport.image} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt={getText(sport.name)} />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                                    <button 
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            toggleFavoriteSport(sport.id);
-                                        }}
-                                        className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-lg z-20"
-                                    >
-                                        <Heart className="w-4 h-4 fill-current" />
-                                    </button>
-                                    <div className="absolute bottom-4 left-4 right-4 text-start z-10">
-                                        <h4 className="text-sm md:text-base font-black text-white uppercase tracking-tight leading-none mb-1">{getText(sport.name)}</h4>
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-0.5 w-4 bg-primary rounded-full"></div>
-                                            <span className="text-[8px] md:text-[10px] font-bold text-white/70 uppercase tracking-widest">{sport.stats?.intensity || 'High'}</span>
-                                        </div>
+                    {/* ── TRAINING ── */}
+                    {activeSection === 'training' && (
+                        <motion.div key="tr" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+                            <div className={`${card} border rounded-[1.5rem] overflow-hidden`}>
+                                <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/5' : 'border-gray-50'} flex items-center justify-between`}>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-primary" />
+                                        <span className={`text-xs font-black ${textC}`}>{ar ? 'الحصص القادمة' : 'Upcoming Sessions'}</span>
                                     </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2rem] p-8 border border-gray-100 dark:border-white/10 text-center shadow-premium">
-                            <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Dumbbell className="w-6 h-6 text-blue-500 opacity-30" />
-                            </div>
-                            <p className="text-[10px] font-bold text-gray-500">
-                                {language === 'ar' ? 'لم تختر أي رياضة مفضلة بعد' : 'No favorite sports yet'}
-                            </p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Wishlist / Favorites Section */}
-                <div className="mt-8 space-y-4">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div>
-                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                                {language === 'ar' ? 'المنتجات المفضلة' : 'Favorite Products'}
-                            </h3>
-                        </div>
-                        <Link href="/store" className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline">
-                            {language === 'ar' ? 'تسوق المزيد' : 'Shop More'}
-                        </Link>
-                    </div>
-
-                    {favorites.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-12">
-                            {products.filter(p => favorites.includes(p.id)).map((product) => (
-                                <motion.div 
-                                    key={product.id}
-                                    whileHover={{ y: -5 }}
-                                    onClick={() => router.push(`/store/${product.id}`)}
-                                    className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-3xl p-3 border border-gray-100 dark:border-white/10 shadow-premium group cursor-pointer"
-                                >
-                                    <div className="aspect-square rounded-2xl overflow-hidden mb-3 relative">
-                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                        <div className="absolute top-2 right-2">
-                                            <div className="w-8 h-8 rounded-xl bg-white/90 dark:bg-black/50 backdrop-blur-md flex items-center justify-center text-rose-500 shadow-lg">
-                                                <Heart className="w-4 h-4 fill-current" />
+                                    <Link href="/profile/training" className="text-[10px] font-black text-primary">{ar ? 'عرض الكل' : 'View All'}</Link>
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    {loadingSchedules ? (
+                                        <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+                                    ) : upcomingSchedules.length > 0 ? upcomingSchedules.slice(0, 4).map((s, i) => (
+                                        <div key={s.id} className={`flex items-center gap-3 p-3 ${darkMode ? 'bg-white/5 hover:bg-white/8' : 'bg-gray-50 hover:bg-gray-100'} rounded-xl transition-all`}>
+                                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                                                <Dumbbell className="w-5 h-5 text-primary" />
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="text-start px-1">
-                                        <h4 className="text-[11px] font-black text-slate-900 dark:text-white line-clamp-1 truncate">{product.name}</h4>
-                                        <div className="flex items-center justify-between mt-1">
-                                            <span className="text-[10px] font-black text-primary">{product.price} {language === 'ar' ? 'رس' : 'SAR'}</span>
-                                            <div className="flex items-center gap-0.5">
-                                                <Star className="w-2.5 h-2.5 text-amber-500 fill-current" />
-                                                <span className="text-[9px] font-bold text-gray-500">{product.rating}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-xs font-black ${textC}`}>{ar ? (s.name_ar || s.name_en) : (s.name_en || s.name_ar)}</p>
+                                                <p className={`text-[10px] font-bold ${muted}`}>{ar ? DAY_NAMES_AR[s.dayIdx] : DAY_NAMES_EN[s.dayIdx]} • {s.time}</p>
                                             </div>
+                                            <span className={`text-[9px] font-black px-2 py-1 rounded-full ${s.daysUntil === 0 ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400' : 'bg-primary/10 text-primary'}`}>
+                                                {s.daysUntil === 0 ? (ar ? 'اليوم' : 'Today') : s.daysUntil === 1 ? (ar ? 'غداً' : 'Tomorrow') : `${ar ? 'بعد' : 'In'} ${s.daysUntil} ${ar ? 'أيام' : 'days'}`}
+                                            </span>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="bg-white dark:bg-[#1a2235]/60 backdrop-blur-3xl rounded-[2.5rem] p-12 border border-gray-100 dark:border-white/10 text-center shadow-premium pb-12">
-                            <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Heart className="w-8 h-8 text-rose-500 opacity-20" />
+                                    )) : (
+                                        <div className="py-10 text-center">
+                                            <Clock className={`w-8 h-8 ${muted} mx-auto mb-3 opacity-40`} />
+                                            <p className={`text-xs font-bold ${muted}`}>{ar ? 'لا توجد حصص مجدولة' : 'No scheduled sessions'}</p>
+                                            <Link href="/booking" className="mt-3 inline-block text-xs font-black text-primary">{ar ? 'احجز حصة' : 'Book a Session'}</Link>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            <p className="text-sm font-bold text-gray-500">
-                                {language === 'ar' ? 'لا توجد منتجات مفضلة بعد' : 'No favorite products yet'}
-                            </p>
-                        </div>
+
+                            {/* Achievements */}
+                            <div className={`${card} border rounded-[1.5rem] overflow-hidden`}>
+                                <div className={`px-5 py-4 border-b ${darkMode ? 'border-white/5' : 'border-gray-50'} flex items-center justify-between`}>
+                                    <div className="flex items-center gap-2">
+                                        <Trophy className="w-4 h-4 text-amber-500" />
+                                        <span className={`text-xs font-black ${textC}`}>{ar ? 'الإنجازات' : 'Achievements'}</span>
+                                    </div>
+                                    <Link href="/profile/achievements" className="text-[10px] font-black text-primary">{ar ? 'عرض الكل' : 'View All'}</Link>
+                                </div>
+                                <div className="p-4 grid grid-cols-4 gap-3">
+                                    {[
+                                        { icon: Flame, label: ar ? 'المثابر' : 'Streak', color: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10', unlocked: trainingStats.streak >= 7 },
+                                        { icon: Trophy, label: ar ? 'الوحش' : 'Beast', color: 'text-amber-500 bg-amber-50 dark:bg-amber-500/10', unlocked: trainingStats.sessions >= 20 },
+                                        { icon: Star, label: ar ? 'النجم' : 'Star', color: 'text-violet-500 bg-violet-50 dark:bg-violet-500/10', unlocked: true },
+                                        { icon: Target, label: ar ? 'متعدد' : 'Multi', color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10', unlocked: trainingStats.activeSports >= 2 },
+                                    ].map(({ icon: Icon, label, color, unlocked }, i) => (
+                                        <div key={i} className={`flex flex-col items-center gap-1.5 p-3 ${darkMode ? 'bg-white/5' : 'bg-gray-50'} rounded-2xl ${!unlocked ? 'opacity-40 grayscale' : ''}`}>
+                                            <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center`}>
+                                                <Icon className="w-5 h-5" />
+                                            </div>
+                                            <span className={`text-[9px] font-black ${textC} text-center`}>{label}</span>
+                                            {unlocked && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </motion.div>
                     )}
-                </div>
+
+                    {/* ── FAVORITES ── */}
+                    {activeSection === 'favorites' && (
+                        <motion.div key="fav" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-5">
+                            {/* Favorite Trainers */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3 px-1">
+                                    <span className={`text-xs font-black ${textC} flex items-center gap-2`}><Users className="w-4 h-4 text-primary" />{ar ? 'المدربون المفضلون' : 'Favorite Trainers'}</span>
+                                    <Link href="/trainers" className="text-[10px] font-black text-primary">{ar ? 'اكتشف المزيد' : 'Discover More'}</Link>
+                                </div>
+                                {favoriteTrainers.length > 0 ? (
+                                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                                        {trainers.filter(tr => favoriteTrainers.includes(tr.id)).map(trainer => (
+                                            <Link key={trainer.id} href={`/trainers/${trainer.id}`}
+                                                className={`flex-shrink-0 w-36 ${card} border rounded-2xl p-3 group hover:border-primary/30 transition-all`}>
+                                                <div className="relative mb-2">
+                                                    <div className="aspect-square rounded-xl overflow-hidden">
+                                                        <img src={trainer.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                    </div>
+                                                    <button onClick={e => { e.preventDefault(); toggleFavoriteTrainer(trainer.id); }}
+                                                        className="absolute top-1 end-1 w-6 h-6 bg-rose-500 rounded-lg flex items-center justify-center">
+                                                        <Heart className="w-3 h-3 text-white fill-current" />
+                                                    </button>
+                                                </div>
+                                                <p className={`text-[10px] font-black ${textC} truncate`}>{getText(trainer.name)}</p>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <Star className="w-2.5 h-2.5 text-amber-500 fill-current" />
+                                                    <span className="text-[9px] font-bold text-amber-500">{trainer.rating || '5.0'}</span>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className={`${card} border rounded-2xl p-6 text-center`}>
+                                        <p className={`text-xs font-bold ${muted}`}>{ar ? 'لم تضف مدربين للمفضلة بعد' : 'No favorite trainers yet'}</p>
+                                        <Link href="/trainers" className="mt-2 inline-block text-xs font-black text-primary">{ar ? 'استعرض المدربين' : 'Browse Trainers'}</Link>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Favorite Sports */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3 px-1">
+                                    <span className={`text-xs font-black ${textC} flex items-center gap-2`}><Dumbbell className="w-4 h-4 text-blue-500" />{ar ? 'الرياضات المفضلة' : 'Favorite Sports'}</span>
+                                    <Link href="/sports" className="text-[10px] font-black text-blue-500">{ar ? 'كل الرياضات' : 'All Sports'}</Link>
+                                </div>
+                                {favoriteSports.length > 0 ? (
+                                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                                        {sports.filter(s => favoriteSports.includes(s.id)).map(sport => (
+                                            <Link key={sport.id} href={`/sports/${sport.id}`}
+                                                className="flex-shrink-0 w-40 h-24 relative rounded-2xl overflow-hidden group">
+                                                <img src={sport.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                                                <button onClick={e => { e.preventDefault(); toggleFavoriteSport(sport.id); }}
+                                                    className="absolute top-2 end-2 w-6 h-6 bg-rose-500 rounded-lg flex items-center justify-center">
+                                                    <Heart className="w-3 h-3 text-white fill-current" />
+                                                </button>
+                                                <p className="absolute bottom-2 start-3 text-white text-[10px] font-black">{getText(sport.name)}</p>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className={`${card} border rounded-2xl p-6 text-center`}>
+                                        <p className={`text-xs font-bold ${muted}`}>{ar ? 'لم تختر رياضات مفضلة بعد' : 'No favorite sports yet'}</p>
+                                        <Link href="/sports" className="mt-2 inline-block text-xs font-black text-primary">{ar ? 'استعرض الرياضات' : 'Browse Sports'}</Link>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Favorite Products */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3 px-1">
+                                    <span className={`text-xs font-black ${textC} flex items-center gap-2`}><Heart className="w-4 h-4 text-rose-500" />{ar ? 'المنتجات المفضلة' : 'Favorite Products'}</span>
+                                    <Link href="/store" className="text-[10px] font-black text-rose-500">{ar ? 'تسوق المزيد' : 'Shop More'}</Link>
+                                </div>
+                                {favorites.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {products.filter(p => favorites.includes(p.id)).map(product => (
+                                            <Link key={product.id} href={`/store/${product.id}`}
+                                                className={`${card} border rounded-2xl p-3 group hover:border-primary/30 transition-all`}>
+                                                <div className="aspect-square rounded-xl overflow-hidden mb-2">
+                                                    <img src={product.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                </div>
+                                                <p className={`text-[10px] font-black ${textC} truncate`}>{getText(product.name)}</p>
+                                                <p className="text-[10px] font-black text-primary mt-0.5">{product.price} {ar ? 'ر.س' : 'SAR'}</p>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className={`${card} border rounded-2xl p-6 text-center`}>
+                                        <p className={`text-xs font-bold ${muted}`}>{ar ? 'لا توجد منتجات مفضلة بعد' : 'No favorite products yet'}</p>
+                                        <Link href="/store" className="mt-2 inline-block text-xs font-black text-primary">{ar ? 'استعرض المنتجات' : 'Browse Products'}</Link>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ── SETTINGS ── */}
+                    {activeSection === 'settings' && (
+                        <motion.div key="set" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
+                            {[
+                                { href: '/profile/edit', icon: Edit3, label: ar ? 'تعديل الملف الشخصي' : 'Edit Profile', sub: needsCompletion ? (ar ? '⚠️ أكمل بياناتك الآن (الاسم + الهاتف)' : '⚠️ Complete your info now (name + phone)') : (ar ? 'الاسم، الصورة، البيانات' : 'Name, photo, details'), color: needsCompletion ? 'text-amber-500 bg-amber-50 dark:bg-amber-500/10' : 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' },
+                                { href: '/settings', icon: Settings, label: ar ? 'الإعدادات العامة' : 'General Settings', sub: ar ? 'اللغة، الوضع الليلي' : 'Language, dark mode', color: 'text-gray-500 bg-gray-50 dark:bg-gray-500/10' },
+                                { href: '/settings/password', icon: ShieldCheck, label: ar ? 'الأمان وكلمة المرور' : 'Security & Password', sub: ar ? 'تغيير كلمة المرور' : 'Change password', color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' },
+                                { href: '/profile/addresses', icon: MapPin, label: ar ? 'عناويني المحفوظة' : 'Saved Addresses', sub: ar ? 'إدارة عناوين التوصيل' : 'Manage delivery addresses', color: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10' },
+                                { href: '/help', icon: MessageCircle, label: ar ? 'المساعدة والدعم' : 'Help & Support', sub: ar ? 'الأسئلة الشائعة، التواصل' : 'FAQs, contact us', color: 'text-amber-500 bg-amber-50 dark:bg-amber-500/10' },
+                                { href: '/about', icon: BookOpen, label: ar ? 'عن كابتينا' : 'About Captina', sub: ar ? 'من نحن، الشروط والأحكام' : 'About us, terms', color: 'text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10' },
+                            ].map(({ href, icon: Icon, label, sub, color }) => (
+                                <Link key={href} href={href}
+                                    className={`${card} border rounded-2xl p-4 flex items-center gap-3 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-sm`}>
+                                    <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center shrink-0`}>
+                                        <Icon className={`w-5 h-5 ${color.split(' ')[0]}`} />
+                                    </div>
+                                    <div className="flex-1 text-start">
+                                        <p className={`text-sm font-black ${textC}`}>{label}</p>
+                                        <p className={`text-[10px] font-bold ${muted}`}>{sub}</p>
+                                    </div>
+                                    {ar ? <ChevronLeft className={`w-4 h-4 ${muted}`} /> : <ChevronRight className={`w-4 h-4 ${muted}`} />}
+                                </Link>
+                            ))}
+
+                            {/* Logout */}
+                            <button onClick={handleLogout}
+                                className="w-full flex items-center gap-3 p-4 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-2xl transition-all border border-rose-200 dark:border-rose-500/20">
+                                <div className="w-10 h-10 bg-rose-50 dark:bg-rose-500/10 rounded-xl flex items-center justify-center shrink-0">
+                                    <LogOut className="w-5 h-5 text-rose-500" />
+                                </div>
+                                <div className="flex-1 text-start">
+                                    <p className="text-sm font-black">{ar ? 'تسجيل الخروج' : 'Logout'}</p>
+                                    <p className="text-[10px] font-bold opacity-70">{user?.email}</p>
+                                </div>
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );

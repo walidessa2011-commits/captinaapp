@@ -1,24 +1,21 @@
 import AdminSportEdit from './AdminSportEdit';
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
 
-export const generateStaticParams = async () => {
-    try {
-        const querySnapshot = await getDocs(collection(db, "sports"));
-        const params = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-        }));
-        params.push({ id: 'new' });
-        return params;
-    } catch (error) {
-        console.error("Error generating static params for admin sports:", error);
-        return [{ id: 'new' }, { id: '1' }];
-    }
-};
+const SPORT_IDS = [
+    'new',
+    'taekwondo', 'boxing', 'karate', 'general',
+    'kick-boxing', 'kickboxing', 'bodybuilding', 'crossfit',
+    'judo', 'wrestling', 'muay-thai', 'muaythai', 'fitness',
+    'mma', 'self-defense', 'selfdefense', 'jiu-jitsu', 'jiujitsu',
+    'yoga', 'swimming', 'basketball', 'football', 'volleyball',
+    'tennis', 'padel', 'running', 'cycling', 'gymnastics',
+    // Legacy / mis-typed IDs already in Firestore
+    'teakwondow', '-fitness-tarining',
+    '1', '2', '3', '4', '5',
+];
 
-export const dynamicParams = false;
+export const generateStaticParams = () => SPORT_IDS.map(id => ({ id }));
 
 export default async function Page({ params }) {
   const resolvedParams = await params;
   return <AdminSportEdit params={resolvedParams} />;
-} 
+}

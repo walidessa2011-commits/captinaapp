@@ -64,14 +64,22 @@ export const matchesSport = (item, sport) => {
         return [val];
     };
 
+    // Build specialties array from all possible field names (AR/EN variants included)
+    const specialtiesAr = Array.isArray(item.specialties_ar) ? item.specialties_ar : (item.specialties_ar ? [item.specialties_ar] : []);
+    const specialtiesEn = Array.isArray(item.specialties_en) ? item.specialties_en : (item.specialties_en ? [item.specialties_en] : []);
+
     const combinedFields = [
-        ...getFields(item.expertise), 
-        ...getFields(item.specialty), 
-        ...getFields(item.specializations), 
+        ...getFields(item.expertise),
+        ...getFields(item.specialty),
+        ...getFields(item.specializations),
         ...getFields(item.sports),
+        ...specialtiesAr,
+        ...specialtiesEn,
         item.title,
         item.description,
-        item.bio
+        item.bio,
+        item.bio_ar,
+        item.bio_en,
     ];
     
     const hasFieldMatch = combinedFields.some(field => {

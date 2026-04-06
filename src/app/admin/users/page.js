@@ -52,7 +52,9 @@ export default function AdminUsers() {
     };
 
     useEffect(() => {
-        fetchUsers();
+        if (typeof window !== 'undefined') {
+            fetchUsers();
+        }
     }, []);
 
     const handleDelete = (userId) => {

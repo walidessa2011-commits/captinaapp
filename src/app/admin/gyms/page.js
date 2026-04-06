@@ -50,7 +50,8 @@ export default function AdminGyms() {
         social: { instagram: '', twitter: '' },
         latitude: '',
         longitude: '',
-        embed_map: ''
+        embed_map: '',
+        workingHours: {}
     });
 
     // Helper: normalize to bilingual object
@@ -121,7 +122,8 @@ export default function AdminGyms() {
                 social: gym.social || { instagram: '', twitter: '' },
                 latitude: gym.latitude || '',
                 longitude: gym.longitude || '',
-                embed_map: gym.embed_map || ''
+                embed_map: gym.embed_map || '',
+                workingHours: gym.workingHours || {}
             });
         } else {
             setEditingGym(null);
@@ -141,7 +143,8 @@ export default function AdminGyms() {
                 social: { instagram: '', twitter: '' },
                 latitude: '',
                 longitude: '',
-                embed_map: ''
+                embed_map: '',
+                workingHours: {}
             });
         }
         setFormLang('ar');
@@ -651,6 +654,54 @@ export default function AdminGyms() {
                                                     placeholder="@captina_monsia"
                                                 />
                                             </div>
+                                        </div>
+
+                                        {/* Working Hours */}
+                                        <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-white/10">
+                                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1">
+                                                <span>⏰</span> {language === 'ar' ? 'أوقات العمل (حسب اليوم)' : 'Working Hours (Per Day)'}
+                                            </label>
+                                            {[
+                                                { key: 'sun', ar: 'الأحد', en: 'Sunday' },
+                                                { key: 'mon', ar: 'الاثنين', en: 'Monday' },
+                                                { key: 'tue', ar: 'الثلاثاء', en: 'Tuesday' },
+                                                { key: 'wed', ar: 'الأربعاء', en: 'Wednesday' },
+                                                { key: 'thu', ar: 'الخميس', en: 'Thursday' },
+                                                { key: 'fri', ar: 'الجمعة', en: 'Friday' },
+                                                { key: 'sat', ar: 'السبت', en: 'Saturday' },
+                                            ].map(({ key, ar: dayAr, en: dayEn }) => {
+                                                const dayHours = formData.workingHours?.[key] || { open: '', close: '', closed: false };
+                                                return (
+                                                    <div key={key} className="grid grid-cols-[100px_1fr_1fr_auto] gap-2 items-center">
+                                                        <span className="text-xs font-black text-gray-700 dark:text-gray-300">
+                                                            {language === 'ar' ? dayAr : dayEn}
+                                                        </span>
+                                                        <input
+                                                            type="time"
+                                                            value={dayHours.open || ''}
+                                                            disabled={dayHours.closed}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, workingHours: { ...prev.workingHours, [key]: { ...dayHours, open: e.target.value } } }))}
+                                                            className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl py-2 px-3 text-xs font-bold dark:text-white outline-none focus:border-emerald-500 disabled:opacity-40"
+                                                        />
+                                                        <input
+                                                            type="time"
+                                                            value={dayHours.close || ''}
+                                                            disabled={dayHours.closed}
+                                                            onChange={(e) => setFormData(prev => ({ ...prev, workingHours: { ...prev.workingHours, [key]: { ...dayHours, close: e.target.value } } }))}
+                                                            className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl py-2 px-3 text-xs font-bold dark:text-white outline-none focus:border-emerald-500 disabled:opacity-40"
+                                                        />
+                                                        <label className="flex items-center gap-1 cursor-pointer select-none">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={!!dayHours.closed}
+                                                                onChange={(e) => setFormData(prev => ({ ...prev, workingHours: { ...prev.workingHours, [key]: { ...dayHours, closed: e.target.checked } } }))}
+                                                                className="accent-primary"
+                                                            />
+                                                            <span className="text-[9px] font-black text-gray-400 uppercase">{language === 'ar' ? 'مغلق' : 'Closed'}</span>
+                                                        </label>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
                                         {/* Sports Selection (Dropdown) */}

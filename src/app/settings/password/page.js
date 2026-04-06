@@ -13,9 +13,14 @@ import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function ChangePassword() {
-    const { language, t, darkMode } = useApp();
+    const { language, t, darkMode } = useApp() || { language: 'ar', t: (s) => s, darkMode: false };
     const router = useRouter();
     const [user, loadingAuth] = useAuthState(auth);
+    const [mounted, setMounted] = useState(false);
+    
+    useEffect(() => {
+        setMounted(true);
+    }, []);
     
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -74,7 +79,7 @@ export default function ChangePassword() {
         }
     };
 
-    if (loadingAuth) {
+    if (!mounted || loadingAuth) {
         return (
             <div className={`min-h-screen ${darkMode ? 'bg-[#0a0f1a]' : 'bg-slate-50'} flex items-center justify-center`}>
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
