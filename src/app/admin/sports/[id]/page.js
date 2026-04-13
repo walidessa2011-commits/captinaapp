@@ -1,6 +1,7 @@
 import AdminSportEdit from './AdminSportEdit';
+import { fetchFirestoreIds } from '@/lib/buildHelpers';
 
-const SPORT_IDS = [
+const FALLBACK = [
     'new',
     'taekwondo', 'boxing', 'karate', 'general',
     'kick-boxing', 'kickboxing', 'bodybuilding', 'crossfit',
@@ -8,14 +9,20 @@ const SPORT_IDS = [
     'mma', 'self-defense', 'selfdefense', 'jiu-jitsu', 'jiujitsu',
     'yoga', 'swimming', 'basketball', 'football', 'volleyball',
     'tennis', 'padel', 'running', 'cycling', 'gymnastics',
-    // Legacy / mis-typed IDs already in Firestore
     'teakwondow', '-fitness-tarining',
     '1', '2', '3', '4', '5',
 ];
 
-export const generateStaticParams = () => SPORT_IDS.map(id => ({ id }));
+export const dynamicParams = false;
+
+export async function generateStaticParams() {
+    const ids = await fetchFirestoreIds('sports', FALLBACK);
+    // Always include 'new' for create-new route
+    const all = Array.from(new Set(['new', ...ids]));
+    return all.map(id => ({ id: String(id) }));
+}
 
 export default async function Page({ params }) {
-  const resolvedParams = await params;
-  return <AdminSportEdit params={resolvedParams} />;
+    const resolvedParams = await params;
+    return <AdminSportEdit params={resolvedParams} />;
 }

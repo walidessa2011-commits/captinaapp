@@ -1,23 +1,19 @@
 import ProductDetails from './ProductDetails';
+import { fetchFirestoreIds } from '@/lib/buildHelpers';
 
-export const generateStaticParams = async () => {
-    // These IDs are fetched from Firestore collections to satisfy 'output: export' requirements.
-    return [
-        { id: '1eV8EAj9bpFqLwTf6JSf' },
-        { id: '7rTMr8RGKOPC5TxkYRyG' },
-        { id: 'Med6emfd9nxn9WjbCgEB' },
-        { id: 'MkmN387xmvhfRFRshzvV' },
-        { id: 'i3ULWpdF6h9QpUeJwInj' },
-        { id: 'mD9ly4jvgSHeGWbmH3vm' },
-        { id: 'q14PGJh2rVuhAsWfBZln' },
-        { id: 'protein-powder' },
-        { id: 'creatine-monohydrate' },
-        { id: 'shaker-bottle' },
-        { id: 'gym-gloves' },
-        { id: 'whey-protein' },
-        { id: 'resistance-bands' },
-    ];
-};
+const FALLBACK = [
+    '1eV8EAj9bpFqLwTf6JSf', '7rTMr8RGKOPC5TxkYRyG', 'Med6emfd9nxn9WjbCgEB',
+    'MkmN387xmvhfRFRshzvV', 'i3ULWpdF6h9QpUeJwInj', 'mD9ly4jvgSHeGWbmH3vm',
+    'q14PGJh2rVuhAsWfBZln', 'protein-powder', 'creatine-monohydrate',
+    'shaker-bottle', 'gym-gloves', 'whey-protein', 'resistance-bands',
+];
+
+export const dynamicParams = false;
+
+export async function generateStaticParams() {
+    const ids = await fetchFirestoreIds('products', FALLBACK);
+    return ids.map(id => ({ id: String(id) }));
+}
 
 export default async function Page({ params }) {
     const resolvedParams = await params;

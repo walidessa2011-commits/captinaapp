@@ -1,7 +1,8 @@
 import CategoryVideos from './CategoryVideos';
 
-export const generateStaticParams = async () => {
-    // These categories are fetched from Firestore collections to satisfy 'output: export' requirements.
+export const dynamicParams = false;
+
+export async function generateStaticParams() {
     return [
         { category: 'educational' },
         { category: 'trainees' },
@@ -11,7 +12,7 @@ export const generateStaticParams = async () => {
         { category: 'combat' },
         { category: 'fitness' },
     ];
-};
+}
 
 export default async function Page({ params }) {
     const resolvedParams = await params;
