@@ -3,14 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --primary: #ff0000; /* Pure Red */
+  --primary: #ff0000;
   --primary-rgb: 255, 0, 0;
   --primary-light: #ff3333;
   --secondary: #ff8c00;
-  --background: #ffffff; /* Pure White */
-  --foreground: #020617; /* Dark slate */
+  --background: #ffffff;
+  --foreground: #020617;
   --card: #ffffff;
   --border: #f1f5f9;
+
+  /* Safe area insets for PWA / notched phones */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
 }
 
 .dark {
@@ -27,6 +33,41 @@ body {
   color: var(--foreground);
   overflow-x: hidden;
   letter-spacing: -0.01em;
+  /* Prevent bounce scroll on iOS */
+  overscroll-behavior: none;
+}
+
+/* ── Safe-area utilities ────────────────────────────── */
+.pt-safe  { padding-top: var(--sat); }
+.pb-safe  { padding-bottom: var(--sab); }
+.pl-safe  { padding-left: var(--sal); }
+.pr-safe  { padding-right: var(--sar); }
+.mb-safe  { margin-bottom: var(--sab); }
+
+/* Header accounts for status bar */
+.header-safe {
+  padding-top: var(--sat);
+}
+
+/* Bottom nav clears the home indicator */
+.nav-safe {
+  padding-bottom: calc(var(--sab) + 0.5rem);
+}
+
+/* ── Mobile performance ─────────────────────────────── */
+/* Reduce heavy blur on low-end devices */
+@media (max-width: 640px) {
+  .backdrop-blur-xl   { backdrop-filter: blur(8px);  -webkit-backdrop-filter: blur(8px); }
+  .backdrop-blur-2xl  { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .backdrop-blur-3xl  { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  /* Disable heavy fixed backgrounds on mobile */
+  .fixed.pointer-events-none .animate-pulse { animation: none; }
+}
+
+/* GPU-accelerate scroll containers */
+.no-scrollbar, [class*="overflow-x-auto"], [class*="overflow-y-auto"] {
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
 }
 
 .glass-card {

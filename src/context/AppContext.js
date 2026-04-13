@@ -113,95 +113,90 @@ export function AppProvider({ children }) {
     const toggleFavoriteTrainer = (id) => setFavoriteTrainers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     const toggleFavoriteSport = (id) => setFavoriteSports(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-    // DOMAIN DATA FETCHERS & SEEDERS
+    // DOMAIN DATA — one-time fetch for static collections, snapshot only for live data
     useEffect(() => {
-        const unsubs = [];
-        const lang = language; // stable reference
+        const lang = language;
 
-        const setupListener = (coll, setter, loadingSetter, initialData = [], transform) => {
-            return onSnapshot(collection(db, coll), async (snap) => {
-                try {
-                    if (snap.empty && initialData.length > 0) {
-                        // Background seeding with stable IDs
-                        initialData.forEach(async (item) => {
-                            const { id, ...data } = item;
-                            if (id) await setDoc(doc(db, coll, id), data);
-                            else await addDoc(collection(db, coll), data);
-                        });
-                    } else if (!snap.empty) {
-                        const data = snap.docs.map(doc => {
-                            const d = doc.data();
-                            return transform ? transform(doc.id, d) : { id: doc.id, ...d };
-                        });
-                        setter(data);
-                    }
-                } catch (e) { console.error(`Error in ${coll}:`, e); }
-                finally { if (loadingSetter) loadingSetter(false); }
-            });
+        // Helper: seed collection if empty, then set state
+        const fetchStatic = async (coll, setter, loadingSetter, initialData = [], transform) => {
+            try {
+                const snap = await getDocs(collection(db, coll));
+                if (snap.empty && initialData.length > 0) {
+                    await Promise.all(initialData.map(item => {
+                        const { id, ...data } = item;
+                        return id ? setDoc(doc(db, coll, id), data) : addDoc(collection(db, coll), data);
+                    }));
+                    setter(initialData);
+                } else if (!snap.empty) {
+                    setter(snap.docs.map(d => transform ? transform(d.id, d.data()) : { id: d.id, ...d.data() }));
+                }
+            } catch (e) { console.error(`Error fetching ${coll}:`, e); }
+            finally { if (loadingSetter) loadingSetter(false); }
         };
 
-        // 1. Gyms
-        unsubs.push(setupListener("gyms", setGyms, setLoadingGyms, initialGyms));
-        
-        // 2. Packages
-        unsubs.push(setupListener("packages", setPackages, setLoadingPackages, initialPackages, (id, d) => ({
+        // Static collections — single read, no persistent socket
+        fetchStatic("gyms",     setGyms,     setLoadingGyms,     initialGyms);
+        fetchStatic("packages", setPackages, setLoadingPackages, initialPackages, (id, d) => ({
             id, ...d,
             name: getValue(d, 'name', lang),
             description: getValue(d, 'description', lang),
             features: lang === 'ar' ? (d.features_ar || []) : (d.features_en || [])
-        })));
-
-        // 3. Trainers
-        unsubs.push(setupListener("trainers", setTrainers, setLoadingTrainers, initialTrainers));
-
-        // 4. Sports
-        unsubs.push(setupListener("sports", setSports, setLoadingSports, initialSports, (id, d) => ({
-            id, ...d,
-            name: getValue(d, 'name', lang)
-        })));
-
-        // 5. Offers
-        unsubs.push(setupListener("offers", setOffers, setLoadingOffers, initialOffers, (id, d) => ({
-            id, ...d,
-            title: getValue(d, 'title', lang),
-            subtitle: getValue(d, 'subtitle', lang) || getValue(d, 'desc', lang),
-            badge: getValue(d, 'badge', lang) || (lang === 'ar' ? 'عرض خاص' : 'Special Offer')
-        })));
-
-        // 6. Products
-        unsubs.push(setupListener("products", setProducts, setLoadingProducts, initialProducts, (id, d) => ({
+        }));
+        fetchStatic("trainers", setTrainers, setLoadingTrainers, initialTrainers);
+        fetchStatic("sports",   setSports,   setLoadingSports,   initialSports, (id, d) => ({
+            id, ...d, name: getValue(d, 'name', lang)
+        }));
+        fetchStatic("products", setProducts, setLoadingProducts, initialProducts, (id, d) => ({
             id, ...d,
             name: getValue(d, 'name', lang),
             category: getValue(d, 'category', lang),
             description: getValue(d, 'description', lang) || getValue(d, 'desc', lang)
-        })));
+        }));
+        fetchStatic("tasks", setTasks, setLoadingTasks, initialTasks, (id, d) => ({
+            id, ...d, title: getValue(d, 'title', lang), time: getValue(d, 'time', lang)
+        }));
+        fetchStatic("goals", setGoals, setLoadingGoals, initialGoals, (id, d) => ({
+            id, ...d, text: getValue(d, 'text', lang), sub: getValue(d, 'sub', lang)
+        }));
 
-        // 7. Tasks
-        unsubs.push(setupListener("tasks", setTasks, setLoadingTasks, initialTasks, (id, d) => ({
-            id, ...d,
-            title: getValue(d, 'title', lang),
-            time: getValue(d, 'time', lang)
-        })));
+        // Offers — realtime (admin updates frequently)
+        const offerUnsub = onSnapshot(collection(db, "offers"), async (snap) => {
+            if (snap.empty && initialOffers.length > 0) {
+                await Promise.all(initialOffers.map(item => {
+                    const { id, ...data } = item;
+                    return id ? setDoc(doc(db, "offers", id), data) : addDoc(collection(db, "offers"), data);
+                }));
+                setOffers(initialOffers);
+            } else if (!snap.empty) {
+                setOffers(snap.docs.map(d => {
+                    const data = d.data();
+                    return {
+                        id: d.id, ...data,
+                        title: getValue(data, 'title', lang),
+                        subtitle: getValue(data, 'subtitle', lang) || getValue(data, 'desc', lang),
+                        badge: getValue(data, 'badge', lang) || (lang === 'ar' ? 'عرض خاص' : 'Special Offer')
+                    };
+                }));
+            }
+            setLoadingOffers(false);
+        });
 
-        // 8. Goals
-        unsubs.push(setupListener("goals", setGoals, setLoadingGoals, initialGoals, (id, d) => ({
-            id, ...d,
-            text: getValue(d, 'text', lang),
-            sub: getValue(d, 'sub', lang)
-        })));
-
-        // 9. Subscriptions
+        // Subscriptions — realtime (user-specific)
+        let subUnsub = null;
         if (user) {
             const q = query(collection(db, "subscriptions"), where("userId", "==", user.uid), orderBy("createdAt", "desc"), limit(1));
-            unsubs.push(onSnapshot(q, (snap) => {
+            subUnsub = onSnapshot(q, (snap) => {
                 setActiveSubscription(!snap.empty ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null);
                 setLoadingSubscription(false);
-            }));
+            });
         } else {
             setLoadingSubscription(false);
         }
 
-        return () => unsubs.forEach(unsub => unsub?.());
+        return () => {
+            offerUnsub();
+            if (subUnsub) subUnsub();
+        };
     }, [user, language]);
 
     // SETTINGS & CONTENT LISTENER
